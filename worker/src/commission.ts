@@ -1,6 +1,7 @@
 // Commission requests: emails the request to the shop and a confirmation to the client (via Resend).
 
-import { json, logEvent } from "./util.js";
+import { json, logEvent, errMsg } from "./util.ts";
+import type { Env } from "./types.ts";
 
 const RESEND_URL = "https://api.resend.com/emails";
 const TYPES = ["Dice vault", "Game set or box", "Dice", "Engraving on an existing design", "Something else"];
@@ -10,28 +11,50 @@ const MAX_PER_HOUR = 5;
 // Stricter than the browser check: one @, no spaces, a dotted domain with a 2+ letter ending.
 const EMAIL_RE = /^[^\s@<>(),;:"]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
 
-export const isEmail = (s) => typeof s === "string" && s.length <= LIMITS.email && EMAIL_RE.test(s) && !s.includes("..");
+export interface CommissionData {
+  name: string;
+  email: string;
+  type: string;
+  idea: string;
+  when: string;
+  budget: string;
+}
 
-const oneLine = (v, max) => String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
+interface Email {
+  from: string;
+  to: string[];
+  reply_to: string;
+  subject: string;
+  text: string;
+}
 
-export function parseCommission(body) {
-  const b = body && typeof body === "object" ? body : {};
-  const data = {
+// An Env with the email settings filled in.
+type MailEnv = Env & Required<Pick<Env, "RESEND_API_KEY" | "EMAIL_FROM" | "COMMISSION_TO">>;
+const mailReady = (env: Env): env is MailEnv => !!(env.RESEND_API_KEY && env.EMAIL_FROM && env.COMMISSION_TO);
+
+export const isEmail = (s: unknown): s is string =>
+  typeof s === "string" && s.length <= LIMITS.email && EMAIL_RE.test(s) && !s.includes("..");
+
+const oneLine = (v: unknown, max: number) => String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
+
+export function parseCommission(body: unknown) {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data: CommissionData = {
     name: oneLine(b.name, LIMITS.name),
     email: oneLine(b.email, LIMITS.email),
-    type: TYPES.includes(b.type) ? b.type : "Something else",
+    type: typeof b.type === "string" && TYPES.includes(b.type) ? b.type : "Something else",
     idea: String(b.idea ?? "").trim().slice(0, LIMITS.idea),
     when: oneLine(b.when, LIMITS.when),
     budget: oneLine(b.budget, LIMITS.budget)
   };
-  const missing = [];
+  const missing: string[] = [];
   if (!data.name) missing.push("your name");
   if (!isEmail(data.email)) missing.push("a valid email");
   if (!data.idea) missing.push("a description of your idea");
   return { data, missing };
 }
 
-function summary(d) {
+function summary(d: CommissionData) {
   return [
     `Name: ${d.name}`,
     `Email: ${d.email}`,
@@ -43,7 +66,7 @@ function summary(d) {
   ].filter((l, i) => l !== "" || i === 5).join("\n");
 }
 
-export function buildEmails(env, d) {
+export function buildEmails(env: MailEnv, d: CommissionData): { shop: Email; client: Email } {
   const shop = env.COMMISSION_TO;
   return {
     shop: {
@@ -68,7 +91,7 @@ export function buildEmails(env, d) {
   };
 }
 
-async function send(env, message) {
+async function send(env: MailEnv, message: Email) {
   const res = await fetch(RESEND_URL, {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
@@ -78,7 +101,7 @@ async function send(env, message) {
 }
 
 // Each request emails an address the visitor typed, so cap how many one visitor can send.
-async function overLimit(env, request) {
+async function overLimit(env: Env, request: Request) {
   if (!env.GC_KV) return false;
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
   const key = `commission:rate:${ip}:${Math.floor(Date.now() / 3600000)}`;
@@ -88,9 +111,9 @@ async function overLimit(env, request) {
   return false;
 }
 
-export async function commission(request, env) {
-  let body;
-  try { body = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
+export async function commission(request: Request, env: Env) {
+  let body: Record<string, unknown> | null;
+  try { body = (await request.json()) as Record<string, unknown> | null; } catch { return json({ error: "Invalid request." }, 400); }
 
   // Hidden field real visitors never fill in. Pretend it worked so bots don't retry.
   if (body && body.website) return json({ ok: true, confirmationSent: true });
@@ -98,7 +121,7 @@ export async function commission(request, env) {
   const { data, missing } = parseCommission(body);
   if (missing.length) return json({ error: `Add ${missing.join(", ")} to send the request.`, missing }, 400);
 
-  if (!env.RESEND_API_KEY || !env.EMAIL_FROM || !env.COMMISSION_TO) {
+  if (!mailReady(env)) {
     await logEvent(env, "Commission email is not set up (RESEND_API_KEY, EMAIL_FROM, COMMISSION_TO)");
     return json({ error: "The form can't send right now. Email me directly instead." }, 503);
   }
@@ -110,7 +133,7 @@ export async function commission(request, env) {
   try {
     await send(env, emails.shop);
   } catch (e) {
-    await logEvent(env, "Commission request failed to send", { error: e.message });
+    await logEvent(env, "Commission request failed to send", { error: errMsg(e) });
     return json({ error: "The request didn't send. Try again, or email me directly." }, 502);
   }
 
@@ -120,7 +143,7 @@ export async function commission(request, env) {
     await send(env, emails.client);
   } catch (e) {
     confirmationSent = false;
-    await logEvent(env, "Commission confirmation to client failed", { to: data.email, error: e.message });
+    await logEvent(env, "Commission confirmation to client failed", { to: data.email, error: errMsg(e) });
   }
   return json({ ok: true, confirmationSent });
 }

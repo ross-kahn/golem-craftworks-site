@@ -1,15 +1,24 @@
 // Etsy Open API v3: OAuth (PKCE), listings, inventory, receipts, webhook verification.
-import { hmacSha256Base64, base64ToBytes, base64Url, enc8, safeEqual } from "./util.js";
+import { hmacSha256Base64, base64ToBytes, base64Url, enc8, safeEqual } from "./util.ts";
+import type { Env, EtsyInventory, EtsyListing, EtsyReceipt, EtsyTokens } from "./types.ts";
 
 const API = "https://openapi.etsy.com/v3/application";
 const TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
 const SCOPES = "listings_r listings_w transactions_r";
 
-const apiKey = (env) => `${env.ETSY_KEYSTRING}:${env.ETSY_SHARED_SECRET}`;
+interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number | string;
+  error?: string;
+  error_description?: string;
+}
+
+const apiKey = (env: Env) => `${env.ETSY_KEYSTRING}:${env.ETSY_SHARED_SECRET}`;
 
 // ---------- OAuth ----------
 
-export async function startEtsyAuth(env, redirectUri) {
+export async function startEtsyAuth(env: Env, redirectUri: string) {
   const verifierBytes = crypto.getRandomValues(new Uint8Array(48));
   const verifier = base64Url(verifierBytes);
   const challenge = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", enc8(verifier))));
@@ -28,7 +37,7 @@ export async function startEtsyAuth(env, redirectUri) {
   return u.toString();
 }
 
-export async function finishEtsyAuth(env, { code, state, redirectUri }) {
+export async function finishEtsyAuth(env: Env, { code, state, redirectUri }: { code: string; state: string; redirectUri: string }) {
   const verifier = await env.GC_KV.get(`etsy:pkce:${state}`);
   if (!verifier) throw new Error("This sign-in link expired. Start again from /admin/etsy/connect.");
   const tokens = await tokenRequest({
@@ -42,27 +51,28 @@ export async function finishEtsyAuth(env, { code, state, redirectUri }) {
   await env.GC_KV.delete(`etsy:pkce:${state}`);
 }
 
-async function tokenRequest(params) {
+async function tokenRequest(params: Record<string, string>) {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString()
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok) throw new Error(`Etsy token request failed (${res.status}) ${data.error || ""} ${data.error_description || ""}`);
   return data;
 }
 
-async function saveTokens(env, t) {
-  await env.GC_KV.put("etsy:tokens", JSON.stringify({
+async function saveTokens(env: Env, t: TokenResponse) {
+  const tokens: EtsyTokens = {
     access_token: t.access_token,
     refresh_token: t.refresh_token,
     expires_at: Date.now() + (Number(t.expires_in) || 3600) * 1000
-  }));
+  };
+  await env.GC_KV.put("etsy:tokens", JSON.stringify(tokens));
 }
 
-export async function etsyAccessToken(env) {
-  const t = await env.GC_KV.get("etsy:tokens", "json");
+export async function etsyAccessToken(env: Env) {
+  const t = await env.GC_KV.get<EtsyTokens>("etsy:tokens", "json");
   if (!t) throw new Error("Etsy is not connected yet. Visit /admin/etsy/connect.");
   if (Date.now() < t.expires_at - 5 * 60 * 1000) return t.access_token;
   const fresh = await tokenRequest({
@@ -76,26 +86,31 @@ export async function etsyAccessToken(env) {
 
 // ---------- API calls ----------
 
-export async function etsy(env, pathOrUrl, { method = "GET", json, form } = {}) {
+export async function etsy<T>(
+  env: Env,
+  pathOrUrl: string,
+  { method = "GET", json, form }: { method?: string; json?: unknown; form?: Record<string, string> } = {}
+): Promise<T> {
   const token = await etsyAccessToken(env);
   const url = pathOrUrl.startsWith("http") ? pathOrUrl : API + pathOrUrl;
-  const headers = { "x-api-key": apiKey(env), authorization: `Bearer ${token}` };
-  let body;
+  const headers: Record<string, string> = { "x-api-key": apiKey(env), authorization: `Bearer ${token}` };
+  let body: string | undefined;
   if (json) { headers["content-type"] = "application/json"; body = JSON.stringify(json); }
   if (form) { headers["content-type"] = "application/x-www-form-urlencoded"; body = new URLSearchParams(form).toString(); }
   const res = await fetch(url, { method, headers, body });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(`Etsy ${method} ${url.replace(API, "")} failed (${res.status}) ${data.error || JSON.stringify(data).slice(0, 300)}`);
   return data;
 }
 
 // All shop listings we might need to sync, with their SKUs and quantities.
-export async function fetchShopListings(env, states = ["active", "inactive", "sold_out"]) {
-  const out = [];
+export async function fetchShopListings(env: Env, states = ["active", "inactive", "sold_out"]) {
+  const out: EtsyListing[] = [];
   for (const state of states) {
     let offset = 0;
     for (;;) {
-      const data = await etsy(env, `/shops/${env.ETSY_SHOP_ID}/listings?state=${state}&limit=100&offset=${offset}`);
+      const data = await etsy<{ results?: EtsyListing[]; count?: number }>(
+        env, `/shops/${env.ETSY_SHOP_ID}/listings?state=${state}&limit=100&offset=${offset}`);
       (data.results || []).forEach((l) => out.push(l));
       offset += 100;
       if (!data.results || data.results.length < 100 || offset >= (data.count || 0)) break;
@@ -105,25 +120,25 @@ export async function fetchShopListings(env, states = ["active", "inactive", "so
 }
 
 // sku -> listing_id. Listings whose products have SKUs set in Etsy.
-export function buildEtsySkuMap(listings) {
-  const map = {};
+export function buildEtsySkuMap(listings: EtsyListing[]) {
+  const map: Record<string, number> = {};
   for (const l of listings) for (const sku of l.skus || []) if (sku) map[sku.trim()] = l.listing_id;
   return map;
 }
 
-export const getListing = (env, id) => etsy(env, `/listings/${id}`);
-export const getInventory = (env, id) => etsy(env, `/listings/${id}/inventory`);
+export const getListing = (env: Env, id: number) => etsy<EtsyListing>(env, `/listings/${id}`);
+export const getInventory = (env: Env, id: number) => etsy<EtsyInventory>(env, `/listings/${id}/inventory`);
 
-export const setListingState = (env, id, state) =>
-  etsy(env, `/shops/${env.ETSY_SHOP_ID}/listings/${id}`, { method: "PATCH", form: { state } });
+export const setListingState = (env: Env, id: number, state: string) =>
+  etsy<EtsyListing>(env, `/shops/${env.ETSY_SHOP_ID}/listings/${id}`, { method: "PATCH", form: { state } });
 
 // Etsy's inventory GET returns read-only fields and price objects that its PUT rejects.
-export function inventoryForPut(inv, changes /* Map(sku -> qty) */) {
+export function inventoryForPut(inv: EtsyInventory, changes: Map<string, number> /* sku -> qty */) {
   return {
     products: inv.products.filter((p) => !p.is_deleted).map((p) => {
       const sku = (p.sku || "").trim();
-      const has = changes.has(sku);
-      const qty = has ? changes.get(sku) : null;
+      const qty = changes.get(sku);
+      const has = qty !== undefined;
       return {
         sku: p.sku || "",
         property_values: (p.property_values || []).map((pv) => ({
@@ -146,16 +161,18 @@ export function inventoryForPut(inv, changes /* Map(sku -> qty) */) {
   };
 }
 
-export const putInventory = (env, id, body) => etsy(env, `/listings/${id}/inventory`, { method: "PUT", json: body });
+export const putInventory = (env: Env, id: number, body: unknown) =>
+  etsy<unknown>(env, `/listings/${id}/inventory`, { method: "PUT", json: body });
 
-export async function recentPaidReceipts(env, sinceSeconds) {
-  const data = await etsy(env, `/shops/${env.ETSY_SHOP_ID}/receipts?was_paid=true&min_created=${sinceSeconds}&limit=100`);
+export async function recentPaidReceipts(env: Env, sinceSeconds: number) {
+  const data = await etsy<{ results?: EtsyReceipt[] }>(
+    env, `/shops/${env.ETSY_SHOP_ID}/receipts?was_paid=true&min_created=${sinceSeconds}&limit=100`);
   return data.results || [];
 }
 
 // ---------- Webhooks ----------
 // Etsy signs: base64(HMAC-SHA256(base64decode(secret without "whsec_"), id + "." + timestamp + "." + body))
-export async function verifyEtsySignature(env, request, rawBody) {
+export async function verifyEtsySignature(env: Env, request: Request, rawBody: string) {
   const id = request.headers.get("webhook-id");
   const ts = request.headers.get("webhook-timestamp");
   const sigHeader = request.headers.get("webhook-signature");

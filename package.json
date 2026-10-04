@@ -1,0 +1,20 @@
+{
+  "name": "golem-craftworks-site",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "build": "node node_modules/typescript/lib/tsc.js -p site",
+    "watch": "node node_modules/typescript/lib/tsc.js -p site --watch",
+    "typecheck": "node node_modules/typescript/lib/tsc.js -b site worker tools",
+    "test": "node --test worker/test/*.test.ts",
+    "dev": "node node_modules/wrangler/bin/wrangler.js dev --cwd worker",
+    "deploy": "node node_modules/wrangler/bin/wrangler.js deploy --cwd worker"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5",
+    "@types/node": "^22",
+    "typescript": "^6.0.3",
+    "wrangler": "^4"
+  }
+}

@@ -9,17 +9,18 @@
 //   GET  /admin/etsy/connect    one-time Etsy sign-in (needs ?token=)
 //   cron (hourly)               safety check + Etsy token refresh
 
-import * as square from "./square.js";
-import * as etsyApi from "./etsy.js";
-import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.js";
-import { commission } from "./commission.js";
-import { json, corsHeaders, safeEqual, logEvent } from "./util.js";
+import * as square from "./square.ts";
+import * as etsyApi from "./etsy.ts";
+import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.ts";
+import { commission } from "./commission.ts";
+import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
+import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent } from "./types.ts";
 
 const PRODUCTS_CACHE_KEY = "https://cache.golemcraftworks.internal/products";
 const PRODUCTS_TTL = 60;
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
     const url = new URL(request.url);
     const cors = corsHeaders(env, request);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -34,24 +35,24 @@ export default {
       if (url.pathname === "/") return json({ ok: true, service: "golem-craftworks" });
       return json({ error: "Not found" }, 404);
     } catch (e) {
-      await logEvent(env, "Request failed", { path: url.pathname, error: e.message });
+      await logEvent(env, "Request failed", { path: url.pathname, error: errMsg(e) });
       return withCors(json({ error: "Something went wrong on our side. Try again in a minute." }, 500), cors);
     }
   },
 
-  async scheduled(event, env, ctx) {
+  async scheduled(_event: unknown, env: Env, ctx: Ctx): Promise<void> {
     ctx.waitUntil((async () => {
       try {
         await etsyApi.etsyAccessToken(env); // keeps the 90-day refresh token alive
         await reconcile(env);
       } catch (e) {
-        await logEvent(env, "Hourly check failed", { error: e.message });
+        await logEvent(env, "Hourly check failed", { error: errMsg(e) });
       }
     })());
   }
 };
 
-function withCors(res, cors) {
+function withCors(res: Response, cors: Record<string, string>) {
   const r = new Response(res.body, res);
   Object.entries(cors).forEach(([k, v]) => r.headers.set(k, v));
   return r;
@@ -59,7 +60,7 @@ function withCors(res, cors) {
 
 // ---------- Storefront ----------
 
-async function products(env, ctx) {
+async function products(env: Env, ctx: Ctx) {
   const cache = caches.default;
   const hit = await cache.match(PRODUCTS_CACHE_KEY);
   if (hit) return hit;
@@ -75,11 +76,16 @@ async function products(env, ctx) {
 
 const purgeProducts = () => caches.default.delete(PRODUCTS_CACHE_KEY);
 
-async function checkout(request, env) {
-  let body;
-  try { body = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
+interface CheckoutBody {
+  lines?: { variationId?: unknown; qty?: unknown }[];
+  fulfillment?: unknown;
+}
+
+async function checkout(request: Request, env: Env) {
+  let body: CheckoutBody;
+  try { body = (await request.json()) as CheckoutBody; } catch { return json({ error: "Invalid request." }, 400); }
   const raw = Array.isArray(body.lines) ? body.lines : [];
-  const merged = new Map();
+  const merged = new Map<string, number>();
   for (const l of raw) {
     const qty = Math.floor(Number(l.qty));
     if (typeof l.variationId !== "string" || !(qty > 0)) continue;
@@ -93,8 +99,8 @@ async function checkout(request, env) {
   const found = new Map(variations.map((v) => [v.id, v]));
   const counts = await square.fetchCounts(env, ids);
 
-  const soldOut = [];
-  const lines = [];
+  const soldOut: string[] = [];
+  const lines: { variationId: string; qty: number }[] = [];
   for (const [id, qty] of merged) {
     const v = found.get(id);
     const d = v && v.item_variation_data;
@@ -117,10 +123,10 @@ async function checkout(request, env) {
 
 // ---------- Webhooks ----------
 
-async function squareWebhook(request, env, ctx) {
+async function squareWebhook(request: Request, env: Env, ctx: Ctx) {
   const raw = await request.text();
   if (!(await square.verifySquareSignature(env, request, raw))) return json({ error: "Bad signature" }, 401);
-  const event = JSON.parse(raw);
+  const event: SquareWebhookEvent = JSON.parse(raw);
   if (event.event_id) {
     const key = `square:event:${event.event_id}`;
     if (await env.GC_KV.get(key)) return json({ ok: true, duplicate: true });
@@ -130,7 +136,7 @@ async function squareWebhook(request, env, ctx) {
     ctx.waitUntil((async () => {
       await purgeProducts();
       try { await handleSquareInventoryEvent(env, event); }
-      catch (e) { await logEvent(env, "Square webhook handling failed", { error: e.message }); }
+      catch (e) { await logEvent(env, "Square webhook handling failed", { error: errMsg(e) }); }
     })());
   } else if (event.type && event.type.startsWith("catalog.")) {
     ctx.waitUntil(purgeProducts());
@@ -138,20 +144,20 @@ async function squareWebhook(request, env, ctx) {
   return json({ ok: true });
 }
 
-async function etsyWebhook(request, env, ctx) {
+async function etsyWebhook(request: Request, env: Env, ctx: Ctx) {
   const raw = await request.text();
   if (!(await etsyApi.verifyEtsySignature(env, request, raw))) return json({ error: "Bad signature" }, 401);
-  const event = JSON.parse(raw);
+  const event: EtsyWebhookEvent = JSON.parse(raw);
   ctx.waitUntil((async () => {
     try { await handleEtsyEvent(env, event); }
-    catch (e) { await logEvent(env, "Etsy webhook handling failed (the hourly check will retry)", { error: e.message }); }
+    catch (e) { await logEvent(env, "Etsy webhook handling failed (the hourly check will retry)", { error: errMsg(e) }); }
   })());
   return json({ ok: true });
 }
 
 // ---------- Admin ----------
 
-async function admin(request, env, url) {
+async function admin(request: Request, env: Env, url: URL) {
   const token = url.searchParams.get("token") || "";
   const isCallback = url.pathname === "/admin/etsy/callback"; // Etsy can't pass our token; PKCE state protects it
   if (!isCallback && !(env.ADMIN_TOKEN && safeEqual(token, env.ADMIN_TOKEN))) return json({ error: "Not found" }, 404);
@@ -169,16 +175,16 @@ async function admin(request, env, url) {
     await logEvent(env, "Etsy connected");
     let shopLine = "";
     try {
-      const me = await etsyApi.etsy(env, "/users/me");
+      const me = await etsyApi.etsy<{ shop_id?: number }>(env, "/users/me");
       if (me.shop_id) shopLine = `<p>Your Etsy shop ID is <strong>${me.shop_id}</strong>. Put it in ETSY_SHOP_ID in wrangler.toml if you haven't yet.</p>`;
     } catch { /* not critical */ }
     return html(`<p>Etsy is connected. You can close this tab.</p>${shopLine}`);
   }
   if (url.pathname === "/admin/status") {
     const [last, log, tokens] = await Promise.all([
-      env.GC_KV.get("status:last-reconcile", "json"),
-      env.GC_KV.get("log", "json"),
-      env.GC_KV.get("etsy:tokens", "json")
+      env.GC_KV.get<ReconcileReport>("status:last-reconcile", "json"),
+      env.GC_KV.get<LogLine[]>("log", "json"),
+      env.GC_KV.get<EtsyTokens>("etsy:tokens", "json")
     ]);
     return json({
       etsyConnected: !!tokens,
@@ -193,7 +199,7 @@ async function admin(request, env, url) {
   return json({ error: "Not found" }, 404);
 }
 
-function html(message, status = 200) {
+function html(message: string, status = 200) {
   return new Response(
     `<!doctype html><meta name="viewport" content="width=device-width"><title>Golem Craftworks</title>` +
     `<body style="font:18px system-ui;padding:40px;max-width:40ch">${message}</body>`,

@@ -1,23 +1,25 @@
-// Run with: node --test test/
+// Run with: npm test
 // Exercises the Worker against fake Square and Etsy APIs (no network, no real accounts).
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 
-import worker from "../src/index.js";
-import * as square from "../src/square.js";
-import { pushToEtsy, recordEtsyReceipt, reconcile, handleSquareInventoryEvent } from "../src/sync.js";
+import worker from "../src/index.ts";
+import * as square from "../src/square.ts";
+import { pushToEtsy, recordEtsyReceipt, reconcile } from "../src/sync.ts";
+import type { Env, LogLine } from "../src/types.ts";
 
 // ---------- fakes ----------
 class KV {
-  constructor() { this.m = new Map(); }
-  async get(k, type) { const v = this.m.get(k); if (v === undefined) return null; return type === "json" ? JSON.parse(v) : v; }
-  async put(k, v) { this.m.set(k, v); }
-  async delete(k) { this.m.delete(k); }
+  m = new Map<string, string>();
+  async get(k: string, type?: string) { const v = this.m.get(k); if (v === undefined) return null; return type === "json" ? JSON.parse(v) : v; }
+  async put(k: string, v: string) { this.m.set(k, v); }
+  async delete(k: string) { this.m.delete(k); }
 }
-globalThis.caches = { default: { match: async () => null, put: async () => {}, delete: async () => true } };
+(globalThis as any).caches = { default: { match: async () => null, put: async () => {}, delete: async () => true } };
 
-let state, calls;
+// The fakes mirror raw API payloads, so they're left loosely typed.
+let state: any, calls: { method: string; url: string; body: any }[];
 const LOC = "LOC1";
 
 function freshState() {
@@ -54,16 +56,16 @@ function freshState() {
   };
 }
 
-function item(id, name, variations, { cat, image, archived } = {}) {
+function item(id: string, name: string, variations: object[], { cat, image, archived }: { cat?: string; image?: string; archived?: boolean } = {}) {
   return { id, type: "ITEM", updated_at: "2026-09-01T00:00:00Z", present_at_all_locations: true,
     item_data: { name, description_plaintext: `${name} description`, is_archived: !!archived,
       categories: cat ? [{ id: cat }] : [], image_ids: image ? [image] : [], variations } };
 }
-function variation(id, name, price, sku, track) {
+function variation(id: string, name: string, price: number, sku: string, track: boolean) {
   return { id, type: "ITEM_VARIATION", present_at_all_locations: true,
     item_variation_data: { name, sku, price_money: { amount: price, currency: "USD" }, pricing_type: "FIXED_PRICING", track_inventory: track } };
 }
-function inv(rows) {
+function inv(rows: [sku: string, qty: number, enabled: boolean, valueId?: number][]) {
   return {
     products: rows.map(([sku, qty, enabled, valueId], i) => ({
       product_id: 9000 + i, sku, is_deleted: false,
@@ -74,10 +76,10 @@ function inv(rows) {
   };
 }
 
-const ok = (body) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 
-globalThis.fetch = async (url, init = {}) => {
-  url = String(url);
+globalThis.fetch = (async (input: unknown, init: any = {}) => {
+  const url = String(input);
   const method = init.method || "GET";
   const body = init.body && init.headers && String(init.headers["content-type"]).includes("json") ? JSON.parse(init.body) : init.body;
   calls.push({ method, url, body });
@@ -86,18 +88,18 @@ globalThis.fetch = async (url, init = {}) => {
   if (url.endsWith("/v2/catalog/search")) {
     if (body.object_types[0] === "ITEM_VARIATION") {
       const sku = body.query.exact_query.attribute_value;
-      const v = state.catalog.flatMap((i) => i.item_data.variations).find((x) => x.item_variation_data.sku === sku);
+      const v = state.catalog.flatMap((i: any) => i.item_data.variations).find((x: any) => x.item_variation_data.sku === sku);
       return ok({ objects: v ? [v] : [] });
     }
     return ok({ objects: state.catalog, related_objects: state.related });
   }
   if (url.endsWith("/v2/catalog/batch-retrieve")) {
-    const all = state.catalog.flatMap((i) => i.item_data.variations);
-    return ok({ objects: all.filter((v) => body.object_ids.includes(v.id)) });
+    const all = state.catalog.flatMap((i: any) => i.item_data.variations);
+    return ok({ objects: all.filter((v: any) => body.object_ids.includes(v.id)) });
   }
   if (url.endsWith("/v2/inventory/counts/batch-retrieve")) {
-    return ok({ counts: body.catalog_object_ids.filter((id) => id in state.counts)
-      .map((id) => ({ catalog_object_id: id, location_id: LOC, state: "IN_STOCK", quantity: String(state.counts[id]) })) });
+    return ok({ counts: body.catalog_object_ids.filter((id: string) => id in state.counts)
+      .map((id: string) => ({ catalog_object_id: id, location_id: LOC, state: "IN_STOCK", quantity: String(state.counts[id]) })) });
   }
   if (url.endsWith("/v2/inventory/changes/batch-create")) {
     state.squareAdjustments.push(body);
@@ -113,9 +115,9 @@ globalThis.fetch = async (url, init = {}) => {
   // ---- Etsy ----
   if (url.includes("openapi.etsy.com")) {
     assert.equal(init.headers["x-api-key"], "KEY:SECRET");
-    let m;
+    let m: RegExpMatchArray | null;
     if ((m = url.match(/\/shops\/\d+\/listings\?state=(\w+)/))) {
-      return ok({ count: 0, results: Object.values(state.listings).filter((l) => l.state === m[1]) });
+      return ok({ count: 0, results: Object.values(state.listings).filter((l: any) => l.state === m![1]) });
     }
     if ((m = url.match(/\/listings\/(\d+)\/inventory$/))) {
       if (method === "PUT") { state.inventories[m[1]] = { ...state.inventories[m[1]], put: body }; return ok({}); }
@@ -131,13 +133,13 @@ globalThis.fetch = async (url, init = {}) => {
     if (url.includes("/receipts?")) return ok({ results: state.receipts });
   }
   throw new Error("Unexpected fetch " + method + " " + url);
-};
+}) as typeof fetch;
 
-function makeEnv(extra = {}) {
+function makeEnv(extra: Partial<Env> = {}): Env {
   const kv = new KV();
   kv.m.set("etsy:tokens", JSON.stringify({ access_token: "AT", refresh_token: "RT", expires_at: Date.now() + 3600e3 }));
   return {
-    GC_KV: kv, SQUARE_ACCESS_TOKEN: "sq", SQUARE_LOCATION_ID: LOC, SQUARE_ENV: "sandbox",
+    GC_KV: kv as unknown as KVNamespace, SQUARE_ACCESS_TOKEN: "sq", SQUARE_LOCATION_ID: LOC, SQUARE_ENV: "sandbox",
     SQUARE_WEBHOOK_SIGNATURE_KEY: "sigkey", SQUARE_WEBHOOK_URL: "https://w.example/webhooks/square",
     ETSY_KEYSTRING: "KEY", ETSY_SHARED_SECRET: "SECRET", ETSY_SHOP_ID: "55",
     ETSY_WEBHOOK_SECRET: "whsec_" + Buffer.from("etsy-secret-bytes").toString("base64"),
@@ -146,7 +148,7 @@ function makeEnv(extra = {}) {
     SYNC_DRY_RUN: "false", ...extra
   };
 }
-const ctx = () => { const p = []; return { waitUntil: (x) => p.push(x), done: () => Promise.all(p) }; };
+const ctx = () => { const p: Promise<unknown>[] = []; return { waitUntil: (x: Promise<unknown>) => { p.push(x); }, done: () => Promise.all(p) }; };
 
 beforeEach(() => { state = freshState(); calls = []; });
 
@@ -155,7 +157,7 @@ beforeEach(() => { state = freshState(); calls = []; });
 test("storefront: hides archived and hidden-category items, keeps stock and untracked items", async () => {
   const { products, skuMap, tracked } = await square.buildStorefront(makeEnv());
   assert.deepEqual(products.map((p) => p.name).sort(), ["Ember dice set", "Yahtzee set"]);
-  const yz = products.find((p) => p.id === "I_YZ");
+  const yz = products.find((p) => p.id === "I_YZ")!;
   assert.equal(yz.category, "Game sets");
   assert.deepEqual(yz.images, ["https://img/yz.jpg"]);
   assert.deepEqual(yz.variations.map((v) => [v.name, v.qty, v.priceCents]), [["Walnut", 3, 6500], ["Cherry", 0, 6000]]);
@@ -176,12 +178,12 @@ test("Square -> Etsy: variation sells out, offering disabled and read-only field
   const r = await pushToEtsy(env, "YZ-CHE", 0);
   assert.deepEqual(r.plan, ["set-quantity"]);
   const put = state.inventories[202].put;
-  const che = put.products.find((p) => p.sku === "YZ-CHE");
+  const che = put.products.find((p: any) => p.sku === "YZ-CHE");
   assert.deepEqual(che.offerings, [{ price: 65, quantity: 0, is_enabled: false }]);
   assert.equal("product_id" in che, false);
   assert.equal("offering_id" in che.offerings[0], false);
   assert.deepEqual(che.property_values[0].value_ids, [514]);
-  const wal = put.products.find((p) => p.sku === "YZ-WAL");
+  const wal = put.products.find((p: any) => p.sku === "YZ-WAL");
   assert.deepEqual(wal.offerings, [{ price: 65, quantity: 3, is_enabled: true }], "other variations untouched");
   assert.deepEqual(put.quantity_on_property, [200]);
 });
@@ -205,8 +207,8 @@ test("dry run changes nothing", async () => {
   const r = await pushToEtsy(env, "DICE-1", 0);
   assert.equal(r.dryRun, true);
   assert.equal(state.listings[101].state, "active");
-  const log = await env.GC_KV.get("log", "json");
-  assert.match(log[0].message, /DRY RUN/);
+  const log = await env.GC_KV.get<LogLine[]>("log", "json");
+  assert.match(log![0].message, /DRY RUN/);
 });
 
 test("Etsy -> Square: sale recorded once even if delivered twice", async () => {
@@ -277,17 +279,17 @@ test("hourly check: catches a missed Etsy sale, lowers Etsy, never raises, ignor
 
 test("checkout: blocks sold items and builds a Square link with shipping and taxes", async () => {
   const env = makeEnv();
-  const post = (b) => worker.fetch(new Request("https://w.example/api/checkout", {
+  const post = (b: unknown) => worker.fetch(new Request("https://w.example/api/checkout", {
     method: "POST", body: JSON.stringify(b), headers: { "content-type": "application/json", origin: "https://golemcraftworks.com" } }), env, ctx());
 
   const sold = await post({ lines: [{ variationId: "V_CHE", qty: 1 }], fulfillment: "ship" });
   assert.equal(sold.status, 409);
-  assert.deepEqual((await sold.json()).soldOut, ["V_CHE"]);
+  assert.deepEqual(((await sold.json()) as any).soldOut, ["V_CHE"]);
 
   const okRes = await post({ lines: [{ variationId: "V_WAL", qty: 2 }, { variationId: "V_DICE", qty: 1 }], fulfillment: "ship" });
   assert.equal(okRes.status, 200);
   assert.equal(okRes.headers.get("access-control-allow-origin"), "https://golemcraftworks.com");
-  assert.equal((await okRes.json()).url, "https://square.link/u/abc");
+  assert.equal(((await okRes.json()) as any).url, "https://square.link/u/abc");
   const link = state.paymentLinks[0];
   assert.deepEqual(link.order.line_items, [{ catalog_object_id: "V_WAL", quantity: "2" }, { catalog_object_id: "V_DICE", quantity: "1" }]);
   assert.equal(link.order.pricing_options.auto_apply_taxes, true);
@@ -309,5 +311,5 @@ test("admin endpoints require the token", async () => {
   assert.equal(no.status, 404);
   const yes = await worker.fetch(new Request("https://w.example/admin/status?token=admintoken"), env, ctx());
   assert.equal(yes.status, 200);
-  assert.equal((await yes.json()).etsyConnected, true);
+  assert.equal(((await yes.json()) as any).etsyConnected, true);
 });

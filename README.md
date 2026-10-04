@@ -8,11 +8,12 @@ site/      The website. Static files for GitHub Pages.
   product/              Product page  (/product/?id=...)
   about/  commissions/  thanks/   Content pages
   styles/main.css       All styling
-  js/config.js          The only file you need to edit for a basic launch
-  js/                   Shop, product, cart and form scripts
+  ts/config.ts          The only file you need to edit for a basic launch
+  ts/                   Shop, product, cart and form scripts (TypeScript source)
+  js/                   Built from ts/ by `npm run build`. Don't edit by hand.
   assets/               Logo, favicon, hero golem
   data/demo-products.json   Sample products used until the Worker is connected
-worker/    Cloudflare Worker (Square + Etsy logic, keeps your API keys secret)
+worker/    Cloudflare Worker in TypeScript (Square + Etsy logic, keeps your API keys secret)
 tools/     One-time helper to copy Etsy photos into Square
 ```
 
@@ -64,8 +65,8 @@ Until step 3 below is done, the site runs in demo mode with sample products and 
 ## 3. Deploy the Worker (free Cloudflare plan)
 
 ```bash
+npm install                                   # once, in the project folder
 cd worker
-npm install
 npx wrangler login
 npx wrangler kv namespace create GC_KV        # paste the id into wrangler.toml
 npx wrangler secret put SQUARE_ACCESS_TOKEN
@@ -77,7 +78,7 @@ npx wrangler secret put ADMIN_TOKEN           # any long random string, keep it 
 npx wrangler deploy
 ```
 
-Then in `site/js/config.js` set `apiBase` to the Worker URL (`https://golem-craftworks.<your-subdomain>.workers.dev`), and set your email, Instagram and Etsy links.
+Then in `site/ts/config.ts` set `apiBase` to the Worker URL (`https://golem-craftworks.<your-subdomain>.workers.dev`), set your email, Instagram and Etsy links, and run `npm run build`.
 
 `SQUARE_WEBHOOK_URL` in wrangler.toml must exactly match the URL you gave Square, or webhook signatures won't verify.
 
@@ -106,8 +107,8 @@ To run the hourly check on demand: `curl -X POST "https://.../admin/reconcile?to
 Your dice photos live on Etsy. To copy them into Square (so Square holds everything the site shows):
 
 ```bash
-SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.mjs EtsyListingsDownload.csv          # preview
-SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.mjs EtsyListingsDownload.csv --apply  # upload
+SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.ts EtsyListingsDownload.csv          # preview
+SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.ts EtsyListingsDownload.csv --apply  # upload
 ```
 
 It matches by SKU, then by exact title, skips Square items that already have photos, and lists any Etsy listings it couldn't match.
@@ -116,7 +117,7 @@ It matches by SKU, then by exact title, skips Square items that already have pho
 
 - **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute. If you also want it on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.
 - **Hide something from the website** (market-only items): put it in a Square category and add that category name to `HIDDEN_CATEGORIES`.
-- **Change shipping:** `SHIPPING_FLAT_CENTS` in wrangler.toml (what's charged) and `shippingCents` in `site/js/config.js` (what the cart shows).
+- **Change shipping:** `SHIPPING_FLAT_CENTS` in wrangler.toml (what's charged) and `shippingCents` in `site/ts/config.ts` (what the cart shows; run `npm run build` after).
 
 ## Known limits
 
@@ -144,7 +145,18 @@ Each visitor is limited to 5 requests an hour. Failures show up in `/admin/statu
 
 ## Developing
 
+Everything is TypeScript. Needs Node 22.18 or newer. Run these from the project folder:
+
 ```bash
+npm install          # once
+npm run build        # site/ts/*.ts -> site/js/*.js (the pages load the js/ files)
+npm run watch        # same, rebuilding as you edit
+npm run typecheck    # type-check the site, the Worker and tools/
+npm test             # Worker tests against fake Square/Etsy APIs
+npm run deploy       # wrangler deploy (it compiles the Worker's TypeScript itself)
 cd site && python3 -m http.server 8000     # http://localhost:8000 (demo mode)
-cd worker && npm test                      # Worker tests against fake Square/Etsy APIs
 ```
+
+The built `site/js/` files are committed, because GitHub Pages serves the folder as it is. After changing anything in `site/ts/`, run `npm run build` and commit both.
+
+**Network share:** this project sits on `\openmediavault`, which doesn't allow running programs stored on it. Building, type-checking and tests work there. `npm run deploy` and `npm run dev` do not, because Wrangler's bundler is a program inside `node_modules`. Run those from a copy on a local disk, or allow execution on the share.

@@ -1,0 +1,16 @@
+{
+  // Compiles ts/*.ts to js/*.js, one file each. The pages load the js/ files with plain <script> tags.
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ES2020",
+    "rootDir": "ts",
+    "outDir": "js",
+    "types": [],
+    "strict": true,
+    "noEmitOnError": true,
+    "newLine": "lf",
+    "skipLibCheck": true
+  },
+  "include": ["ts"]
+}

@@ -1,28 +1,30 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { commission, isEmail, parseCommission } from "../src/commission.js";
+import { commission, isEmail, parseCommission } from "../src/commission.ts";
+import type { Env } from "../src/types.ts";
 
-const env = () => ({
+const env = (extra: object = {}) => ({
   RESEND_API_KEY: "re_test",
   EMAIL_FROM: "Golem Craftworks <commissions@golemcraftworks.com>",
   COMMISSION_TO: "golemcraftworks@gmail.com",
-  SITE_URL: "https://golemcraftworks.com"
-});
+  SITE_URL: "https://golemcraftworks.com",
+  ...extra
+}) as Env;
 
-const post = (body) => new Request("https://worker.test/api/commission", {
+const post = (body: unknown) => new Request("https://worker.test/api/commission", {
   method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
 });
 
 const valid = { name: "Jane Doe", email: "jane@example.com", type: "Dice vault", idea: "Walnut vault with initials." };
 
-function fakeResend(failFor) {
-  const sent = [];
-  globalThis.fetch = async (url, opts) => {
+function fakeResend(failFor?: string) {
+  const sent: any[] = [];
+  globalThis.fetch = (async (_url: unknown, opts: { body: string }) => {
     const msg = JSON.parse(opts.body);
     if (failFor && msg.to[0] === failFor) return new Response("nope", { status: 422 });
     sent.push(msg);
     return new Response(JSON.stringify({ id: "x" }), { status: 200 });
-  };
+  }) as unknown as typeof fetch;
   return sent;
 }
 
@@ -83,8 +85,8 @@ test("honeypot submissions send nothing", async () => {
 
 test("limits requests per visitor", async () => {
   fakeResend();
-  const store = new Map();
-  const e = { ...env(), GC_KV: { get: async (k) => store.get(k) ?? null, put: async (k, v) => { store.set(k, v); } } };
+  const store = new Map<string, string>();
+  const e = env({ GC_KV: { get: async (k: string) => store.get(k) ?? null, put: async (k: string, v: string) => { store.set(k, v); } } });
   for (let i = 0; i < 5; i++) assert.equal((await commission(post(valid), e)).status, 200);
   assert.equal((await commission(post(valid), e)).status, 429);
 });

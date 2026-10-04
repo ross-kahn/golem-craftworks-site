@@ -6,11 +6,23 @@
 // Skips Square items that already have photos. Dry run unless you pass --apply.
 //
 // Usage:
-//   SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.mjs EtsyListingsDownload.csv            # preview
-//   SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.mjs EtsyListingsDownload.csv --apply    # upload
+//   SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.ts EtsyListingsDownload.csv            # preview
+//   SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.ts EtsyListingsDownload.csv --apply    # upload
 // Options: --max-images=5   --sandbox   --include-items-with-photos
 
 import { readFileSync } from "node:fs";
+
+// The parts of a Square catalog item this script reads.
+interface SquareItem {
+  id: string;
+  is_deleted?: boolean;
+  item_data: {
+    name: string;
+    is_archived?: boolean;
+    image_ids?: string[];
+    variations?: { item_variation_data?: { sku?: string } }[];
+  };
+}
 
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith("--"));
@@ -23,13 +35,13 @@ const BASE = SANDBOX ? "https://connect.squareupsandbox.com" : "https://connect.
 const VERSION = process.env.SQUARE_VERSION || "2025-01-23";
 
 if (!file || !TOKEN) {
-  console.error("Usage: SQUARE_ACCESS_TOKEN=... node tools/import-etsy-images.mjs <etsy-export.csv> [--apply]");
+  console.error("Usage: SQUARE_ACCESS_TOKEN=... node tools/import-etsy-images.ts <etsy-export.csv> [--apply]");
   process.exit(1);
 }
 
 // Minimal RFC 4180 CSV parser (handles quotes, commas and newlines inside fields).
-function parseCSV(text) {
-  const rows = []; let row = []; let field = ""; let q = false;
+function parseCSV(text: string): Record<string, string>[] {
+  const rows: string[][] = []; let row: string[] = []; let field = ""; let q = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (q) {
@@ -49,22 +61,22 @@ function parseCSV(text) {
   return body.map((r) => Object.fromEntries(keys.map((k, i) => [k, (r[i] || "").trim()])));
 }
 
-const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const norm = (s: string | undefined) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-async function sq(path, init = {}) {
+async function sq<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(BASE + path, {
     ...init,
     headers: { authorization: `Bearer ${TOKEN}`, "square-version": VERSION, ...(init.headers || {}) }
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as T & { errors?: unknown };
   if (!res.ok) throw new Error(`${path}: ${res.status} ${JSON.stringify(data.errors || data)}`);
   return data;
 }
 
 async function squareItems() {
-  const items = []; let cursor;
+  const items: SquareItem[] = []; let cursor: string | undefined;
   do {
-    const d = await sq("/v2/catalog/search", {
+    const d = await sq<{ objects?: SquareItem[]; cursor?: string }>("/v2/catalog/search", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ object_types: ["ITEM"], cursor, limit: 1000 })
     });
@@ -73,7 +85,7 @@ async function squareItems() {
   return items.filter((i) => !i.is_deleted && !i.item_data?.is_archived);
 }
 
-async function uploadImage(itemId, url, name, isPrimary) {
+async function uploadImage(itemId: string, url: string, name: string, isPrimary: boolean) {
   const img = await fetch(url);
   if (!img.ok) throw new Error(`download failed ${img.status}`);
   const type = img.headers.get("content-type") || "image/jpeg";
@@ -85,13 +97,13 @@ async function uploadImage(itemId, url, name, isPrimary) {
     is_primary: isPrimary,
     image: { type: "IMAGE", id: "#etsy_image", image_data: { name } }
   })], { type: "application/json" }));
-  form.append("image_file", blob, url.split("/").pop().split("?")[0] || "photo.jpg");
+  form.append("image_file", blob, url.split("/").pop()!.split("?")[0] || "photo.jpg");
   return sq("/v2/catalog/images", { method: "POST", body: form });
 }
 
 const rows = parseCSV(readFileSync(file, "utf8"));
 const items = await squareItems();
-const bySku = new Map(); const byTitle = new Map();
+const bySku = new Map<string, SquareItem>(); const byTitle = new Map<string, SquareItem>();
 for (const it of items) {
   byTitle.set(norm(it.item_data.name), it);
   for (const v of it.item_data.variations || []) {
@@ -99,7 +111,7 @@ for (const it of items) {
   }
 }
 
-let planned = 0; const unmatched = []; const skippedHasPhotos = [];
+let planned = 0; const unmatched: string[] = []; const skippedHasPhotos: string[] = [];
 for (const r of rows) {
   const skus = (r.SKU || "").split(",").map((s) => s.trim()).filter(Boolean);
   const item = skus.map((s) => bySku.get(s)).find(Boolean) || byTitle.get(norm(r.TITLE));
@@ -112,7 +124,7 @@ for (const r of rows) {
     planned++;
     if (!APPLY) continue;
     try { await uploadImage(item.id, u, `${item.item_data.name} ${i + 1}`, i === 0); }
-    catch (e) { console.log(`   ! ${u}: ${e.message}`); }
+    catch (e) { console.log(`   ! ${u}: ${e instanceof Error ? e.message : e}`); }
   }
 }
 
