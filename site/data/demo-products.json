@@ -1,0 +1,179 @@
+{
+ "products": [
+  {
+   "id": "demo-yahtzee",
+   "name": "Yahtzee set",
+   "category": "Game sets",
+   "optionLabel": "Wood",
+   "description": "A hardwood box that holds five dice, a pencil and a score pad, with a lid that doubles as a dice tray.\n\nSample description. Your real description comes from Square.",
+   "images": [],
+   "variations": [
+    {
+     "id": "y-walnut",
+     "name": "Walnut",
+     "priceCents": 6500,
+     "qty": 4,
+     "sku": "YZ-WAL"
+    },
+    {
+     "id": "y-cherry",
+     "name": "Cherry",
+     "priceCents": 6000,
+     "qty": 2,
+     "sku": "YZ-CHE"
+    },
+    {
+     "id": "y-maple",
+     "name": "Maple",
+     "priceCents": 5500,
+     "qty": 0,
+     "sku": "YZ-MAP"
+    },
+    {
+     "id": "y-padauk",
+     "name": "Padauk",
+     "priceCents": 7000,
+     "qty": 1,
+     "sku": "YZ-PAD"
+    }
+   ]
+  },
+  {
+   "id": "demo-vault-walnut",
+   "name": "Hex dice vault",
+   "category": "Dice vaults",
+   "optionLabel": "Wood",
+   "description": "Holds a full seven-piece set in a magnetic-lid hexagon vault.",
+   "images": [],
+   "variations": [
+    {
+     "id": "dv-wal",
+     "name": "Walnut",
+     "priceCents": 4000,
+     "qty": 6,
+     "sku": "DV-HEX-WAL"
+    },
+    {
+     "id": "dv-map",
+     "name": "Maple",
+     "priceCents": 3600,
+     "qty": 5,
+     "sku": "DV-HEX-MAP"
+    }
+   ]
+  },
+  {
+   "id": "demo-dice-ember",
+   "name": "Ember, sharp-edge resin set",
+   "category": "Dice",
+   "description": "Seven-piece set poured and hand-sanded. One of a kind.",
+   "images": [],
+   "variations": [
+    {
+     "id": "d1",
+     "name": "Default",
+     "priceCents": 4500,
+     "qty": 1,
+     "sku": "DICE-0412"
+    }
+   ]
+  },
+  {
+   "id": "demo-dice-moss",
+   "name": "Moss and walnut d20",
+   "category": "Dice",
+   "description": "A single wooden-core d20. One of a kind.",
+   "images": [],
+   "variations": [
+    {
+     "id": "d2",
+     "name": "Default",
+     "priceCents": 3200,
+     "qty": 1,
+     "sku": "DICE-0415"
+    }
+   ]
+  },
+  {
+   "id": "demo-dice-frost",
+   "name": "Frost, seven-piece set",
+   "category": "Dice",
+   "description": "One of a kind.",
+   "images": [],
+   "variations": [
+    {
+     "id": "d3",
+     "name": "Default",
+     "priceCents": 5200,
+     "qty": 0,
+     "sku": "DICE-0398"
+    }
+   ]
+  },
+  {
+   "id": "demo-dice-night",
+   "name": "Night sky, seven-piece set",
+   "category": "Dice",
+   "description": "One of a kind.",
+   "images": [],
+   "variations": [
+    {
+     "id": "d4",
+     "name": "Default",
+     "priceCents": 4800,
+     "qty": 1,
+     "sku": "DICE-0420"
+    }
+   ]
+  },
+  {
+   "id": "demo-tower",
+   "name": "Golem dice tower",
+   "category": "3D prints",
+   "optionLabel": "Color",
+   "description": "Printed in PLA. Folds flat for travel.",
+   "images": [],
+   "variations": [
+    {
+     "id": "t-blk",
+     "name": "Black",
+     "priceCents": 2800,
+     "qty": 5,
+     "sku": "TWR-BLK"
+    },
+    {
+     "id": "t-wht",
+     "name": "White",
+     "priceCents": 2800,
+     "qty": 3,
+     "sku": "TWR-WHT"
+    },
+    {
+     "id": "t-stn",
+     "name": "Stone grey",
+     "priceCents": 2800,
+     "qty": 2,
+     "sku": "TWR-GRY"
+    }
+   ]
+  },
+  {
+   "id": "demo-tray",
+   "name": "Rolling tray with leather floor",
+   "category": "Dice vaults",
+   "optionLabel": "Wood",
+   "description": "Sample product.",
+   "images": [],
+   "variations": [
+    {
+     "id": "tr-wal",
+     "name": "Walnut",
+     "priceCents": 5500,
+     "qty": 2,
+     "sku": "TRAY-WAL"
+    }
+   ]
+  }
+ ],
+ "demo": true
+}

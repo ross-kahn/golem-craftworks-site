@@ -1,0 +1,39 @@
+name = "golem-craftworks"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Hourly safety check (minute 7 to stay off the top of the hour).
+[triggers]
+crons = ["7 * * * *"]
+
+# Create with:  npx wrangler kv namespace create GC_KV   then paste the id here.
+[[kv_namespaces]]
+binding = "GC_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+SITE_URL = "https://golemcraftworks.com"
+ALLOWED_ORIGINS = "https://golemcraftworks.com,https://www.golemcraftworks.com"
+SQUARE_ENV = "production"            # "sandbox" while testing
+SQUARE_LOCATION_ID = "REPLACE_ME"
+SQUARE_WEBHOOK_URL = "https://golem-craftworks.YOUR-SUBDOMAIN.workers.dev/webhooks/square"
+ETSY_KEYSTRING = "REPLACE_ME"
+ETSY_SHOP_ID = "REPLACE_ME"
+SHIPPING_FLAT_CENTS = "800"
+# Optional: only list items in these Square categories online (comma-separated). Empty = everything.
+ONLINE_CATEGORIES = ""
+# Optional: never list items in these Square categories online (e.g. "Market only").
+HIDDEN_CATEGORIES = ""
+# Start with "true": the Worker logs what it WOULD change on Etsy/Square without changing anything.
+SYNC_DRY_RUN = "true"
+# Commission form emails (sent through Resend). EMAIL_FROM must be on a domain verified in Resend.
+EMAIL_FROM = "Golem Craftworks <commissions@golemcraftworks.com>"
+COMMISSION_TO = "golemcraftworks@gmail.com"
+
+# Secrets (set with `npx wrangler secret put NAME`, never put them in this file):
+#   SQUARE_ACCESS_TOKEN
+#   SQUARE_WEBHOOK_SIGNATURE_KEY
+#   ETSY_SHARED_SECRET
+#   ETSY_WEBHOOK_SECRET
+#   ADMIN_TOKEN
+#   RESEND_API_KEY
