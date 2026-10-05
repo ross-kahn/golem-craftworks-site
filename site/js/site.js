@@ -6,10 +6,13 @@
     const root = api.siteRoot();
     const CART_KEY = "gc-cart-v2";
     const FULFIL_KEY = "gc-fulfillment";
+    const THEME_KEY = "gc-theme"; // also read by theme.ts
     const icons = {
         bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1 13H6L5 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
         menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/></svg>',
-        close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+        close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+        moon: '<svg class="when-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+        sun: '<svg class="when-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
     };
     const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESCAPES[c]);
@@ -86,6 +89,18 @@
         },
         clear() { writeCart([]); }
     };
+    // ---------- Theme ----------
+    // theme.ts picks the starting theme in <head>; this flips it and remembers the choice.
+    // The switch names the theme it leads to; CSS shows the half that applies.
+    const themeLabel = '<span class="when-light">Dark mode</span><span class="when-dark">Light mode</span>';
+    function toggleTheme() {
+        const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        try {
+            localStorage.setItem(THEME_KEY, next);
+        }
+        catch (_) { }
+    }
     // ---------- Chrome ----------
     function header(active) {
         const link = (href, label, key) => `<a href="${href}"${active === key ? ' aria-current="page"' : ""}>${label}</a>`;
@@ -102,6 +117,9 @@
           <span class="brand__name">${esc(cfg.shopName)}</span>
         </a>
         <nav class="nav" aria-label="Main">${links}</nav>
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle>
+          ${icons.moon}${icons.sun}<span class="visually-hidden">${themeLabel}</span>
+        </button>
         <button class="cart-btn" type="button" data-open-cart aria-haspopup="dialog">
           ${icons.bag}<span class="visually-hidden">Cart,</span>
           <span class="cart-btn__count" data-cart-count data-empty="true">0</span>
@@ -111,7 +129,9 @@
           ${icons.menu}<span class="visually-hidden">Menu</span>
         </button>
       </div>
-      <nav class="mobile-nav" id="mobile-nav" aria-label="Main">${links}</nav>`;
+      <nav class="mobile-nav" id="mobile-nav" aria-label="Main">${links}
+        <button type="button" data-theme-toggle>${icons.moon}${icons.sun}${themeLabel}</button>
+      </nav>`;
     }
     function footer() {
         const year = new Date().getFullYear();
@@ -338,11 +358,13 @@
         document.body.insertAdjacentHTML("beforeend", drawerShell());
         renderCount();
         document.addEventListener("click", (e) => {
-            const t = e.target.closest("[data-open-cart],[data-close-cart],[data-menu],[data-inc],[data-dec],[data-remove],[data-checkout]");
+            const t = e.target.closest("[data-open-cart],[data-close-cart],[data-menu],[data-theme-toggle],[data-inc],[data-dec],[data-remove],[data-checkout]");
             if (!t)
                 return;
             if (t.hasAttribute("data-open-cart"))
                 openCart();
+            else if (t.hasAttribute("data-theme-toggle"))
+                toggleTheme();
             else if (t.hasAttribute("data-close-cart")) {
                 if (t.tagName !== "A")
                     e.preventDefault();
