@@ -62,6 +62,40 @@ export interface SquareItemData {
   reporting_category?: { id?: string };
   image_ids?: string[];
   variations?: SquareObject[];
+  modifier_list_info?: SquareModifierListInfo[];
+}
+
+// How one item uses a modifier list. -1 (or missing) on min/max means "use the list's own setting".
+export interface SquareModifierListInfo {
+  modifier_list_id: string;
+  enabled?: boolean;
+  ordinal?: number;
+  min_selected_modifiers?: number;
+  max_selected_modifiers?: number;
+  modifier_overrides?: {
+    modifier_id: string;
+    on_by_default?: boolean; // older field
+    on_by_default_override?: string; // YES | NO | NOT_SET
+    hidden_online_override?: string;
+  }[];
+}
+
+export interface SquareModifierListData {
+  name?: string;
+  selection_type?: string; // SINGLE | MULTIPLE (older field)
+  modifier_type?: string; // LIST | TEXT
+  min_selected_modifiers?: number;
+  max_selected_modifiers?: number;
+  modifiers?: SquareObject[];
+}
+
+export interface SquareModifierData {
+  name?: string;
+  price_money?: SquareMoney;
+  on_by_default?: boolean;
+  hidden_online?: boolean;
+  ordinal?: number;
+  location_overrides?: { location_id: string; price_money?: SquareMoney; sold_out?: boolean }[];
 }
 
 export interface SquareObject {
@@ -76,6 +110,8 @@ export interface SquareObject {
   item_variation_data?: SquareVariationData;
   category_data?: { name?: string };
   image_data?: { url?: string };
+  modifier_list_data?: SquareModifierListData;
+  modifier_data?: SquareModifierData;
 }
 
 export interface SquareCount {
@@ -100,6 +136,22 @@ export interface StorefrontVariation {
   qty: number | null; // null: Square isn't counting stock for it
 }
 
+export interface StorefrontModifier {
+  id: string;
+  name: string;
+  priceCents: number;
+  default: boolean; // selected when the product page opens
+}
+
+// A group of add-ons the buyer picks from: at least `min`, at most `max`.
+export interface StorefrontModifierList {
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  modifiers: StorefrontModifier[];
+}
+
 export interface StorefrontProduct {
   id: string;
   name: string;
@@ -107,6 +159,7 @@ export interface StorefrontProduct {
   category: string;
   images: string[];
   variations: StorefrontVariation[];
+  modifierLists: StorefrontModifierList[];
   updatedAt?: string;
 }
 

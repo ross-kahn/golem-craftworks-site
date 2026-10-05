@@ -36,6 +36,22 @@
      "qty": 1,
      "sku": "YZ-PAD"
     }
+   ],
+   "modifierLists": [
+    {
+     "id": "demo-dice",
+     "name": "Dice",
+     "min": 0,
+     "max": 1,
+     "modifiers": [
+      {
+       "id": "demo-handmade",
+       "name": "Handmade dice",
+       "priceCents": 1500,
+       "default": true
+      }
+     ]
+    }
    ]
   },
   {

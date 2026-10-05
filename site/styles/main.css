@@ -336,6 +336,7 @@ p { margin: 0 0 1em; max-width: 66ch; }
 
 .picker { border: 0; padding: 0; margin: 0 0 24px; }
 .picker legend { font-family: var(--font-display); font-weight: 650; margin-bottom: 10px; padding: 0; }
+.picker__hint { color: var(--graphite); font-weight: 400; font-size: 0.85rem; margin-left: 6px; }
 .picker__options { display: flex; flex-wrap: wrap; gap: 8px; }
 .picker__option input { position: absolute; opacity: 0; pointer-events: none; }
 .picker__option span {

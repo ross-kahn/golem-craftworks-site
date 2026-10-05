@@ -2,7 +2,7 @@
 // Talks to the Cloudflare Worker (or demo data when no Worker is configured).
 (function () {
     const cfg = window.GC_CONFIG;
-    const CACHE_KEY = "gc-products-v1";
+    const CACHE_KEY = "gc-products-v2";
     const CACHE_MS = 60 * 1000;
     const isDemo = () => !cfg.apiBase;
     function siteRoot() {
@@ -53,14 +53,23 @@
         }));
         const totalAvailable = variations.reduce((n, v) => n + v.available, 0);
         const prices = variations.map((v) => v.priceCents).filter((n) => typeof n === "number");
+        const modifierLists = p.modifierLists || [];
+        // Add-ons move the price range: the cheapest required picks, and every paid extra allowed.
+        let minExtra = 0, maxExtra = 0;
+        modifierLists.forEach((l) => {
+            const byPrice = l.modifiers.map((m) => m.priceCents).sort((a, b) => a - b);
+            minExtra += byPrice.slice(0, l.min).reduce((n, c) => n + c, 0);
+            maxExtra += byPrice.slice(-l.max).reduce((n, c) => n + Math.max(0, c), 0);
+        });
         return {
             ...p,
             variations,
+            modifierLists,
             soldOut: totalAvailable === 0,
             // One-of-a-kind: a single variation with exactly one in stock, or flagged in Square.
             unique: p.unique === true || (variations.length === 1 && variations[0].qty === 1),
-            minPrice: prices.length ? Math.min(...prices) : null,
-            maxPrice: prices.length ? Math.max(...prices) : null
+            minPrice: prices.length ? Math.min(...prices) + minExtra : null,
+            maxPrice: prices.length ? Math.max(...prices) + maxExtra : null
         };
     }
     async function getProduct(id) {
@@ -77,7 +86,7 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                lines: lines.map((l) => ({ variationId: l.variationId, qty: l.qty })),
+                lines: lines.map((l) => ({ variationId: l.variationId, qty: l.qty, modifiers: l.modifiers.map((m) => m.id) })),
                 fulfillment
             })
         });

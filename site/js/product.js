@@ -25,6 +25,16 @@
             return { text: `${v.available} left`, cls: "" };
         return { text: "In stock", cls: "" };
     }
+    // What Square's min/max rules mean for the buyer, when it isn't obvious from the options.
+    function listHint(l) {
+        if (l.modifiers.length === 1)
+            return l.min ? "" : "Optional";
+        if (l.min === l.max)
+            return `Choose ${l.min}`;
+        if (l.min === 0)
+            return l.max === l.modifiers.length ? "Optional" : `Optional, up to ${l.max}`;
+        return l.max === l.modifiers.length ? `Choose at least ${l.min}` : `Choose ${l.min} to ${l.max}`;
+    }
     function render(p) {
         document.title = `${p.name} · Golem Craftworks`;
         const firstAvail = p.variations.find((v) => v.available > 0) || p.variations[0];
@@ -56,6 +66,17 @@
                   </label>`).join("")}
               </div>
             </fieldset>` : ""}
+          ${p.modifierLists.map((l) => `
+            <fieldset class="picker" data-list="${esc(l.id)}">
+              <legend>${esc(l.name)}${listHint(l) ? ` <small class="picker__hint">${listHint(l)}</small>` : ""}</legend>
+              <div class="picker__options">
+                ${l.modifiers.map((m) => `
+                  <label class="picker__option">
+                    <input type="${l.min === 1 && l.max === 1 ? "radio" : "checkbox"}" name="mod-${esc(l.id)}" value="${esc(m.id)}" ${m.default ? "checked" : ""}>
+                    <span>${esc(m.name)}${m.priceCents ? ` (${m.priceCents > 0 ? "+" : "−"}${api.money(Math.abs(m.priceCents))})` : ""}</span>
+                  </label>`).join("")}
+              </div>
+            </fieldset>`).join("")}
           <div class="product__buy">
             <button class="btn btn--block" type="button" data-add>Add to cart</button>
           </div>
@@ -72,31 +93,52 @@
         const priceEl = mount.querySelector("[data-price]");
         const stockEl = mount.querySelector("[data-stock]");
         const addBtn = mount.querySelector("[data-add]");
+        const checked = (l) => [...mount.querySelectorAll(`[name="mod-${CSS.escape(l.id)}"]:checked`)].map((i) => i.value);
+        const selected = () => p.modifierLists.flatMap((l) => l.modifiers.filter((m) => checked(l).includes(m.id)));
         function update() {
             const s = stockText(p, current);
-            priceEl.textContent = api.money(current.priceCents);
+            const mods = selected();
+            priceEl.textContent = api.money(current.priceCents + mods.reduce((n, m) => n + m.priceCents, 0));
             stockEl.textContent = s.text;
             stockEl.className = "product__stock " + s.cls;
-            const inCart = cart.lines().find((l) => l.variationId === current.id);
+            const inCart = cart.lines().reduce((n, l) => n + (l.variationId === current.id ? l.qty : 0), 0);
+            const short = p.modifierLists.find((l) => checked(l).length < l.min);
+            delete addBtn.dataset.view;
             if (current.available === 0) {
                 addBtn.disabled = true;
                 addBtn.textContent = "Sold";
             }
-            else if (inCart && inCart.qty >= current.available) {
+            else if (inCart >= current.available) {
                 addBtn.disabled = false;
                 addBtn.textContent = "In your cart · view cart";
                 addBtn.dataset.view = "1";
             }
+            else if (short) {
+                addBtn.disabled = true;
+                addBtn.textContent = `Choose ${short.name.toLowerCase()} to continue`;
+            }
             else {
                 addBtn.disabled = false;
                 addBtn.textContent = "Add to cart";
-                delete addBtn.dataset.view;
             }
         }
         mount.addEventListener("change", (e) => {
             const input = e.target;
             if (input.name === "variation") {
                 current = p.variations.find((v) => v.id === input.value) || current;
+                update();
+            }
+            const list = p.modifierLists.find((l) => input.name === `mod-${l.id}`);
+            if (list) {
+                // Past the limit: with one choice allowed the new pick replaces the old one, otherwise it's refused.
+                const over = checked(list).length > list.max;
+                if (over && list.max === 1) {
+                    mount.querySelectorAll(`[name="${CSS.escape(input.name)}"]`).forEach((i) => { i.checked = i === input; });
+                }
+                else if (over) {
+                    input.checked = false;
+                    toast(`Choose up to ${list.max}.`);
+                }
                 update();
             }
         });
@@ -113,7 +155,7 @@
                     openCart();
                     return;
                 }
-                const r = cart.add(p, current, 1);
+                const r = cart.add(p, current, 1, selected());
                 if (r.ok) {
                     toast(`Added ${p.name} to your cart`);
                     update();

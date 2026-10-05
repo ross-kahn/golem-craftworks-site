@@ -1,8 +1,8 @@
 // Square: catalog, inventory, checkout links, webhook verification.
 import { hmacSha256Base64, enc8, safeEqual } from "./util.ts";
-import type { Env, Fulfillment, SquareCount, SquareObject, StorefrontProduct } from "./types.ts";
+import type { Env, Fulfillment, SquareCount, SquareObject, StorefrontModifierList, StorefrontProduct } from "./types.ts";
 
-const DEFAULT_VERSION = "2025-01-23";
+const DEFAULT_VERSION = "2025-05-21"; // first version with the current modifier fields (defaults, min/max)
 
 interface SquareError {
   code: string;
@@ -106,6 +106,44 @@ function categoryNames(item: SquareObject, related: Map<string, SquareObject>) {
     .filter((name): name is string => !!name);
 }
 
+// The modifier lists on an item ("Handmade dice +$15"), with Square's min/max rules and default selections.
+// Item-level settings win over the list's own; text-entry lists are skipped.
+function modifierLists(item: SquareObject, related: Map<string, SquareObject>, locationId: string) {
+  const set = (n?: number) => (typeof n === "number" && n >= 0 ? n : undefined);
+  const lists: StorefrontModifierList[] = [];
+  const infos = [...(item.item_data?.modifier_list_info || [])].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0));
+  for (const info of infos) {
+    const list = related.get(info.modifier_list_id);
+    const ld = list?.modifier_list_data;
+    if (info.enabled === false || !list || !ld || list.is_deleted || ld.modifier_type === "TEXT") continue;
+    const overrides = new Map((info.modifier_overrides || []).map((o) => [o.modifier_id, o]));
+
+    const modifiers = (ld.modifiers || [])
+      .filter((m) => !m.is_deleted && presentHere(m, locationId))
+      .sort((a, b) => (a.modifier_data?.ordinal ?? 0) - (b.modifier_data?.ordinal ?? 0))
+      .flatMap((m) => {
+        const md = m.modifier_data || {};
+        const o = overrides.get(m.id);
+        const here = (md.location_overrides || []).find((l) => l.location_id === locationId);
+        const hidden = o?.hidden_online_override === "YES" || (o?.hidden_online_override !== "NO" && md.hidden_online === true);
+        if (hidden || here?.sold_out) return [];
+        const onByDefault = o?.on_by_default_override === "YES" || o?.on_by_default === true ||
+          (o?.on_by_default_override !== "NO" && md.on_by_default === true);
+        return [{ id: m.id, name: md.name || "", priceCents: Number((here?.price_money || md.price_money)?.amount || 0), default: onByDefault }];
+      });
+    if (!modifiers.length) continue;
+
+    // max 0 means no limit.
+    const maxSet = set(info.max_selected_modifiers) ?? set(ld.max_selected_modifiers) ?? (ld.selection_type === "SINGLE" ? 1 : 0);
+    const max = maxSet === 0 ? modifiers.length : Math.min(maxSet, modifiers.length);
+    const min = Math.min(set(info.min_selected_modifiers) ?? set(ld.min_selected_modifiers) ?? 0, max);
+    let on = 0;
+    modifiers.forEach((m) => { if (m.default && ++on > max) m.default = false; });
+    lists.push({ id: list.id, name: ld.name || "", min, max, modifiers });
+  }
+  return lists;
+}
+
 // Shape Square's catalog into what the storefront needs. Also returns a SKU map.
 export async function buildStorefront(env: Env) {
   const { items, related } = await fetchCatalog(env);
@@ -169,6 +207,7 @@ export async function buildStorefront(env: Env) {
       category: cats[0] || "",
       images,
       variations: vs,
+      modifierLists: modifierLists(item, related, loc),
       updatedAt: item.updated_at
     });
   }
@@ -234,7 +273,7 @@ export async function recordExternalSale(
 
 export async function createPaymentLink(
   env: Env,
-  { lines, fulfillment }: { lines: { variationId: string; qty: number }[]; fulfillment: Fulfillment }
+  { lines, fulfillment }: { lines: { variationId: string; qty: number; modifiers?: string[] }[]; fulfillment: Fulfillment }
 ) {
   const ship = fulfillment !== "pickup";
   const shippingCents = Number(env.SHIPPING_FLAT_CENTS || 0);
@@ -243,7 +282,11 @@ export async function createPaymentLink(
     idempotency_key: crypto.randomUUID(),
     order: {
       location_id: env.SQUARE_LOCATION_ID,
-      line_items: lines.map((l) => ({ catalog_object_id: l.variationId, quantity: String(l.qty) })),
+      line_items: lines.map((l) => ({
+        catalog_object_id: l.variationId,
+        quantity: String(l.qty),
+        ...(l.modifiers && l.modifiers.length ? { modifiers: l.modifiers.map((id) => ({ catalog_object_id: id })) } : {})
+      })),
       pricing_options: { auto_apply_taxes: true }
     },
     checkout_options: {

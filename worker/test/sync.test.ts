@@ -29,7 +29,12 @@ function freshState() {
       item("I_YZ", "Yahtzee set", [
         variation("V_WAL", "Walnut", 6500, "YZ-WAL", true),
         variation("V_CHE", "Cherry", 6000, "YZ-CHE", true)
-      ], { cat: "C_GAME", image: "IMG1" }),
+      ], { cat: "C_GAME", image: "IMG1", lists: [
+        { modifier_list_id: "ML_DICE", min_selected_modifiers: -1, max_selected_modifiers: -1 },
+        { modifier_list_id: "ML_FINISH", ordinal: 2, modifier_overrides: [{ modifier_id: "M_GLOSS", on_by_default_override: "YES" }] },
+        { modifier_list_id: "ML_OFF", enabled: false },
+        { modifier_list_id: "ML_TEXT" }
+      ] }),
       item("I_STICKER", "Sticker", [variation("V_STK", "Default", 300, "STK", false)], { cat: "C_MISC" }),
       item("I_OLD", "Archived thing", [variation("V_OLD", "Default", 100, "OLD", true)], { archived: true })
     ],
@@ -37,7 +42,17 @@ function freshState() {
       { id: "C_DICE", type: "CATEGORY", category_data: { name: "Dice" } },
       { id: "C_GAME", type: "CATEGORY", category_data: { name: "Game sets" } },
       { id: "C_MISC", type: "CATEGORY", category_data: { name: "Market only" } },
-      { id: "IMG1", type: "IMAGE", image_data: { url: "https://img/yz.jpg" } }
+      { id: "IMG1", type: "IMAGE", image_data: { url: "https://img/yz.jpg" } },
+      modifierList("ML_DICE", "Dice", { selection_type: "MULTIPLE" }, [
+        modifier("M_HAND", "Handmade dice", 1500, { on_by_default: true }),
+        modifier("M_SECRET", "Staff only", 0, { hidden_online: true })
+      ]),
+      modifierList("ML_FINISH", "Finish", { selection_type: "SINGLE" }, [
+        modifier("M_SATIN", "Satin", 0, { on_by_default: true }),
+        modifier("M_GLOSS", "Gloss", 500)
+      ]),
+      modifierList("ML_OFF", "Turned off", {}, [modifier("M_OFF", "Off", 100)]),
+      modifierList("ML_TEXT", "Engraving text", { modifier_type: "TEXT" }, [])
     ],
     counts: { V_DICE: 1, V_WAL: 3, V_CHE: 0, V_OLD: 5 },
     listings: {
@@ -56,10 +71,18 @@ function freshState() {
   };
 }
 
-function item(id: string, name: string, variations: object[], { cat, image, archived }: { cat?: string; image?: string; archived?: boolean } = {}) {
+function item(id: string, name: string, variations: object[],
+  { cat, image, archived, lists }: { cat?: string; image?: string; archived?: boolean; lists?: object[] } = {}) {
   return { id, type: "ITEM", updated_at: "2026-09-01T00:00:00Z", present_at_all_locations: true,
     item_data: { name, description_plaintext: `${name} description`, is_archived: !!archived,
-      categories: cat ? [{ id: cat }] : [], image_ids: image ? [image] : [], variations } };
+      categories: cat ? [{ id: cat }] : [], image_ids: image ? [image] : [], variations, modifier_list_info: lists || [] } };
+}
+function modifierList(id: string, name: string, data: object, modifiers: object[]) {
+  return { id, type: "MODIFIER_LIST", present_at_all_locations: true, modifier_list_data: { name, ...data, modifiers } };
+}
+function modifier(id: string, name: string, price: number, data: object = {}) {
+  return { id, type: "MODIFIER", present_at_all_locations: true,
+    modifier_data: { name, price_money: { amount: price, currency: "USD" }, ...data } };
 }
 function variation(id: string, name: string, price: number, sku: string, track: boolean) {
   return { id, type: "ITEM_VARIATION", present_at_all_locations: true,
@@ -163,6 +186,27 @@ test("storefront: hides archived and hidden-category items, keeps stock and untr
   assert.deepEqual(yz.variations.map((v) => [v.name, v.qty, v.priceCents]), [["Walnut", 3, 6500], ["Cherry", 0, 6000]]);
   assert.equal(skuMap["STK"], "V_STK", "hidden items still map for Etsy sales");
   assert.equal(tracked.has("V_STK"), false);
+});
+
+test("storefront: modifier lists carry Square's defaults and limits", async () => {
+  const { products } = await square.buildStorefront(makeEnv());
+  assert.deepEqual(products.find((p) => p.id === "I_DICE")!.modifierLists, []);
+  assert.deepEqual(products.find((p) => p.id === "I_YZ")!.modifierLists, [
+    // Hidden-online modifiers are dropped; the list's own default applies.
+    { id: "ML_DICE", name: "Dice", min: 0, max: 1, modifiers: [{ id: "M_HAND", name: "Handmade dice", priceCents: 1500, default: true }] },
+    // Pick-one list: the item's override turns Gloss on, and only one default survives.
+    { id: "ML_FINISH", name: "Finish", min: 0, max: 1, modifiers: [
+      { id: "M_SATIN", name: "Satin", priceCents: 0, default: true },
+      { id: "M_GLOSS", name: "Gloss", priceCents: 500, default: false }
+    ] }
+  ]);
+
+  // The item's own min/max win over the list's.
+  state.catalog[1].item_data.modifier_list_info[1].min_selected_modifiers = 1;
+  state.related.find((r: any) => r.id === "ML_DICE").modifier_list_data.modifiers[0].modifier_data.on_by_default = false;
+  const again = (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_YZ")!.modifierLists;
+  assert.deepEqual([again[1].min, again[1].max], [1, 1]);
+  assert.equal(again[0].modifiers[0].default, false);
 });
 
 test("Square -> Etsy: one-of-a-kind sells in person, Etsy listing is deactivated", async () => {
@@ -303,6 +347,40 @@ test("checkout: blocks sold items and builds a Square link with shipping and tax
 
   const tooMany = await post({ lines: [{ variationId: "V_DICE", qty: 2 }] });
   assert.equal(tooMany.status, 409, "can't buy two of a one-of-a-kind");
+
+  const hidden = await post({ lines: [{ variationId: "V_STK", qty: 1 }] });
+  assert.equal(hidden.status, 409, "can't buy something the site doesn't list");
+});
+
+test("checkout: add-ons are sent to Square, checked against the item's rules, and share stock", async () => {
+  const env = makeEnv();
+  const post = (b: unknown) => worker.fetch(new Request("https://w.example/api/checkout", {
+    method: "POST", body: JSON.stringify(b), headers: { "content-type": "application/json" } }), env, ctx());
+
+  const okRes = await post({ lines: [
+    { variationId: "V_WAL", qty: 1, modifiers: ["M_HAND", "M_GLOSS"] },
+    { variationId: "V_WAL", qty: 2 }
+  ] });
+  assert.equal(okRes.status, 200);
+  assert.deepEqual(state.paymentLinks[0].order.line_items, [
+    { catalog_object_id: "V_WAL", quantity: "1", modifiers: [{ catalog_object_id: "M_GLOSS" }, { catalog_object_id: "M_HAND" }] },
+    { catalog_object_id: "V_WAL", quantity: "2" }
+  ]);
+
+  const overStock = await post({ lines: [{ variationId: "V_WAL", qty: 2, modifiers: ["M_HAND"] }, { variationId: "V_WAL", qty: 2 }] });
+  assert.equal(overStock.status, 409, "three in stock, four asked for across two lines");
+  assert.deepEqual(((await overStock.json()) as any).soldOut, ["V_WAL"]);
+
+  for (const modifiers of [["M_NOPE"], ["M_SECRET"], ["M_OFF"], ["M_SATIN", "M_GLOSS"]]) {
+    const bad = await post({ lines: [{ variationId: "V_WAL", qty: 1, modifiers }] });
+    assert.equal(bad.status, 409, modifiers.join("+"));
+    assert.deepEqual(((await bad.json()) as any).changed, ["V_WAL"]);
+  }
+
+  state.catalog[1].item_data.modifier_list_info[1].min_selected_modifiers = 1;
+  assert.equal((await post({ lines: [{ variationId: "V_WAL", qty: 1 }] })).status, 409, "a required choice is missing");
+  assert.equal((await post({ lines: [{ variationId: "V_WAL", qty: 1, modifiers: ["M_SATIN"] }] })).status, 200);
+  assert.equal(state.paymentLinks.length, 2);
 });
 
 test("admin endpoints require the token", async () => {

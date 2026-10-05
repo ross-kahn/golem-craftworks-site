@@ -3,7 +3,7 @@
   const cfg = window.GC_CONFIG;
   const api = window.GC_API;
   const root = api.siteRoot();
-  const CART_KEY = "gc-cart-v1";
+  const CART_KEY = "gc-cart-v2";
   const FULFIL_KEY = "gc-fulfillment";
 
   const icons = {
@@ -30,35 +30,43 @@
   }
   function setFulfillment(v: string) { try { localStorage.setItem(FULFIL_KEY, v); } catch (_) {} renderDrawer(); }
 
+  // How many of a variation are in the cart across all of its lines.
+  const inCart = (lines: CartLine[], variationId: string) =>
+    lines.reduce((n, l) => n + (l.variationId === variationId ? l.qty : 0), 0);
+
   const cart: GCCart = {
     lines: readCart,
     count: () => readCart().reduce((n, l) => n + l.qty, 0),
-    add(product, variation, qty = 1) {
+    add(product, variation, qty = 1, modifiers = []) {
       const lines = readCart();
-      const existing = lines.find((l) => l.variationId === variation.id);
+      const key = [variation.id, ...modifiers.map((m) => m.id).sort()].join("|");
+      const existing = lines.find((l) => l.key === key);
       const max = variation.available;
+      const room = max - inCart(lines, variation.id);
+      if (room <= 0) return { ok: false, reason: max === 1 ? "That piece is already in your cart." : `Only ${max} available.` };
+      lines.forEach((l) => { if (l.variationId === variation.id) l.max = max; });
       if (existing) {
-        if (existing.qty >= max) return { ok: false, reason: max === 1 ? "That piece is already in your cart." : `Only ${max} available.` };
-        existing.qty = Math.min(max, existing.qty + qty);
-        existing.max = max;
+        existing.qty += Math.min(qty, room);
       } else {
         lines.push({
+          key,
           variationId: variation.id,
           productId: product.id,
           name: product.name,
           variationName: product.variations.length > 1 ? variation.name : "",
-          priceCents: variation.priceCents,
+          modifiers: modifiers.map((m) => ({ id: m.id, name: m.name })),
+          priceCents: variation.priceCents + modifiers.reduce((n, m) => n + m.priceCents, 0),
           image: (product.images && product.images[0]) || "",
-          qty: Math.min(qty, max),
+          qty: Math.min(qty, room),
           max
         });
       }
       writeCart(lines);
       return { ok: true };
     },
-    setQty(variationId, qty) {
+    setQty(key, qty) {
       let lines = readCart();
-      lines = lines.map((l) => (l.variationId === variationId ? { ...l, qty } : l)).filter((l) => l.qty > 0);
+      lines = lines.map((l) => (l.key === key ? { ...l, qty } : l)).filter((l) => l.qty > 0);
       writeCart(lines);
     },
     clear() { writeCart([]); }
@@ -167,19 +175,20 @@
       return;
     }
     body.innerHTML = lines.map((l) => {
-      const note = lineNotes[l.variationId];
+      const note = lineNotes[l.key];
+      const variant = [l.variationName, ...l.modifiers.map((m) => m.name)].filter(Boolean).join(" · ");
       return `
       <div class="line">
         <div class="line__img">${l.image ? `<img src="${esc(l.image)}" alt="">` : `<div class="ph"><img src="${root}assets/logo.png" alt=""></div>`}</div>
         <div>
           <p class="line__name">${esc(l.name)}</p>
-          ${l.variationName ? `<p class="line__variant">${esc(l.variationName)}</p>` : `<p class="line__variant"></p>`}
-          ${l.max === 1
-            ? `<button class="text-btn" type="button" data-remove="${esc(l.variationId)}">Remove</button>`
+          <p class="line__variant">${esc(variant)}</p>
+          ${l.max <= 1
+            ? `<button class="text-btn" type="button" data-remove="${esc(l.key)}">Remove</button>`
             : `<div class="qty" role="group" aria-label="Quantity for ${esc(l.name)}">
-                 <button type="button" data-dec="${esc(l.variationId)}" aria-label="Decrease">−</button>
+                 <button type="button" data-dec="${esc(l.key)}" aria-label="Decrease">−</button>
                  <output>${l.qty}</output>
-                 <button type="button" data-inc="${esc(l.variationId)}" aria-label="Increase" ${l.qty >= l.max ? "disabled" : ""}>+</button>
+                 <button type="button" data-inc="${esc(l.key)}" aria-label="Increase" ${inCart(lines, l.variationId) >= l.max ? "disabled" : ""}>+</button>
                </div>`}
           ${note ? `<p class="line__note line__note--warn">${esc(note)}</p>` : ""}
         </div>
@@ -210,26 +219,45 @@
     const byVar = new Map<string, { p: Product; v: Variation }>();
     products.forEach((p) => p.variations.forEach((v) => byVar.set(v.id, { p, v })));
     lineNotes = {};
-    let changed = false;
+    const left = new Map<string, number>(); // stock not yet claimed by an earlier line
     const lines = readCart().map((l) => {
       const hit = byVar.get(l.variationId);
-      if (!hit || hit.v.available === 0) {
-        lineNotes[l.variationId] = "This just sold. Remove it to continue.";
-        changed = true;
+      const remaining = hit ? (left.get(l.variationId) ?? hit.v.available) : 0;
+      if (!hit || remaining === 0) {
+        lineNotes[l.key] = "This just sold. Remove it to continue.";
         return { ...l, max: 0 };
       }
-      const next = { ...l, max: hit.v.available, priceCents: hit.v.priceCents };
-      if (l.qty > hit.v.available) {
-        next.qty = hit.v.available;
-        lineNotes[l.variationId] = `Only ${hit.v.available} left, so your quantity was lowered.`;
-        changed = true;
+      const chosen = chosenModifiers(hit.p, l.modifiers.map((m) => m.id));
+      if (!chosen) {
+        lineNotes[l.key] = "The options on this have changed. Remove it and add it again.";
+        return { ...l, max: 0 };
       }
-      if (l.priceCents !== hit.v.priceCents) changed = true;
+      const next = {
+        ...l, max: hit.v.available,
+        modifiers: chosen.map((m) => ({ id: m.id, name: m.name })),
+        priceCents: hit.v.priceCents + chosen.reduce((n, m) => n + m.priceCents, 0)
+      };
+      if (l.qty > remaining) {
+        next.qty = remaining;
+        lineNotes[l.key] = `Only ${hit.v.available} left, so your quantity was lowered.`;
+      }
+      left.set(l.variationId, remaining - next.qty);
       return next;
     });
     writeCart(lines);
-    // OK to continue as long as nothing in the cart is fully sold out.
+    // OK to continue as long as every line can still be bought as it stands.
     return lines.every((l) => l.max > 0);
+  }
+
+  // The current versions of a line's add-ons, or null if they no longer fit the product's rules.
+  function chosenModifiers(p: Product, ids: string[]): Modifier[] | null {
+    const all = p.modifierLists.flatMap((l) => l.modifiers);
+    if (ids.some((id) => !all.some((m) => m.id === id))) return null;
+    const fits = p.modifierLists.every((l) => {
+      const n = l.modifiers.filter((m) => ids.includes(m.id)).length;
+      return n >= l.min && n <= l.max;
+    });
+    return fits ? all.filter((m) => ids.includes(m.id)) : null;
   }
 
   async function startCheckout(btn: HTMLButtonElement) {
@@ -237,15 +265,16 @@
     btn.disabled = true; btn.textContent = "Checking stock…";
     try {
       const ok = await reconcileCart();
-      if (!ok) { checkoutError = "Something in your cart sold out. Remove it to continue."; renderDrawer(); return; }
+      if (!ok) { checkoutError = "Something in your cart is no longer available. Remove it to continue."; renderDrawer(); return; }
       const res = await api.createCheckout({ lines: readCart(), fulfillment: getFulfillment() });
       if (res && res.url) { window.location.href = res.url; return; }
       throw new Error("Checkout link was not returned.");
     } catch (e) {
       const err = e as ApiError;
-      if (err.body && err.body.soldOut) {
-        err.body.soldOut.forEach((id) => { lineNotes[id] = "This just sold. Remove it to continue."; });
-      }
+      const flag = (ids: string[] | undefined, note: string) =>
+        readCart().forEach((l) => { if (ids && ids.includes(l.variationId)) lineNotes[l.key] = note; });
+      flag(err.body?.soldOut, "This just sold. Remove it to continue.");
+      flag(err.body?.changed, "The options on this have changed. Remove it and add it again.");
       checkoutError = err.message || "Checkout couldn't start. Try again in a moment.";
       renderDrawer();
     }
@@ -297,11 +326,12 @@
         const open = nav.classList.toggle("is-open");
         t.setAttribute("aria-expanded", String(open));
       } else if (t.dataset.inc) {
-        const l = readCart().find((x) => x.variationId === t.dataset.inc);
-        if (l && l.qty < l.max) cart.setQty(l.variationId, l.qty + 1);
+        const lines = readCart();
+        const l = lines.find((x) => x.key === t.dataset.inc);
+        if (l && inCart(lines, l.variationId) < l.max) cart.setQty(l.key, l.qty + 1);
       } else if (t.dataset.dec) {
-        const l = readCart().find((x) => x.variationId === t.dataset.dec);
-        if (l) cart.setQty(l.variationId, l.qty - 1);
+        const l = readCart().find((x) => x.key === t.dataset.dec);
+        if (l) cart.setQty(l.key, l.qty - 1);
       } else if (t.dataset.remove) {
         delete lineNotes[t.dataset.remove];
         cart.setQty(t.dataset.remove, 0);

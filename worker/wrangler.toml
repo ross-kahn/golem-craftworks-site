@@ -14,13 +14,20 @@ run_worker_first = ["/api/*", "/webhooks/*", "/admin/*"]
 command = "node ../node_modules/typescript/lib/tsc.js -p ../site"
 
 # The domain must already be active in this Cloudflare account (README step 2).
+# PRE-LAUNCH: the site lives at preview.golemcraftworks.com while the main domain still forwards
+# from GoDaddy. To go live: delete the A records for golemcraftworks.com and www in Cloudflare DNS,
+# swap the route below for the two commented ones, and switch the three URLs in [vars] back.
 [[routes]]
-pattern = "golemcraftworks.com"
+pattern = "preview.golemcraftworks.com"
 custom_domain = true
 
-[[routes]]
-pattern = "www.golemcraftworks.com"
-custom_domain = true
+# [[routes]]
+# pattern = "golemcraftworks.com"
+# custom_domain = true
+#
+# [[routes]]
+# pattern = "www.golemcraftworks.com"
+# custom_domain = true
 
 # Hourly safety check (minute 7 to stay off the top of the hour).
 [triggers]
@@ -32,18 +39,21 @@ binding = "GC_KV"
 id = "68298024fb784e2ba7914b0c297a625b"
 
 [vars]
-SITE_URL = "https://golemcraftworks.com"
-ALLOWED_ORIGINS = "https://golemcraftworks.com,https://www.golemcraftworks.com"
+# PRE-LAUNCH values. Live: SITE_URL = "https://golemcraftworks.com"
+#   ALLOWED_ORIGINS = "https://golemcraftworks.com,https://www.golemcraftworks.com"
+#   SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"
+SITE_URL = "https://preview.golemcraftworks.com"
+ALLOWED_ORIGINS = "https://preview.golemcraftworks.com"
 SQUARE_ENV = "production"            # "sandbox" while testing
-SQUARE_LOCATION_ID = "L1JFA3WSXNWGF"
-SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"   # must match the URL given to Square exactly
+SQUARE_LOCATION_ID = "LNQ38H5968VDC"
+SQUARE_WEBHOOK_URL = "https://preview.golemcraftworks.com/webhooks/square"   # must match the URL given to Square exactly
 ETSY_KEYSTRING = "REPLACE_ME"
 ETSY_SHOP_ID = "REPLACE_ME"
 SHIPPING_FLAT_CENTS = "800"
 # Optional: only list items in these Square categories online (comma-separated). Empty = everything.
 ONLINE_CATEGORIES = ""
 # Optional: never list items in these Square categories online (e.g. "Market only").
-HIDDEN_CATEGORIES = ""
+HIDDEN_CATEGORIES = "In-Person"
 # Start with "true": the Worker logs what it WOULD change on Etsy/Square without changing anything.
 SYNC_DRY_RUN = "true"
 # Commission form emails (sent through Resend). EMAIL_FROM must be on a domain verified in Resend.

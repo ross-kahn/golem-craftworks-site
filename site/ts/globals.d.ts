@@ -22,6 +22,22 @@ interface RawVariation {
   sku?: string;
 }
 
+interface Modifier {
+  id: string;
+  name: string;
+  priceCents: number;
+  default?: boolean; // selected when the product page opens
+}
+
+// A group of add-ons from Square: the buyer picks at least `min` and at most `max`.
+interface ModifierList {
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  modifiers: Modifier[];
+}
+
 interface RawProduct {
   id: string;
   slug?: string;
@@ -31,6 +47,7 @@ interface RawProduct {
   description?: string;
   images?: string[];
   variations?: RawVariation[];
+  modifierLists?: ModifierList[];
   unique?: boolean;
   updatedAt?: string;
 }
@@ -39,8 +56,9 @@ interface Variation extends RawVariation {
   available: number;
 }
 
-interface Product extends Omit<RawProduct, "variations" | "unique"> {
+interface Product extends Omit<RawProduct, "variations" | "modifierLists" | "unique"> {
   variations: Variation[];
+  modifierLists: ModifierList[];
   soldOut: boolean;
   unique: boolean;
   minPrice: number | null;
@@ -50,14 +68,16 @@ interface Product extends Omit<RawProduct, "variations" | "unique"> {
 type Fulfillment = "ship" | "pickup";
 
 interface CartLine {
+  key: string; // variation plus chosen add-ons: the same piece with different add-ons is its own line
   variationId: string;
   productId: string;
   name: string;
   variationName: string;
-  priceCents: number;
+  modifiers: { id: string; name: string }[];
+  priceCents: number; // each, add-ons included
   image: string;
   qty: number;
-  max: number;
+  max: number; // stock for the variation, shared by every line that uses it
 }
 
 interface CommissionData {
@@ -72,7 +92,7 @@ interface CommissionData {
 
 interface ApiError extends Error {
   status?: number;
-  body?: { error?: string; soldOut?: string[] } | null;
+  body?: { error?: string; soldOut?: string[]; changed?: string[] } | null;
   demo?: boolean;
 }
 
@@ -92,8 +112,8 @@ type CartAddResult = { ok: true } | { ok: false; reason: string };
 interface GCCart {
   lines(): CartLine[];
   count(): number;
-  add(product: Product, variation: Variation, qty?: number): CartAddResult;
-  setQty(variationId: string, qty: number): void;
+  add(product: Product, variation: Variation, qty?: number, modifiers?: Modifier[]): CartAddResult;
+  setQty(key: string, qty: number): void;
   clear(): void;
 }
 

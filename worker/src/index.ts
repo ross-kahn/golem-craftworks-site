@@ -14,7 +14,7 @@ import * as etsyApi from "./etsy.ts";
 import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.ts";
 import { commission } from "./commission.ts";
 import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
-import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent } from "./types.ts";
+import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontProduct } from "./types.ts";
 
 const PRODUCTS_CACHE_KEY = "https://cache.golemcraftworks.internal/products";
 const PRODUCTS_TTL = 60;
@@ -78,7 +78,7 @@ async function products(env: Env, ctx: Ctx) {
 const purgeProducts = () => caches.default.delete(PRODUCTS_CACHE_KEY);
 
 interface CheckoutBody {
-  lines?: { variationId?: unknown; qty?: unknown }[];
+  lines?: { variationId?: unknown; qty?: unknown; modifiers?: unknown }[];
   fulfillment?: unknown;
 }
 
@@ -86,40 +86,54 @@ async function checkout(request: Request, env: Env) {
   let body: CheckoutBody;
   try { body = (await request.json()) as CheckoutBody; } catch { return json({ error: "Invalid request." }, 400); }
   const raw = Array.isArray(body.lines) ? body.lines : [];
-  const merged = new Map<string, number>();
+  // The same variation with different add-ons is a separate line.
+  const merged = new Map<string, { variationId: string; qty: number; modifiers: string[] }>();
   for (const l of raw) {
     const qty = Math.floor(Number(l.qty));
     if (typeof l.variationId !== "string" || !(qty > 0)) continue;
-    merged.set(l.variationId, Math.min(20, (merged.get(l.variationId) || 0) + qty));
+    const mods = Array.isArray(l.modifiers) ? l.modifiers.filter((m): m is string => typeof m === "string") : [];
+    const modifiers = [...new Set(mods)].sort();
+    const key = [l.variationId, ...modifiers].join("|");
+    const line = merged.get(key) || { variationId: l.variationId, qty: 0, modifiers };
+    line.qty = Math.min(20, line.qty + qty);
+    merged.set(key, line);
   }
   if (!merged.size || merged.size > 25) return json({ error: "Your cart is empty." }, 400);
   const fulfillment = body.fulfillment === "pickup" ? "pickup" : "ship";
 
-  const ids = [...merged.keys()];
-  const variations = await square.retrieveVariations(env, ids);
-  const found = new Map(variations.map((v) => [v.id, v]));
-  const counts = await square.fetchCounts(env, ids);
+  // Check against exactly what the storefront is showing: prices, stock and add-on rules.
+  const { products } = await square.buildStorefront(env);
+  const byVariation = new Map<string, { product: StorefrontProduct; qty: number | null }>();
+  products.forEach((p) => p.variations.forEach((v) => byVariation.set(v.id, { product: p, qty: v.qty })));
 
-  const soldOut: string[] = [];
-  const lines: { variationId: string; qty: number }[] = [];
-  for (const [id, qty] of merged) {
-    const v = found.get(id);
-    const d = v && v.item_variation_data;
-    if (!v || !d || !d.price_money || d.sellable === false) { soldOut.push(id); continue; }
-    const override = (d.location_overrides || []).find((o) => o.location_id === env.SQUARE_LOCATION_ID);
-    const tracked = override && typeof override.track_inventory === "boolean" ? override.track_inventory : d.track_inventory === true;
-    if (tracked) {
-      const available = counts.get(id) ?? 0;
-      if (available < qty) { soldOut.push(id); continue; }
-    }
-    lines.push({ variationId: id, qty });
-  }
+  const wanted = new Map<string, number>(); // stock is per variation, whatever the add-ons
+  merged.forEach((l) => wanted.set(l.variationId, (wanted.get(l.variationId) || 0) + l.qty));
+  const soldOut = [...wanted].filter(([id, qty]) => {
+    const hit = byVariation.get(id);
+    return !hit || (hit.qty !== null && hit.qty < qty);
+  }).map(([id]) => id);
   if (soldOut.length) {
     return json({ error: "Something in your cart just sold. Remove it to continue.", soldOut }, 409);
   }
 
+  const lines = [...merged.values()];
+  const changed = lines.filter((l) => !validModifiers(byVariation.get(l.variationId)!.product, l.modifiers)).map((l) => l.variationId);
+  if (changed.length) {
+    return json({ error: "The options on something in your cart have changed. Remove it and add it again.", changed }, 409);
+  }
+
   const link = await square.createPaymentLink(env, { lines, fulfillment });
   return json({ url: link.url });
+}
+
+// Every chosen add-on belongs to the product, and each list has between its min and max chosen.
+function validModifiers(product: StorefrontProduct, chosen: string[]) {
+  const known = new Set(product.modifierLists.flatMap((l) => l.modifiers.map((m) => m.id)));
+  if (chosen.some((id) => !known.has(id))) return false;
+  return product.modifierLists.every((l) => {
+    const n = l.modifiers.filter((m) => chosen.includes(m.id)).length;
+    return n >= l.min && n <= l.max;
+  });
 }
 
 // ---------- Webhooks ----------
