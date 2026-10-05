@@ -79,10 +79,12 @@
   // theme.ts picks the starting theme in <head>; this flips it and remembers the choice.
   // The switch names the theme it leads to; CSS shows the half that applies.
   const themeLabel = '<span class="when-light">Dark mode</span><span class="when-dark">Light mode</span>';
+  const themeTip = () => (document.documentElement.dataset.theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
   function toggleTheme() {
     const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+    document.querySelectorAll<HTMLElement>(".theme-btn").forEach((b) => { b.title = themeTip(); });
   }
 
   // ---------- Chrome ----------
@@ -102,7 +104,7 @@
           <span class="brand__name">${esc(cfg.shopName)}</span>
         </a>
         <nav class="nav" aria-label="Main">${links}</nav>
-        <button class="icon-btn theme-btn" type="button" data-theme-toggle>
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle title="${themeTip()}">
           ${icons.moon}${icons.sun}<span class="visually-hidden">${themeLabel}</span>
         </button>
         <button class="cart-btn" type="button" data-open-cart aria-haspopup="dialog">
