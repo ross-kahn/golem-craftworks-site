@@ -75,7 +75,7 @@
       products = data;
       if (api.isDemo()) {
         noticeEl.hidden = false;
-        noticeEl.innerHTML = `<p>Demo mode: these are sample products. Set <code>apiBase</code> in ts/config.ts and run <code>npm run build</code> to show your live Square inventory.</p>`;
+        noticeEl.innerHTML = `<p>Demo mode: these are sample products. Set <code>apiBase</code> to "/" in ts/config.ts and run <code>npm run deploy</code> to show your live Square inventory.</p>`;
       }
       renderFilters(); render();
     })

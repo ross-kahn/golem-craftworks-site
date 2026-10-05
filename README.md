@@ -1,9 +1,11 @@
 # Golem Craftworks website
 
-A storefront for golemcraftworks.com that sells straight from your Square inventory, plus a small Cloudflare Worker that keeps Etsy in step with Square.
+A storefront for golemcraftworks.com that sells straight from your Square inventory and keeps Etsy in step with Square.
+
+The whole thing runs on Cloudflare's free plan as one Worker: Cloudflare serves the pages in `site/`, and the Worker code handles checkout, the commission form and the Square/Etsy sync. GitHub holds the source in a private repo and plays no part in hosting.
 
 ```
-site/      The website. Static files for GitHub Pages.
+site/      The website. Static files, served by Cloudflare as they are.
   index.html            Shop (home)
   product/              Product page  (/product/?id=...)
   about/  commissions/  thanks/   Content pages
@@ -13,9 +15,41 @@ site/      The website. Static files for GitHub Pages.
   js/                   Built from ts/ by `npm run build`. Don't edit by hand.
   assets/               Logo, favicon, hero golem
   data/demo-products.json   Sample products used until the Worker is connected
+  .assetsignore         Files in site/ that are not published (the TypeScript source)
 worker/    Cloudflare Worker in TypeScript (Square + Etsy logic, keeps your API keys secret)
+  wrangler.toml         Cloudflare settings: domain, site folder, shop options
 tools/     One-time helper to copy Etsy photos into Square
 ```
+
+## Build and deploy
+
+Needs Node 22.18 or newer. Run these from the project folder.
+
+```bash
+npm install          # once per computer
+npm run prepare      # once per copy of the repo: turns on the pre-commit hook
+npx wrangler login   # once per computer: opens Cloudflare in your browser
+npm run deploy       # builds site/ts -> site/js, then publishes the site and the Worker together
+```
+
+`npm run deploy` is the only way anything goes live. It publishes whatever is in the folder on your computer, committed or not. Pushing to GitHub does not deploy.
+
+A normal change looks like this:
+
+```bash
+npm run watch        # rebuilds site/js as you edit site/ts (leave it running)
+npm run dev          # the site and the Worker at http://localhost:8787
+npm run typecheck    # type-check the site, the Worker and tools/
+npm test             # Worker tests against fake Square/Etsy APIs
+git commit           # the hook rebuilds site/js and adds it to the commit
+git push
+npm run deploy
+```
+
+- **What needs a deploy:** any change to `site/`, `worker/src/` or `worker/wrangler.toml`. Secrets set with `wrangler secret put` take effect at once and need no deploy.
+- **Local preview without Cloudflare:** `cd site && python3 -m http.server 8000`, then open http://localhost:8000. This serves the pages only, so it only works in demo mode (`apiBase: ""`).
+- **`npm run dev` with real data:** put the secrets in `worker/.dev.vars`, one `NAME=value` per line. Git ignores that file. Use sandbox Square credentials there.
+- **Undo a bad deploy:** `npx wrangler rollback` from `worker/` goes back to the previous version.
 
 ## How inventory stays in sync
 
@@ -31,7 +65,11 @@ Square is the single source of truth. You only ever change stock in Square.
 
 Products are matched between Square and Etsy **by SKU**. That's the one bit of setup that matters most.
 
-## Before anything else: SKUs
+## First-time setup
+
+Do these in order. Steps 1 to 4 put the shop online; 5 and 6 connect Etsy.
+
+### 1. SKUs
 
 1. In Square, give every item variation a SKU. One-of-a-kind dice each get their own (for example `DICE-0412`). Standard items get one per option (`YZ-WAL`, `YZ-CHE`, `TWR-BLK`).
 2. In Etsy, put the same SKU on the matching listing. For listings with variations (wood species, colors), each variation's SKU must match the Square variation's SKU.
@@ -39,68 +77,70 @@ Products are matched between Square and Etsy **by SKU**. That's the one bit of s
 
 After setup, `/admin/status` lists any SKUs found on only one side so you can fix gaps.
 
-## 1. Put the site on GitHub Pages
+### 2. Move the domain to Cloudflare
 
-1. Create a GitHub repo and push the contents of `site/` to it (or push this whole folder and set Pages to deploy from `/site` with a GitHub Action).
-2. In the repo: **Settings → Pages**, deploy from the `main` branch.
-3. `site/CNAME` already contains `golemcraftworks.com`.
-4. At GoDaddy, turn off the current forwarding to your link page, then set DNS:
-   - `A` records for `@` → `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
-   - `CNAME` for `www` → `YOUR-GITHUB-USERNAME.github.io`
-5. Back in GitHub Pages settings, tick **Enforce HTTPS** once the certificate is issued.
+The Worker can only be attached to a domain that Cloudflare manages, so the domain's DNS moves from GoDaddy to Cloudflare. The domain stays registered at GoDaddy.
 
-Until step 3 below is done, the site runs in demo mode with sample products and checkout turned off.
+1. Create a free Cloudflare account. In the dashboard, add the domain `golemcraftworks.com` on the Free plan.
+2. Cloudflare copies your existing DNS records. Keep any email records (`MX`, `TXT`). Delete the records for `@` and `www` that point at the old link page; the deploy creates its own and fails if others are in the way.
+3. At GoDaddy, turn off forwarding to the link page, then change the domain's nameservers to the two Cloudflare shows you.
+4. Wait until Cloudflare lists the domain as **Active**. The domain shows nothing from then until the first deploy in step 4.
 
-## 2. Square
+### 3. Square
 
 1. Go to the Square Developer Console, create an application.
 2. Start in **Sandbox**: copy the sandbox access token and a sandbox location ID.
 3. Later for real use, copy your **Production** access token and your shop's **Location ID** (Locations page in the Developer Console).
 4. Under **Webhooks**, add a subscription:
-   - URL: `https://golem-craftworks.<your-subdomain>.workers.dev/webhooks/square`
+   - URL: `https://golemcraftworks.com/webhooks/square`
    - Events: `inventory.count.updated` and `catalog.version.updated`
    - Copy the **signature key**.
 5. Make sure the tax you charge in person is set on your items in Square. Online checkout applies the same catalog taxes.
 
-## 3. Deploy the Worker (free Cloudflare plan)
+### 4. First deploy
 
 ```bash
-npm install                                   # once, in the project folder
-cd worker
+npm install
 npx wrangler login
+cd worker
 npx wrangler kv namespace create GC_KV        # paste the id into wrangler.toml
-npx wrangler secret put SQUARE_ACCESS_TOKEN
-npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
-npx wrangler secret put ETSY_SHARED_SECRET
-npx wrangler secret put ETSY_WEBHOOK_SECRET
-npx wrangler secret put ADMIN_TOKEN           # any long random string, keep it private
-# fill in the REPLACE_ME values in wrangler.toml, then:
-npx wrangler deploy
 ```
 
-Then in `site/ts/config.ts` set `apiBase` to the Worker URL (`https://golem-craftworks.<your-subdomain>.workers.dev`), set your email, Instagram and Etsy links, and run `npm run build`.
+Fill in `SQUARE_LOCATION_ID` in `worker/wrangler.toml` (the Etsy values can wait for step 5). Deploy once so the Worker exists, then add the secrets from the base directory:
+
+```bash
+npx wrangler deploy
+npx wrangler secret put SQUARE_ACCESS_TOKEN
+npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
+npx wrangler secret put ADMIN_TOKEN           # any long random string, keep it private (weaker than most)
+```
+
+The site is now at https://golemcraftworks.com in demo mode: sample products, checkout turned off.
+
+To show your real inventory, set `apiBase: "/"` in `site/ts/config.ts`, set your email, Instagram and Etsy links there too, and run `npm run deploy` from the project folder.
 
 `SQUARE_WEBHOOK_URL` in wrangler.toml must exactly match the URL you gave Square, or webhook signatures won't verify.
 
-## 4. Etsy
+### 5. Etsy
 
 1. Register an app at developers.etsy.com. Copy the **keystring** and **shared secret**.
-2. In the app's settings, add the callback URL `https://golem-craftworks.<your-subdomain>.workers.dev/admin/etsy/callback`.
-3. Visit `https://golem-craftworks.<your-subdomain>.workers.dev/admin/etsy/connect?token=YOUR_ADMIN_TOKEN` and approve. The confirmation page shows your **shop ID**; put it in `ETSY_SHOP_ID` and redeploy.
-4. In Etsy's Webhooks portal, add an endpoint for `order.paid` pointing to `/webhooks/etsy` on the Worker. Copy its signing secret (starts with `whsec_`) into the `ETSY_WEBHOOK_SECRET` secret.
+2. Put the keystring in `ETSY_KEYSTRING` in wrangler.toml, and from `worker/` run `npx wrangler secret put ETSY_SHARED_SECRET`.
+3. In the app's settings, add the callback URL `https://golemcraftworks.com/admin/etsy/callback`.
+4. Run `npm run deploy`, then visit `https://golemcraftworks.com/admin/etsy/connect?token=YOUR_ADMIN_TOKEN` and approve. The confirmation page shows your **shop ID**; put it in `ETSY_SHOP_ID` and deploy again.
+5. In Etsy's Webhooks portal, add an endpoint for `order.paid` pointing to `https://golemcraftworks.com/webhooks/etsy`. Copy its signing secret (starts with `whsec_`), then from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
 
 The hourly check also refreshes the Etsy sign-in, which otherwise expires after 90 days unused.
 
-## 5. Test safely, then go live
+### 6. Test safely, then go live
 
 `SYNC_DRY_RUN = "true"` is the default. In this mode the Worker logs what it would change on Etsy and Square but changes nothing.
 
 1. Leave dry run on for a few days of normal selling.
-2. Check `/admin/status?token=YOUR_ADMIN_TOKEN`: recent activity, SKUs missing on either side, and the last hourly check.
-3. When the planned changes look right, set `SYNC_DRY_RUN = "false"` and `npx wrangler deploy`.
+2. Check `https://golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: recent activity, SKUs missing on either side, and the last hourly check.
+3. When the planned changes look right, set `SYNC_DRY_RUN = "false"` and `npm run deploy`.
 4. Place one real website order for something cheap (pickup option) to confirm checkout, receipt and the Etsy update end to end.
 
-To run the hourly check on demand: `curl -X POST "https://.../admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
+To run the hourly check on demand: `curl -X POST "https://golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
 
 ## Photos from Etsy
 
@@ -115,9 +155,9 @@ It matches by SKU, then by exact title, skips Square items that already have pho
 
 ## Day to day
 
-- **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute. If you also want it on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.
-- **Hide something from the website** (market-only items): put it in a Square category and add that category name to `HIDDEN_CATEGORIES`.
-- **Change shipping:** `SHIPPING_FLAT_CENTS` in wrangler.toml (what's charged) and `shippingCents` in `site/ts/config.ts` (what the cart shows; run `npm run build` after).
+- **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute, with no deploy. If you also want it on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.
+- **Hide something from the website** (market-only items): put it in a Square category, add that category name to `HIDDEN_CATEGORIES` in wrangler.toml, then `npm run deploy`.
+- **Change shipping:** `SHIPPING_FLAT_CENTS` in wrangler.toml (what's charged) and `shippingCents` in `site/ts/config.ts` (what the cart shows), then `npm run deploy`.
 
 ## Known limits
 
@@ -125,7 +165,7 @@ It matches by SKU, then by exact title, skips Square items that already have pho
 - **Etsy cancellations** aren't added back to Square automatically. Adjust the count in Square and the sync will update Etsy.
 - **Turning an Etsy listing back on** may count as a renewal with Etsy's listing fee.
 - **Sales tax** uses the taxes attached to your items in Square. If you need destination-based tax for shipped orders, that needs a separate decision.
-- **Commission form** only sends email once the Worker and Resend are set up (below). In demo mode it opens the visitor's email app with the request filled in.
+- **Commission form** only sends email once Resend is set up (below). In demo mode it opens the visitor's email app with the request filled in.
 
 ## Commission emails
 
@@ -136,27 +176,17 @@ The commission form posts to the Worker, which sends two emails through [Resend]
 
 Setup:
 
-1. Create a Resend account, add the domain `golemcraftworks.com`, and add the DNS records it shows you at GoDaddy. Until the domain is verified Resend will only deliver to your own address, so clients get no confirmation.
-2. Create an API key, then `npx wrangler secret put RESEND_API_KEY`.
-3. Check `EMAIL_FROM` and `COMMISSION_TO` in wrangler.toml, then `npx wrangler deploy`.
+1. Create a Resend account, add the domain `golemcraftworks.com`, and add the DNS records it shows you in Cloudflare (the domain's DNS lives there after setup step 2). Until the domain is verified Resend will only deliver to your own address, so clients get no confirmation.
+2. Create an API key, then from `worker/` run `npx wrangler secret put RESEND_API_KEY`.
+3. Check `EMAIL_FROM` and `COMMISSION_TO` in wrangler.toml, then `npm run deploy`.
 4. Send yourself a test request from the live form using a second email address.
 
 Each visitor is limited to 5 requests an hour. Failures show up in `/admin/status`.
 
-## Developing
+## GitHub
 
-Everything is TypeScript. Needs Node 22.18 or newer. Run these from the project folder:
+The repo is private and is only a backup and history of the source. It holds no secrets: API keys live in Cloudflare (`wrangler secret put`) and in `worker/.dev.vars`, which git ignores. Never paste a key into `wrangler.toml` or any other tracked file.
 
-```bash
-npm install          # once
-npm run build        # site/ts/*.ts -> site/js/*.js (the pages load the js/ files)
-npm run watch        # same, rebuilding as you edit
-npm run typecheck    # type-check the site, the Worker and tools/
-npm test             # Worker tests against fake Square/Etsy APIs
-npm run deploy       # wrangler deploy (it compiles the Worker's TypeScript itself)
-cd site && python3 -m http.server 8000     # http://localhost:8000 (demo mode)
-```
+`site/js/` is committed so a fresh copy of the repo can be previewed without building. The pre-commit hook in `.githooks/` rebuilds it whenever a commit touches `site/ts/`, and stops the commit if the build fails. On a new copy of the repo, run `npm install` and `npm run prepare` once.
 
-The built `site/js/` files are committed, because GitHub Pages serves the folder as it is. After changing anything in `site/ts/`, run `npm run build` and commit both.
-
-**Network share:** this project sits on `\openmediavault`, which doesn't allow running programs stored on it. Building, type-checking and tests work there. `npm run deploy` and `npm run dev` do not, because Wrangler's bundler is a program inside `node_modules`. Run those from a copy on a local disk, or allow execution on the share.
+**Network share:** if the project sits on `\\openmediavault`, which doesn't allow running programs stored on it, building, type-checking and tests still work there. `npm run deploy` and `npm run dev` do not, because Wrangler's bundler is a program inside `node_modules`. Run those from a copy on a local disk, or allow execution on the share.

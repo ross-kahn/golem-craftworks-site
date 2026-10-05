@@ -1,14 +1,12 @@
 // Site settings. Edit these, nothing else needs to change for a basic launch.
 // After editing, run `npm run build` to update js/config.js.
 window.GC_CONFIG = {
-  // Where the Cloudflare Worker lives. Leave empty ("") to run the site in
-  // demo mode with the sample products in data/demo-products.json.
-  apiBase: "",               // e.g. "https://api.golemcraftworks.com"
+  apiBase: "/",
 
   shopName: "Golem Craftworks",
   contactEmail: "golemcraftworks@gmail.com",
-  instagramUrl: "https://www.instagram.com/",     // TODO: your handle
-  etsyUrl: "https://www.etsy.com/shop/",          // TODO: your shop
+  instagramUrl: "https://www.instagram.com/golem_craftworks/",
+  etsyUrl: "https://golemcraftworks.etsy.com",
 
   // Shown in the cart. The real amount is enforced by the Worker (SHIPPING_FLAT_CENTS).
   shippingLabel: "Flat-rate shipping, US only",

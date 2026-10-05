@@ -435,8 +435,8 @@ p { margin: 0 0 1em; max-width: 66ch; }
 .split { display: grid; gap: 36px; padding: 48px 0 80px; }
 @media (min-width: 900px) { .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; } }
 
-.portrait { aspect-ratio: 4/5; background: var(--wash); display: grid; place-items: center; }
-.portrait img { width: 30%; opacity: .16; }
+.portrait { aspect-ratio: 1; background: var(--wash); }
+.portrait img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Commission steps are a real sequence, so they are numbered. */
 .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }

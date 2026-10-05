@@ -103,7 +103,7 @@
               <img src="${root}assets/logo.png" alt="" width="52" height="60">
               <span class="brand__name">${esc(cfg.shopName)}</span>
             </a>
-            <p style="margin-top:16px">Hardwood boxes, game sets and dice, made by hand in Madison, Wisconsin.</p>
+            <p style="margin-top:16px">Hardwood boxes, game sets, and dice, made by hand in Madison, Wisconsin.</p>
           </div>
           <div>
             <h3>Shop</h3>

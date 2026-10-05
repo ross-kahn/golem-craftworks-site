@@ -83,7 +83,7 @@ export function buildEmails(env: MailEnv, d: CommissionData): { shop: Email; cli
       subject: "Golem Craftworks received your commission request",
       text:
         `Hi ${d.name},\n\n` +
-        `Thanks for your commission request. I've got it and will reply to this address with a design, a price and a timeline.\n\n` +
+        `Thanks for your commission request. I've got it and will reply to this address shortly.\n\n` +
         `Here's a copy of what you sent:\n\n${summary(d)}\n\n` +
         `If anything needs changing, just reply to this email.\n\n` +
         `Golem Craftworks\n${env.SITE_URL || ""}`

@@ -1,4 +1,4 @@
-// Golem Craftworks Worker
+// Golem Craftworks Worker. The website in site/ is served by Cloudflare directly; this code handles:
 //   GET  /api/products          storefront catalog from Square (cached ~60s)
 //   POST /api/checkout          creates a Square checkout link
 //   POST /api/commission        emails a commission request to the shop + a confirmation to the client
@@ -32,6 +32,7 @@ export default {
       if (url.pathname === "/webhooks/square" && request.method === "POST") return squareWebhook(request, env, ctx);
       if (url.pathname === "/webhooks/etsy" && request.method === "POST") return etsyWebhook(request, env, ctx);
       if (url.pathname.startsWith("/admin/")) return admin(request, env, url);
+      if (env.ASSETS) return env.ASSETS.fetch(request); // anything else is a page of the site (or its 404 page)
       if (url.pathname === "/") return json({ ok: true, service: "golem-craftworks" });
       return json({ error: "Not found" }, 404);
     } catch (e) {

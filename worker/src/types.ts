@@ -2,6 +2,7 @@
 
 export interface Env {
   GC_KV: KVNamespace;
+  ASSETS?: Fetcher; // the static site (wrangler.toml [assets])
 
   // wrangler.toml [vars]
   SITE_URL?: string;

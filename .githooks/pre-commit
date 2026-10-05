@@ -1,0 +1,12 @@
+#!/bin/sh
+# Rebuild site/js from site/ts so the committed JS (what a local preview loads) never goes stale.
+# Enable once per clone with `npm run prepare` (sets core.hooksPath to .githooks).
+
+git diff --cached --quiet -- site/ts site/tsconfig.json && exit 0
+
+npm run --silent build || {
+  echo "pre-commit: site build failed, commit aborted" >&2
+  exit 1
+}
+
+git add site/js
