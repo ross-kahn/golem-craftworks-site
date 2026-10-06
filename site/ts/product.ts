@@ -3,7 +3,9 @@
   const api = window.GC_API;
   const { esc, root, cart, openCart, toast } = window.GC;
   const mount = document.querySelector<HTMLElement>("[data-product]")!;
-  const id = new URLSearchParams(location.search).get("id");
+  // /product/<slug> when the Worker serves the page, /product/?id=… in demo mode.
+  const id = new URLSearchParams(location.search).get("id") ||
+    decodeURIComponent((location.pathname.split("/product/")[1] || "").replace(/\/$/, ""));
 
   function notFound() {
     document.title = "Not found · Golem Craftworks";

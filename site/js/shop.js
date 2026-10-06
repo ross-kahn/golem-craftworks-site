@@ -9,6 +9,8 @@
     const noticeEl = document.querySelector("[data-notice]");
     let products = [];
     let category = new URLSearchParams(location.search).get("category") || "All";
+    // The Worker serves each product at a readable address. Demo mode has no Worker, so it uses the plain page.
+    const productLink = (p) => api.isDemo() || !p.slug ? `${root}product/?id=${encodeURIComponent(p.id)}` : `${root}product/${encodeURIComponent(p.slug)}`;
     function card(p) {
         const img = p.images && p.images[0];
         const media = img
@@ -29,7 +31,7 @@
         }
         return `
       <li class="card${p.soldOut ? " card--sold" : ""}">
-        <a href="${root}product/?id=${encodeURIComponent(p.id)}">
+        <a href="${productLink(p)}">
           <div class="card__media">${media}${mark}</div>
           <h3 class="card__name">${esc(p.name)}</h3>
           <div class="card__meta">
@@ -83,7 +85,9 @@
             proof.hidden = false;
         }
     }).catch(() => { });
-    grid.innerHTML = Array.from({ length: 8 }, () => `<li><div class="skeleton"></div><div class="skeleton-line"></div></li>`).join("");
+    // The Worker may have filled the grid already; only show placeholders when it's empty.
+    if (!grid.children.length)
+        grid.innerHTML = Array.from({ length: 8 }, () => `<li><div class="skeleton"></div><div class="skeleton-line"></div></li>`).join("");
     api.getProducts()
         .then((data) => {
         products = data;

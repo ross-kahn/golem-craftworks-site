@@ -155,6 +155,7 @@
               <li><a href="${root}commissions/">Commissions</a></li>
               <li><a href="${root}reviews/">Reviews</a></li>
               <li><a href="${root}about/">About</a></li>
+              <li><a href="${root}shipping/">Shipping and returns</a></li>
             </ul>
           </div>
           <div>

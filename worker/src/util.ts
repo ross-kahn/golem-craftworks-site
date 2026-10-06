@@ -60,6 +60,10 @@ export const enc8 = (s: string) => enc.encode(s);
 
 export const isTrue = (v: unknown) => String(v || "").toLowerCase() === "true";
 
+// `"JAVA" TTRPG Dice Set` -> `java-ttrpg-dice-set`
+export const slugify = (s: string) =>
+  s.normalize("NFKD").replace(/[\u0300-\u036f'’"]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
 export const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 // Append a line to a short rolling activity log in KV, visible at /admin/status.

@@ -3,6 +3,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import worker from "../src/index.ts";
 import * as square from "../src/square.ts";
@@ -390,6 +391,134 @@ test("checkout: add-ons are sent to Square, checked against the item's rules, an
   assert.equal((await post({ lines: [{ variationId: "V_WAL", qty: 1 }] })).status, 409, "a required choice is missing");
   assert.equal((await post({ lines: [{ variationId: "V_WAL", qty: 1, modifiers: ["M_SATIN"] }] })).status, 200);
   assert.equal(state.paymentLinks.length, 2);
+});
+
+// The real page files from site/, served the way Cloudflare's static assets would.
+const ASSETS = { fetch: async (req: Request) => {
+  const path = new URL(req.url).pathname;
+  const name = path.endsWith("/") ? path + "index.html" : path;
+  try { return new Response(readFileSync(new URL("../../site" + name, import.meta.url), "utf8"), { headers: { "content-type": "text/html" } }); }
+  catch { return new Response("static 404", { status: 404 }); }
+} } as unknown as Fetcher;
+const get = (env: Env, path: string) => worker.fetch(new Request("https://w.example" + path), env, ctx());
+
+test("product pages are complete before any script runs", async () => {
+  state.catalog[1].item_data.name = '"JAVA" TTRPG Dice Set';
+  state.catalog[1].item_data.description_plaintext = "Coffee swirl dice.\n\nPrice is $55 & worth it <really>.";
+  const env = makeEnv({ ASSETS, NOINDEX: undefined });
+
+  const feed = (await (await get(env, "/api/products")).json()) as any;
+  assert.deepEqual(feed.products.map((p: any) => p.slug).sort(), ["ember-dice-set", "java-ttrpg-dice-set"]);
+
+  const res = await get(env, "/product/java-ttrpg-dice-set");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("x-robots-tag"), null);
+  const html = await res.text();
+  assert.ok(html.includes("<title>&#34;JAVA&#34; TTRPG Dice Set · Golem Craftworks</title>"));
+  assert.ok(html.includes('<link rel="canonical" href="https://golemcraftworks.com/product/java-ttrpg-dice-set">'));
+  assert.ok(html.includes('<meta property="og:image" content="https://img/yz.jpg">'));
+  assert.ok(html.includes("<h1>&#34;JAVA&#34; TTRPG Dice Set</h1>"));
+  assert.ok(html.includes("<p>Price is $55 &#38; worth it &#60;really&#62;.</p>"), "description is in the page, escaped");
+  assert.ok(!html.includes("ssr:") && !html.includes("skeleton"), "the placeholders are gone");
+  assert.equal((html.match(/<title>/g) || []).length, 1);
+  assert.ok(html.includes('<script src="../js/product.js"></script>'), "the page script still loads");
+
+  const data = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1]);
+  assert.equal(data["@type"], "Product");
+  assert.equal(data.name, '"JAVA" TTRPG Dice Set');
+  assert.deepEqual([data.offers["@type"], data.offers.lowPrice, data.offers.highPrice, data.offers.availability],
+    ["AggregateOffer", "60.00", "65.00", "https://schema.org/InStock"]);
+  assert.equal(data.offers.shippingDetails.shippingRate.value, "8.00");
+
+  // One-of-a-kind and sold: the page stays up and says so.
+  state.counts.V_DICE = 0;
+  const sold = JSON.parse((await (await get(env, "/product/ember-dice-set")).text()).match(/ld\+json">(.*?)<\/script>/)![1]);
+  assert.deepEqual([sold.offers["@type"], sold.offers.price, sold.offers.availability], ["Offer", "45.00", "https://schema.org/OutOfStock"]);
+
+  const missing = await get(env, "/product/no-such-thing");
+  assert.equal(missing.status, 404);
+  assert.ok((await missing.text()).includes("This page wandered off."));
+  assert.equal((await get(env, "/product/sticker")).status, 404, "hidden items have no page");
+  const slash = await get(env, "/product/java-ttrpg-dice-set/");
+  assert.deepEqual([slash.status, slash.headers.get("location")], [301, "https://w.example/product/java-ttrpg-dice-set"]);
+  // The bare page (demo mode's ?id= address) is still the static file.
+  assert.ok((await (await get(env, "/product/?id=I_YZ")).text()).includes("<!--ssr:product-->"));
+});
+
+test("home page lists what's available; same-named items get distinct addresses", async () => {
+  state.catalog[0].item_data.name = "Yahtzee set";
+  state.counts.V_DICE = 0;
+  const env = makeEnv({ ASSETS });
+  const html = await (await get(env, "/")).text();
+  assert.ok(html.includes('<a href="/product/yahtzee-set-i_yz">') && html.includes(">From $60<"));
+  assert.ok(!html.includes("/product/yahtzee-set-i_dice"), "the sold one isn't in the grid");
+  assert.ok(html.includes("Hardwood boxes and dice, made one at a time."), "the rest of the page is intact");
+  assert.equal((await get(env, "/product/yahtzee-set-i_dice")).status, 200, "but its page is still there");
+});
+
+test("renaming an item in Square redirects its old address to the new one", async () => {
+  const env = makeEnv({ ASSETS });
+  const visit = async (path: string) => { const c = ctx(); const res = await worker.fetch(new Request("https://w.example" + path), env, c); await c.done(); return res; };
+  assert.equal((await visit("/product/ember-dice-set")).status, 200);
+
+  state.catalog[0].item_data.name = '"EMBER" TTRPG Dice Set';
+  assert.equal((await visit("/product/ember-ttrpg-dice-set")).status, 200);
+  const old = await visit("/product/ember-dice-set");
+  assert.deepEqual([old.status, old.headers.get("location")], [301, "https://w.example/product/ember-ttrpg-dice-set"]);
+
+  // Renamed again: both earlier addresses lead to the current one.
+  state.catalog[0].item_data.name = "Ember";
+  await visit("/");
+  for (const path of ["/product/ember-dice-set", "/product/ember-ttrpg-dice-set"]) {
+    assert.equal((await visit(path)).headers.get("location"), "https://w.example/product/ember", path);
+  }
+  assert.equal((await visit("/product/never-existed")).status, 404);
+});
+
+test("crawler files: sitemap, robots, llms.txt and the Google feed", async () => {
+  const live = makeEnv({ ASSETS, NOINDEX: "false" });
+  const map = await (await get(live, "/sitemap.xml")).text();
+  for (const path of ["/", "/reviews/", "/shipping/", "/product/yahtzee-set", "/product/ember-dice-set"]) {
+    assert.ok(map.includes(`<loc>https://golemcraftworks.com${path}</loc>`), path);
+  }
+  assert.ok(map.includes("<lastmod>2026-09-01</lastmod>") && !map.includes("sticker"));
+
+  const robots = await (await get(live, "/robots.txt")).text();
+  assert.ok(robots.includes("User-agent: GPTBot\nAllow: /") && robots.includes("Disallow: /admin/"));
+  assert.ok(robots.includes("Sitemap: https://golemcraftworks.com/sitemap.xml"));
+
+  const llms = await (await get(live, "/llms.txt")).text();
+  assert.ok(llms.startsWith("# Golem Craftworks") && llms.includes("## Game sets"));
+  assert.ok(llms.includes("- [Yahtzee set](https://golemcraftworks.com/product/yahtzee-set): From $60, in stock."));
+
+  const feed = await (await get(live, "/feeds/google.xml")).text();
+  // Only items with a photo can be listed; one entry per wood, grouped.
+  assert.equal((feed.match(/<item>/g) || []).length, 2);
+  for (const part of ["<g:id>V_WAL</g:id>", "<g:title>Yahtzee set, Walnut</g:title>", "<g:price>65.00 USD</g:price>", "<g:availability>in_stock</g:availability>",
+    "<g:id>V_CHE</g:id>", "<g:availability>out_of_stock</g:availability>", "<g:item_group_id>I_YZ</g:item_group_id>",
+    "<g:link>https://golemcraftworks.com/product/yahtzee-set</g:link>", "<g:identifier_exists>no</g:identifier_exists>"]) {
+    assert.ok(feed.includes(part), part);
+  }
+
+  // Before launch: everything is closed to search engines.
+  const preview = makeEnv({ ASSETS, NOINDEX: "true" });
+  assert.equal(await (await get(preview, "/robots.txt")).text(), "User-agent: *\nDisallow: /\n");
+  assert.equal((await get(preview, "/product/yahtzee-set")).headers.get("x-robots-tag"), "noindex");
+  assert.equal((await get(preview, "/")).headers.get("x-robots-tag"), "noindex");
+});
+
+test("if Square is unreachable, pages are built from the last saved catalog", async () => {
+  const env = makeEnv({ ASSETS });
+  const c = ctx();
+  await worker.fetch(new Request("https://w.example/api/products"), env, c);
+  await c.done(); // the catalog is saved in the background
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => { throw new Error("Square is down"); }) as typeof fetch;
+  try {
+    const res = await get(env, "/product/yahtzee-set");
+    assert.equal(res.status, 200);
+    assert.ok((await res.text()).includes("<h1>Yahtzee set</h1>"));
+  } finally { globalThis.fetch = realFetch; }
 });
 
 test("catalog report: says why each Square item is or isn't on the site", async () => {

@@ -142,6 +142,25 @@ The hourly check also refreshes the Etsy sign-in, which otherwise expires after 
 
 To run the hourly check on demand: `curl -X POST "https://golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
 
+## Search engines, AI assistants and Google Shopping
+
+The Worker builds each product page in full (`/product/<name>`), plus `/sitemap.xml`, `/robots.txt`, `/llms.txt` (a plain-text guide for AI assistants) and `/feeds/google.xml` (a product feed). All of them update from Square on their own.
+
+While `NOINDEX = "true"` in `worker/wrangler.toml`, search engines are told to stay away. That is right for the preview address. **At launch, set it to `"false"` and deploy.**
+
+After launch, once:
+
+1. **Finish the policy page.** Fill in the two placeholders in `site/shipping/index.html` (how soon orders ship, and the return policy). Google requires both to be on the site.
+2. **Google Search Console** (search.google.com/search-console): add `golemcraftworks.com`, verify it with the DNS record it gives you (add the TXT record in Cloudflare DNS), then under Sitemaps submit `https://golemcraftworks.com/sitemap.xml`.
+3. **Bing Webmaster Tools** (bing.com/webmasters): sign in and choose "Import from Google Search Console". That copies the site and sitemap across. ChatGPT's search draws on Bing, so this one matters for AI assistants too.
+4. **Google Merchant Center** (merchants.google.com), for free listings in the Shopping tab:
+   1. Create an account for Golem Craftworks and claim the website (it reuses the Search Console verification).
+   2. Fill in business details, then the shipping setting (flat $8, United States) and the return policy, matching the policy page.
+   3. Add products: choose "Add products from a file", pick the scheduled fetch option, and give it `https://golemcraftworks.com/feeds/google.xml`, fetched daily.
+   4. Make sure free listings are turned on, then wait for review (usually a few days). The Diagnostics page lists anything Google rejects; the common ones are photos with text or watermarks, and prices that don't match the page.
+
+Handmade pieces have no barcode. The feed already says so (`identifier_exists: no`), so ignore prompts to add GTINs.
+
 ## Listings from Etsy
 
 To bring Etsy listings into Square, download **Currently for Sale Listings** from Etsy (Shop Manager > Settings > Options > Download Data), then:

@@ -2,6 +2,8 @@
 //   GET  /api/products          storefront catalog from Square (cached ~60s)
 //   POST /api/checkout          creates a Square checkout link
 //   POST /api/commission        emails a commission request to the shop + a confirmation to the client
+//   GET  /product/<slug>, /     pages built from the catalog so crawlers get the real content
+//   GET  /sitemap.xml, /robots.txt, /llms.txt, /feeds/google.xml
 //   POST /webhooks/square       Square inventory changes -> Etsy
 //   POST /webhooks/etsy         Etsy paid orders -> Square
 //   GET  /api/reviews           Etsy reviews + approved site reviews, with totals
@@ -18,11 +20,13 @@ import * as etsyApi from "./etsy.ts";
 import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.ts";
 import { commission } from "./commission.ts";
 import * as reviews from "./reviews.ts";
+import * as pages from "./pages.ts";
 import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
-import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontProduct } from "./types.ts";
+import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontCatalog, StorefrontProduct } from "./types.ts";
 
 const PRODUCTS_CACHE_KEY = "https://cache.golemcraftworks.internal/products";
 const PRODUCTS_TTL = 60;
+const SAVED_CATALOG_MAX_AGE_MS = 15 * 60 * 1000;
 
 export default {
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
@@ -41,6 +45,10 @@ export default {
       if (url.pathname === "/webhooks/square" && request.method === "POST") return squareWebhook(request, env, ctx);
       if (url.pathname === "/webhooks/etsy" && request.method === "POST") return etsyWebhook(request, env, ctx);
       if (url.pathname.startsWith("/admin/")) return admin(request, env, url);
+      if (request.method === "GET" && env.ASSETS) {
+        const built = await builtPage(env, ctx, url);
+        if (built) return built;
+      }
       if (env.ASSETS) return env.ASSETS.fetch(request); // anything else is a page of the site (or its 404 page)
       if (url.pathname === "/") return json({ ok: true, service: "golem-craftworks" });
       return json({ error: "Not found" }, 404);
@@ -72,18 +80,62 @@ function withCors(res: Response, cors: Record<string, string>) {
 
 // ---------- Storefront ----------
 
-async function products(env: Env, ctx: Ctx) {
+// The catalog as the site sees it, cached for a minute. If Square can't be reached, the last good
+// copy is used so product pages keep working.
+async function catalog(env: Env, ctx: Ctx): Promise<StorefrontCatalog> {
   const cache = caches.default;
   const hit = await cache.match(PRODUCTS_CACHE_KEY);
-  if (hit) return hit;
-  const { products } = await square.buildStorefront(env);
-  // SKUs are internal; the storefront doesn't need them.
-  const publicProducts = products.map((p) => ({ ...p, variations: p.variations.map(({ sku, ...v }) => v) }));
-  const res = json({ products: publicProducts, generatedAt: new Date().toISOString() }, 200, {
-    "cache-control": `public, max-age=${PRODUCTS_TTL}`
-  });
-  ctx.waitUntil(cache.put(PRODUCTS_CACHE_KEY, res.clone()));
-  return res;
+  if (hit) return hit.json();
+  let data: StorefrontCatalog;
+  try {
+    const { products } = await square.buildStorefront(env);
+    // SKUs are internal; the storefront doesn't need them.
+    data = { products: products.map((p) => ({ ...p, variations: p.variations.map(({ sku, ...v }) => v) })), generatedAt: new Date().toISOString() };
+  } catch (e) {
+    const saved = await env.GC_KV.get<StorefrontCatalog>("storefront:last", "json");
+    if (!saved) throw e;
+    await logEvent(env, "Square couldn't be reached; showing the last saved catalog", { savedAt: saved.generatedAt, error: errMsg(e) });
+    return saved;
+  }
+  ctx.waitUntil((async () => {
+    await cache.put(PRODUCTS_CACHE_KEY, json(data, 200, { "cache-control": `public, max-age=${PRODUCTS_TTL}` }));
+    // Saved sparingly: KV allows a limited number of writes a day.
+    const saved = await env.GC_KV.get<StorefrontCatalog>("storefront:last", "json");
+    if (!saved || Date.now() - Date.parse(saved.generatedAt) > SAVED_CATALOG_MAX_AGE_MS) await env.GC_KV.put("storefront:last", JSON.stringify(data));
+    // Remember every address a product has had, so a rename in Square redirects instead of breaking links.
+    const known = (await env.GC_KV.get<Record<string, string>>(pages.ADDRESSES_KEY, "json")) || {};
+    const fresh = data.products.filter((p) => known[p.slug] !== p.id);
+    if (fresh.length) {
+      fresh.forEach((p) => { known[p.slug] = p.id; });
+      await env.GC_KV.put(pages.ADDRESSES_KEY, JSON.stringify(known));
+    }
+  })());
+  return data;
+}
+
+async function products(env: Env, ctx: Ctx) {
+  return json(await catalog(env, ctx), 200, { "cache-control": `public, max-age=${PRODUCTS_TTL}` });
+}
+
+// Pages and crawler files built from the catalog (see pages.ts). Null means "serve the static file".
+async function builtPage(env: Env, ctx: Ctx, url: URL) {
+  const path = url.pathname;
+  if (path === "/robots.txt") return pages.robots(env, url);
+  const isProduct = path.startsWith("/product/") && path !== "/product/";
+  if (!isProduct && !["/", "/sitemap.xml", "/llms.txt", "/feeds/google.xml"].includes(path)) return null;
+  let data: StorefrontCatalog;
+  try { data = await catalog(env, ctx); }
+  catch (e) {
+    // The home page still works without the catalog: the browser script loads it. The rest have nothing to show.
+    await logEvent(env, "Page built without the catalog", { path, error: errMsg(e) });
+    if (path === "/") return null;
+    data = { products: [], generatedAt: new Date().toISOString() };
+  }
+  if (isProduct) return pages.productPage(env, url, data);
+  if (path === "/") return pages.homePage(env, url, data);
+  if (path === "/sitemap.xml") return pages.sitemap(env, url, data);
+  if (path === "/llms.txt") return pages.llms(env, url, data);
+  return pages.googleFeed(env, url, data);
 }
 
 const purgeProducts = () => caches.default.delete(PRODUCTS_CACHE_KEY);

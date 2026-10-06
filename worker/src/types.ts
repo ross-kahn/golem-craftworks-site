@@ -17,6 +17,7 @@ export interface Env {
   ONLINE_CATEGORIES?: string;
   HIDDEN_CATEGORIES?: string;
   SYNC_DRY_RUN?: string;
+  NOINDEX?: string; // "true" keeps search engines away (the pre-launch preview address)
   EMAIL_FROM?: string;
   COMMISSION_TO?: string;
 
@@ -155,6 +156,7 @@ export interface StorefrontModifierList {
 
 export interface StorefrontProduct {
   id: string;
+  slug: string; // the readable part of its address: /product/<slug>
   name: string;
   description: string;
   category: string;
@@ -162,6 +164,14 @@ export interface StorefrontProduct {
   variations: StorefrontVariation[];
   modifierLists: StorefrontModifierList[];
   updatedAt?: string;
+}
+
+// What the site and its pages are given: no SKUs, which are internal.
+export type PublicProduct = Omit<StorefrontProduct, "variations"> & { variations: Omit<StorefrontVariation, "sku">[] };
+
+export interface StorefrontCatalog {
+  products: PublicProduct[];
+  generatedAt: string;
 }
 
 // ---------- Etsy ----------

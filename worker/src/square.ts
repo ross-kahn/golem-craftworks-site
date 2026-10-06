@@ -1,5 +1,5 @@
 // Square: catalog, inventory, checkout links, webhook verification.
-import { hmacSha256Base64, enc8, safeEqual } from "./util.ts";
+import { hmacSha256Base64, enc8, safeEqual, slugify } from "./util.ts";
 import type { Env, Fulfillment, SquareCount, SquareObject, StorefrontModifierList, StorefrontProduct } from "./types.ts";
 
 const DEFAULT_VERSION = "2025-05-21"; // first version with the current modifier fields (defaults, min/max)
@@ -208,6 +208,7 @@ export async function buildStorefront(env: Env) {
 
     products.push({
       id: item.id,
+      slug: slugify(d.name ?? "") || item.id.toLowerCase(),
       name: d.name ?? "",
       description: d.description_plaintext || stripHtml(d.description_html) || d.description || "",
       category: cats[0] || "",
@@ -217,6 +218,11 @@ export async function buildStorefront(env: Env) {
       updatedAt: item.updated_at
     });
   }
+
+  // Two items with the same name can't share an address: each gets the end of its Square id added.
+  const taken = new Map<string, number>();
+  products.forEach((p) => taken.set(p.slug, (taken.get(p.slug) || 0) + 1));
+  products.forEach((p) => { if (taken.get(p.slug)! > 1) p.slug += `-${p.id.slice(-6).toLowerCase()}`; });
 
   products.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   return { products, skuMap, counts, tracked };
