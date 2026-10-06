@@ -71,6 +71,18 @@
         render();
     });
     soldToggle.addEventListener("change", render);
+    // A quiet line of proof under the hero buttons: rating, review count, Etsy sales. Hidden until there's something to say.
+    api.getReviews().then(({ stats }) => {
+        const proof = document.querySelector("[data-proof]");
+        const parts = [
+            stats.average !== null ? `★ ${stats.average.toFixed(1)} from ${stats.count.toLocaleString("en-US")} ${stats.count === 1 ? "review" : "reviews"}` : "",
+            stats.etsySales !== null ? `${stats.etsySales.toLocaleString("en-US")} sales on Etsy` : ""
+        ].filter(Boolean);
+        if (proof && parts.length) {
+            proof.textContent = parts.join(" · ");
+            proof.hidden = false;
+        }
+    }).catch(() => { });
     grid.innerHTML = Array.from({ length: 8 }, () => `<li><div class="skeleton"></div><div class="skeleton-line"></div></li>`).join("");
     api.getProducts()
         .then((data) => {

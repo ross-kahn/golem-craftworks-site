@@ -97,6 +97,18 @@
     });
   }
 
+  async function getReviews(): Promise<ReviewData> {
+    const data = await fetchJSON<Partial<ReviewData>>(isDemo()
+      ? siteRoot() + "data/demo-reviews.json"
+      : cfg.apiBase.replace(/\/$/, "") + "/api/reviews");
+    return { reviews: data.reviews || [], stats: data.stats || { count: 0, average: null, etsySales: null } };
+  }
+
+  // Sent as a form rather than JSON because it can carry photos.
+  async function sendReview(data: FormData) {
+    return fetchJSON<{ ok: boolean }>(cfg.apiBase.replace(/\/$/, "") + "/api/reviews", { method: "POST", body: data });
+  }
+
   function money(cents: number | null | undefined): string {
     if (typeof cents !== "number") return "";
     return new Intl.NumberFormat("en-US", {
@@ -110,5 +122,5 @@
     return p.minPrice === p.maxPrice ? money(p.minPrice) : `From ${money(p.minPrice)}`;
   }
 
-  window.GC_API = { getProducts, getProduct, createCheckout, sendCommission, money, priceLabel, isDemo, siteRoot };
+  window.GC_API = { getProducts, getProduct, createCheckout, sendCommission, getReviews, sendReview, money, priceLabel, isDemo, siteRoot };
 })();

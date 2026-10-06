@@ -142,6 +142,17 @@ The hourly check also refreshes the Etsy sign-in, which otherwise expires after 
 
 To run the hourly check on demand: `curl -X POST "https://golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
 
+## Listings from Etsy
+
+To bring Etsy listings into Square, download **Currently for Sale Listings** from Etsy (Shop Manager > Settings > Options > Download Data), then:
+
+```bash
+SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-listings.ts EtsyListingsDownload.csv                                        # preview
+SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-listings.ts EtsyListingsDownload.csv --category="8-piece RPG Dice" --apply  # create
+```
+
+A listing whose SKU isn't in Square becomes a new item (title, description, price, SKU) with a stock count of 1. A listing whose SKU is already in Square only updates that item's title and description. Extra columns in the export, such as tags and materials, are saved on the item as custom attributes. It's safe to run twice. Then copy the photos across with the next step.
+
 ## Photos from Etsy
 
 Your dice photos live on Etsy. To copy them into Square (so Square holds everything the site shows):

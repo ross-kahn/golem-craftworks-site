@@ -30,7 +30,7 @@ interface Email {
 
 // An Env with the email settings filled in.
 type MailEnv = Env & Required<Pick<Env, "RESEND_API_KEY" | "EMAIL_FROM" | "COMMISSION_TO">>;
-const mailReady = (env: Env): env is MailEnv => !!(env.RESEND_API_KEY && env.EMAIL_FROM && env.COMMISSION_TO);
+export const mailReady = (env: Env): env is MailEnv => !!(env.RESEND_API_KEY && env.EMAIL_FROM && env.COMMISSION_TO);
 
 export const isEmail = (s: unknown): s is string =>
   typeof s === "string" && s.length <= LIMITS.email && EMAIL_RE.test(s) && !s.includes("..");
@@ -91,7 +91,7 @@ export function buildEmails(env: MailEnv, d: CommissionData): { shop: Email; cli
   };
 }
 
-async function send(env: MailEnv, message: Email) {
+export async function send(env: MailEnv, message: Email) {
   const res = await fetch(RESEND_URL, {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },

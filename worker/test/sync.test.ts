@@ -392,6 +392,20 @@ test("checkout: add-ons are sent to Square, checked against the item's rules, an
   assert.equal(state.paymentLinks.length, 2);
 });
 
+test("catalog report: says why each Square item is or isn't on the site", async () => {
+  state.catalog[0].is_deleted = true;
+  const env = makeEnv();
+  assert.equal((await worker.fetch(new Request("https://w.example/admin/catalog"), env, ctx())).status, 404);
+  const r = (await (await worker.fetch(new Request("https://w.example/admin/catalog?token=admintoken"), env, ctx())).json()) as any;
+  assert.deepEqual(Object.fromEntries(r.items.map((i: any) => [i.name, i.status])), {
+    "Ember dice set": "deleted in Square", "Yahtzee set": "on the site",
+    "Sticker": "in a hidden category", "Archived thing": "archived in Square"
+  });
+  assert.deepEqual(r.totals, { "deleted in Square": 1, "on the site": 1, "in a hidden category": 1, "archived in Square": 1 });
+  assert.deepEqual(r.items.find((i: any) => i.name === "Yahtzee set").skus, ["YZ-WAL", "YZ-CHE"]);
+  assert.equal(calls.find((c) => c.url.endsWith("/v2/catalog/search"))!.body.include_deleted_objects, true);
+});
+
 test("admin endpoints require the token", async () => {
   const env = makeEnv();
   const no = await worker.fetch(new Request("https://w.example/admin/status"), env, ctx());

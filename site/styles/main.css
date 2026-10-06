@@ -64,6 +64,8 @@ body {
 
 img { max-width: 100%; display: block; }
 
+[hidden] { display: none !important; }
+
 a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }
 
@@ -210,6 +212,10 @@ p { margin: 0 0 1em; max-width: 66ch; }
 .hero h1 { max-width: 13ch; margin-bottom: 0.4em; }
 .hero p { font-size: var(--step-1); line-height: 1.4; max-width: 30ch; color: #e6e6e6; }
 .hero__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.hero__proof {
+  align-self: flex-start; margin-top: 20px;
+  font-family: var(--font-display); font-size: 0.95rem; color: #e6e6e6;
+}
 
 /* The golem rises from the bottom edge, cropped at the waist. */
 .hero__golem {
@@ -500,6 +506,32 @@ p { margin: 0 0 1em; max-width: 66ch; }
 @media (min-width: 720px) { .form-panel { padding: 32px; } }
 .form-panel h2 { font-size: var(--step-2); }
 .form-status { font-family: var(--font-display); margin: 0; }
+
+/* ---------- Reviews ---------- */
+
+.stars { letter-spacing: 2px; }
+.stars__off { color: var(--rule); }
+.page-head .review-summary { font-family: var(--font-display); font-size: var(--step-0); color: var(--ink); max-width: none; margin: 12px 0 0; }
+.reviews { list-style: none; margin: 0 0 24px; padding: 0; }
+.review { padding: 22px 0; border-bottom: 1px solid var(--rule); }
+.review:first-child { padding-top: 0; }
+.review__head { margin: 0 0 6px; font-size: 1.1rem; }
+.review__text { margin: 0 0 10px; white-space: pre-line; }
+.review__photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.review__photos img { width: 96px; height: 96px; object-fit: cover; background: var(--wash); border-radius: 2px; }
+.review__by { margin: 0; font-family: var(--font-display); font-size: 0.9rem; color: var(--graphite); }
+.review-legal { font-size: 0.8rem; color: var(--graphite); }
+
+/* Star picker: the radios run 5 to 1 and are laid out right to left, so a star and all before it fill in. */
+.stars-input { border: 0; padding: 0; margin: 0; }
+.stars-input legend { font-family: var(--font-display); font-weight: 650; padding: 0; margin-bottom: 6px; }
+.stars-input__row { display: inline-flex; flex-direction: row-reverse; justify-self: start; }
+.stars-input input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; padding: 0; }
+.stars-input label { cursor: pointer; padding: 0 3px; font-size: 2rem; line-height: 1; color: var(--rule); }
+.stars-input label::before { content: "\2605"; }
+.stars-input input:checked ~ label, .stars-input label:hover, .stars-input label:hover ~ label { color: var(--ink); }
+.stars-input input:focus-visible + label { outline: 3px solid var(--ink); outline-offset: 2px; }
+.field input[type="file"] { padding: 10px; }
 
 /* ---------- Thanks ---------- */
 .thanks { padding: 80px 0 100px; text-align: center; }

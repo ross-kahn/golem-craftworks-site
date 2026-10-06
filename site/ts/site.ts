@@ -94,6 +94,7 @@
     const links = [
       link(root, "Shop", "shop"),
       link(root + "commissions/", "Commissions", "commissions"),
+      link(root + "reviews/", "Reviews", "reviews"),
       link(root + "about/", "About", "about")
     ].join("");
     return `
@@ -138,6 +139,7 @@
             <ul>
               <li><a href="${root}">All products</a></li>
               <li><a href="${root}commissions/">Commissions</a></li>
+              <li><a href="${root}reviews/">Reviews</a></li>
               <li><a href="${root}about/">About</a></li>
             </ul>
           </div>

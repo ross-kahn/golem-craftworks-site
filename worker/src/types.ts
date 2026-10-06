@@ -27,6 +27,7 @@ export interface Env {
   ETSY_WEBHOOK_SECRET?: string;
   ADMIN_TOKEN?: string;
   RESEND_API_KEY?: string;
+  TURNSTILE_SECRET?: string;
 }
 
 export type Ctx = Pick<ExecutionContext, "waitUntil">;
@@ -224,6 +225,41 @@ export interface EtsyReceipt {
 export interface EtsyWebhookEvent {
   event_type: string;
   resource_url: string;
+}
+
+// ---------- Reviews ----------
+
+// A review as the site shows it, from Etsy or left on the site.
+export interface PublicReview {
+  id: string;
+  source: "etsy" | "site";
+  name: string;
+  rating: number;
+  text: string;
+  product: string;
+  photos: string[];
+  at: string;
+}
+
+// A review left on the site, as stored. No email address: that only goes out in the notification email.
+export interface SiteReview {
+  id: string;
+  key: string; // secret for this review's approval link
+  status: "pending" | "approved";
+  name: string;
+  rating: number;
+  text: string;
+  product: string;
+  photoTypes: string[]; // content type of each stored photo
+  at: string;
+}
+
+export interface EtsyReviewCache {
+  at: number;
+  sales: number | null; // all-time sales, as shown on the Etsy shop
+  count: number;
+  average: number | null;
+  reviews: PublicReview[];
 }
 
 // ---------- Sync results ----------

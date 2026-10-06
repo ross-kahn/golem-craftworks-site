@@ -6,6 +6,7 @@ interface SiteConfig {
   contactEmail: string;
   instagramUrl: string;
   etsyUrl: string;
+  turnstileSiteKey: string;
   shippingLabel: string;
   shippingCents: number;
   pickupLabel: string;
@@ -65,6 +66,22 @@ interface Product extends Omit<RawProduct, "variations" | "modifierLists" | "uni
   maxPrice: number | null;
 }
 
+interface Review {
+  id: string;
+  source: "etsy" | "site";
+  name: string;
+  rating: number;
+  text: string;
+  product: string;
+  photos: string[];
+  at: string;
+}
+
+interface ReviewData {
+  reviews: Review[];
+  stats: { count: number; average: number | null; etsySales: number | null };
+}
+
 type Fulfillment = "ship" | "pickup";
 
 interface CartLine {
@@ -101,6 +118,8 @@ interface GCApi {
   getProduct(id: string): Promise<Product | null>;
   createCheckout(order: { lines: CartLine[]; fulfillment: Fulfillment }): Promise<{ url?: string }>;
   sendCommission(data: CommissionData): Promise<{ ok: boolean; confirmationSent: boolean }>;
+  getReviews(): Promise<ReviewData>;
+  sendReview(data: FormData): Promise<{ ok: boolean }>;
   money(cents: number | null | undefined): string;
   priceLabel(p: Product): string;
   isDemo(): boolean;

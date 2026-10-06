@@ -47,8 +47,8 @@ ALLOWED_ORIGINS = "https://preview.golemcraftworks.com"
 SQUARE_ENV = "production"            # "sandbox" while testing
 SQUARE_LOCATION_ID = "LNQ38H5968VDC"
 SQUARE_WEBHOOK_URL = "https://preview.golemcraftworks.com/webhooks/square"   # must match the URL given to Square exactly
-ETSY_KEYSTRING = "REPLACE_ME"
-ETSY_SHOP_ID = "REPLACE_ME"
+ETSY_KEYSTRING = "6ae72rteu6oiyw8qal74efaq"
+ETSY_SHOP_ID = "52196219"
 SHIPPING_FLAT_CENTS = "800"
 # Optional: only list items in these Square categories online (comma-separated). Empty = everything.
 ONLINE_CATEGORIES = ""
@@ -67,3 +67,4 @@ COMMISSION_TO = "golemcraftworks@gmail.com"
 #   ETSY_WEBHOOK_SECRET
 #   ADMIN_TOKEN
 #   RESEND_API_KEY
+#   TURNSTILE_SECRET   (optional: spam check on the review form; pair with turnstileSiteKey in site/ts/config.ts)

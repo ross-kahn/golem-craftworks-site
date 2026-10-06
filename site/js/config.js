@@ -7,6 +7,9 @@ window.GC_CONFIG = {
     contactEmail: "golemcraftworks@gmail.com",
     instagramUrl: "https://www.instagram.com/golem_craftworks/",
     etsyUrl: "https://golemcraftworks.etsy.com",
+    // Optional spam check on the review form (Cloudflare Turnstile). Leave empty to go without it.
+    // Needs the matching TURNSTILE_SECRET set on the Worker.
+    turnstileSiteKey: "",
     // Shown in the cart. The real amount is enforced by the Worker (SHIPPING_FLAT_CENTS).
     shippingLabel: "Flat-rate shipping, US only",
     shippingCents: 800,

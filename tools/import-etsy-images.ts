@@ -11,6 +11,7 @@
 // Options: --max-images=5   --sandbox   --include-items-with-photos
 
 import { readFileSync } from "node:fs";
+import { parseCSV, norm, squareClient, postJSON } from "./shared.ts";
 
 // The parts of a Square catalog item this script reads.
 interface SquareItem {
@@ -31,55 +32,18 @@ const SANDBOX = args.includes("--sandbox");
 const INCLUDE_WITH_PHOTOS = args.includes("--include-items-with-photos");
 const MAX = Number((args.find((a) => a.startsWith("--max-images=")) || "=5").split("=")[1]);
 const TOKEN = process.env.SQUARE_ACCESS_TOKEN;
-const BASE = SANDBOX ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
-const VERSION = process.env.SQUARE_VERSION || "2025-01-23";
 
 if (!file || !TOKEN) {
   console.error("Usage: SQUARE_ACCESS_TOKEN=... node tools/import-etsy-images.ts <etsy-export.csv> [--apply]");
   process.exit(1);
 }
 
-// Minimal RFC 4180 CSV parser (handles quotes, commas and newlines inside fields).
-function parseCSV(text: string): Record<string, string>[] {
-  const rows: string[][] = []; let row: string[] = []; let field = ""; let q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) {
-      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') q = false;
-      else field += c;
-    } else if (c === '"') q = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(field); rows.push(row); row = []; field = "";
-    } else field += c;
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  const [head, ...body] = rows.filter((r) => r.some((x) => x.trim()));
-  const keys = head.map((h) => h.trim().toUpperCase());
-  return body.map((r) => Object.fromEntries(keys.map((k, i) => [k, (r[i] || "").trim()])));
-}
-
-const norm = (s: string | undefined) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-
-async function sq<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(BASE + path, {
-    ...init,
-    headers: { authorization: `Bearer ${TOKEN}`, "square-version": VERSION, ...(init.headers || {}) }
-  });
-  const data = (await res.json().catch(() => ({}))) as T & { errors?: unknown };
-  if (!res.ok) throw new Error(`${path}: ${res.status} ${JSON.stringify(data.errors || data)}`);
-  return data;
-}
+const sq = squareClient({ token: TOKEN, sandbox: SANDBOX });
 
 async function squareItems() {
   const items: SquareItem[] = []; let cursor: string | undefined;
   do {
-    const d = await sq<{ objects?: SquareItem[]; cursor?: string }>("/v2/catalog/search", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ object_types: ["ITEM"], cursor, limit: 1000 })
-    });
+    const d = await sq<{ objects?: SquareItem[]; cursor?: string }>("/v2/catalog/search", postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }));
     items.push(...(d.objects || [])); cursor = d.cursor;
   } while (cursor);
   return items.filter((i) => !i.is_deleted && !i.item_data?.is_archived);

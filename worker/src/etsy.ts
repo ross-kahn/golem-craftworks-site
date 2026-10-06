@@ -86,6 +86,17 @@ export async function etsyAccessToken(env: Env) {
 
 // ---------- API calls ----------
 
+// The app key is enough for public shop data (reviews, sales count); no shop sign-in needed.
+export const etsyKeyReady = (env: Env) =>
+  [env.ETSY_KEYSTRING, env.ETSY_SHOP_ID, env.ETSY_SHARED_SECRET].every((v) => !!v && v !== "REPLACE_ME");
+
+export async function etsyPublic<T>(env: Env, path: string): Promise<T> {
+  const res = await fetch(API + path, { headers: { "x-api-key": apiKey(env) } });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(`Etsy GET ${path} failed (${res.status}) ${data.error || ""}`);
+  return data;
+}
+
 export async function etsy<T>(
   env: Env,
   pathOrUrl: string,

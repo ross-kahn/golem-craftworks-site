@@ -4,7 +4,11 @@
 //   POST /api/commission        emails a commission request to the shop + a confirmation to the client
 //   POST /webhooks/square       Square inventory changes -> Etsy
 //   POST /webhooks/etsy         Etsy paid orders -> Square
+//   GET  /api/reviews           Etsy reviews + approved site reviews, with totals
+//   POST /api/reviews           leave a review (held for approval)
+//   GET  /admin/reviews         every site review (needs ?token=); each has its own approval link
 //   GET  /admin/status          sync health (needs ?token=ADMIN_TOKEN)
+//   GET  /admin/catalog         every Square item and why it is or isn't on the site (needs ?token=)
 //   POST /admin/reconcile       run the hourly check now (needs ?token=)
 //   GET  /admin/etsy/connect    one-time Etsy sign-in (needs ?token=)
 //   cron (hourly)               safety check + Etsy token refresh
@@ -13,6 +17,7 @@ import * as square from "./square.ts";
 import * as etsyApi from "./etsy.ts";
 import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.ts";
 import { commission } from "./commission.ts";
+import * as reviews from "./reviews.ts";
 import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
 import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontProduct } from "./types.ts";
 
@@ -29,6 +34,10 @@ export default {
       if (url.pathname === "/api/products" && request.method === "GET") return withCors(await products(env, ctx), cors);
       if (url.pathname === "/api/checkout" && request.method === "POST") return withCors(await checkout(request, env), cors);
       if (url.pathname === "/api/commission" && request.method === "POST") return withCors(await commission(request, env), cors);
+      if (url.pathname === "/api/reviews" && request.method === "GET") return withCors(await reviews.list(env, ctx), cors);
+      if (url.pathname === "/api/reviews" && request.method === "POST") return withCors(await reviews.submit(request, env), cors);
+      if (url.pathname.startsWith("/api/reviews/photo/") && request.method === "GET") return reviews.photo(env, url);
+      if (url.pathname === "/admin/reviews" || url.pathname === "/admin/review") return reviews.moderate(request, env, url);
       if (url.pathname === "/webhooks/square" && request.method === "POST") return squareWebhook(request, env, ctx);
       if (url.pathname === "/webhooks/etsy" && request.method === "POST") return etsyWebhook(request, env, ctx);
       if (url.pathname.startsWith("/admin/")) return admin(request, env, url);
@@ -43,6 +52,8 @@ export default {
 
   async scheduled(_event: unknown, env: Env, ctx: Ctx): Promise<void> {
     ctx.waitUntil((async () => {
+      try { await reviews.refreshEtsyReviews(env); }
+      catch (e) { await logEvent(env, "Etsy reviews didn't refresh", { error: errMsg(e) }); }
       try {
         await etsyApi.etsyAccessToken(env); // keeps the 90-day refresh token alive
         await reconcile(env);
@@ -207,6 +218,11 @@ async function admin(request: Request, env: Env, url: URL) {
       lastHourlyCheck: last,
       recentActivity: log || []
     });
+  }
+  if (url.pathname === "/admin/catalog") {
+    const report = await square.catalogReport(env);
+    await env.GC_KV.put("status:catalog", JSON.stringify(report));
+    return json(report);
   }
   if (url.pathname === "/admin/reconcile" && request.method === "POST") {
     return json(await reconcile(env));

@@ -40,14 +40,14 @@ export async function sq<T>(env: Env, path: string, { method = "GET", body }: { 
 // ---------- Catalog ----------
 
 // Every ITEM with its variations, images and categories (paginated).
-export async function fetchCatalog(env: Env) {
+export async function fetchCatalog(env: Env, { includeDeleted = false } = {}) {
   const items: SquareObject[] = [];
   const related = new Map<string, SquareObject>();
   let cursor: string | undefined;
   do {
     const data = await sq<CatalogResponse>(env, "/v2/catalog/search", {
       method: "POST",
-      body: { object_types: ["ITEM"], include_related_objects: true, cursor, limit: 1000 }
+      body: { object_types: ["ITEM"], include_related_objects: true, include_deleted_objects: includeDeleted, cursor, limit: 1000 }
     });
     (data.objects || []).forEach((o) => items.push(o));
     (data.related_objects || []).forEach((o) => related.set(o.id, o));
@@ -220,6 +220,40 @@ export async function buildStorefront(env: Env) {
 
   products.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   return { products, skuMap, counts, tracked };
+}
+
+// Every item Square knows about, deleted ones included, with why each is or isn't on the site.
+// Read-only; for working out where an item went (/admin/catalog).
+export async function catalogReport(env: Env) {
+  const { items, related } = await fetchCatalog(env, { includeDeleted: true });
+  const loc = env.SQUARE_LOCATION_ID;
+  const csv = (v?: string) => (v || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const onlineCats = csv(env.ONLINE_CATEGORIES), hiddenCats = csv(env.HIDDEN_CATEGORIES);
+  const rows = items.map((item) => {
+    const d = item.item_data || {};
+    const variations = (d.variations || []).filter((v) => !v.is_deleted);
+    const cats = categoryNames(item, related);
+    const lower = cats.map((c) => c.toLowerCase());
+    const sellable = variations.some((v) => {
+      const vd = v.item_variation_data || {};
+      return presentHere(v, loc) && vd.price_money && vd.pricing_type !== "VARIABLE_PRICING" && vd.sellable !== false;
+    });
+    const status =
+      item.is_deleted ? "deleted in Square" :
+      d.is_archived ? "archived in Square" :
+      !presentHere(item, loc) ? "not at this Square location" :
+      onlineCats.length && !lower.some((c) => onlineCats.includes(c)) ? "not in an online category" :
+      hiddenCats.length && lower.some((c) => hiddenCats.includes(c)) ? "in a hidden category" :
+      !sellable ? "no variation with a fixed price at this location" :
+      "on the site";
+    return {
+      status, name: d.name || "", categories: cats, updatedAt: item.updated_at,
+      skus: variations.map((v) => v.item_variation_data?.sku || "").filter(Boolean)
+    };
+  }).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  const totals: Record<string, number> = {};
+  rows.forEach((r) => { totals[r.status] = (totals[r.status] || 0) + 1; });
+  return { at: new Date().toISOString(), locationId: loc, totals, items: rows };
 }
 
 function stripHtml(html?: string) {
