@@ -58,7 +58,7 @@ const fill = (html: string, name: string, content: string) =>
 // Product data in the form search engines read (schema.org).
 function productData(p: PublicProduct, link: string, env: Env) {
   const availability = madeToOrder(p) ? "MadeToOrder" : inStock(p) ? "InStock" : "OutOfStock";
-  const shipping = Number(env.SHIPPING_FLAT_CENTS || 0);
+  const shipping = shippingCents(env);
   const common = {
     priceCurrency: "USD",
     availability: `https://schema.org/${availability}`,
@@ -158,6 +158,23 @@ export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
   return page(fill(html, "grid", cards), env);
 }
 
+// ---------- The shipping price, from SHIPPING_FLAT_CENTS ----------
+
+const shippingCents = (env: Env) => Number(env.SHIPPING_FLAT_CENTS || 0);
+
+// The site's settings file with the real shipping price laid over the one written in it.
+export async function siteConfig(env: Env, url: URL) {
+  const js = await template(env, url, "/js/config.js");
+  if (js === null) return null;
+  return new Response(`${js}\nwindow.GC_CONFIG.shippingCents = ${shippingCents(env)};\n`,
+    { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=300" } });
+}
+
+export async function shippingPage(env: Env, url: URL) {
+  const html = await template(env, url, "/shipping/");
+  return html === null ? null : page(fill(html, "shipping-price", money(shippingCents(env))), env);
+}
+
 // ---------- Files for crawlers ----------
 
 const STATIC_PAGES = ["/", "/commissions/", "/reviews/", "/about/", "/shipping/"];
@@ -189,7 +206,7 @@ export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
   const categories = [...new Set(catalog.products.map((p) => p.category || "Other"))];
   return file([
     `# ${SHOP}`, "",
-    `> ${TAGLINE} Everything is designed and made by one person, Ross. Orders ship flat-rate within the US or can be picked up in Madison. Custom commissions are welcome.`, "",
+    `> ${TAGLINE} Everything is designed and made by one person, Ross. Orders ship within the US for a flat ${money(shippingCents(env))} or can be picked up in Madison for free. Custom commissions are welcome.`, "",
     "## Pages", "",
     `- [Shop](${base}/): everything currently available`,
     `- [Commissions](${base}/commissions/): how custom orders work, and the request form`,

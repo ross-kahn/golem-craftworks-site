@@ -10,8 +10,10 @@ window.GC_CONFIG = {
     // Optional spam check on the review form (Cloudflare Turnstile). Leave empty to go without it.
     // Needs the matching TURNSTILE_SECRET set on the Worker.
     turnstileSiteKey: "",
-    // Shown in the cart. The real amount is enforced by the Worker (SHIPPING_FLAT_CENTS).
     shippingLabel: "Flat-rate shipping, US only",
+    // Don't change the price here. The Worker replaces this with SHIPPING_FLAT_CENTS from
+    // worker/wrangler.toml, the one place the shipping price is set. This number is only used
+    // in demo mode, where there is no Worker.
     shippingCents: 800,
     pickupLabel: "Local pickup or drop-off in Madison, WI",
     pickupNote: "I'll email you to set a time.",

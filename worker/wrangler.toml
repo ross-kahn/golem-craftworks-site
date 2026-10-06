@@ -10,7 +10,9 @@ not_found_handling = "404-page"
 run_worker_first = [
   "/api/*", "/webhooks/*", "/admin/*",
   # Built from the catalog so search engines and AI crawlers see real content (worker/src/pages.ts).
-  "/", "/product/*", "/sitemap.xml", "/robots.txt", "/llms.txt", "/feeds/*"
+  "/", "/product/*", "/sitemap.xml", "/robots.txt", "/llms.txt", "/feeds/*",
+  # These two show the shipping price, which is filled in from SHIPPING_FLAT_CENTS below.
+  "/js/config.js", "/shipping/"
 ]
 
 # Builds site/ts -> site/js before every deploy and `wrangler dev`.
@@ -55,6 +57,8 @@ SQUARE_LOCATION_ID = "LNQ38H5968VDC"
 SQUARE_WEBHOOK_URL = "https://preview.golemcraftworks.com/webhooks/square"   # must match the URL given to Square exactly
 ETSY_KEYSTRING = "6ae72rteu6oiyw8qal74efaq"
 ETSY_SHOP_ID = "52196219"
+# The flat shipping price, in cents. This is the only place it's set: checkout, the cart,
+# the shipping page and the product data for search engines all read it from here.
 SHIPPING_FLAT_CENTS = "800"
 # Optional: only list items in these Square categories online (comma-separated). Empty = everything.
 ONLINE_CATEGORIES = ""

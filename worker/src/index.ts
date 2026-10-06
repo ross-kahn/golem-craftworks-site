@@ -121,6 +121,8 @@ async function products(env: Env, ctx: Ctx) {
 async function builtPage(env: Env, ctx: Ctx, url: URL) {
   const path = url.pathname;
   if (path === "/robots.txt") return pages.robots(env, url);
+  if (path === "/js/config.js") return pages.siteConfig(env, url);
+  if (path === "/shipping/") return pages.shippingPage(env, url);
   const isProduct = path.startsWith("/product/") && path !== "/product/";
   if (!isProduct && !["/", "/sitemap.xml", "/llms.txt", "/feeds/google.xml"].includes(path)) return null;
   let data: StorefrontCatalog;

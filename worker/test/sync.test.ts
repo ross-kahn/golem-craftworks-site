@@ -456,6 +456,23 @@ test("home page lists what's available; same-named items get distinct addresses"
   assert.equal((await get(env, "/product/yahtzee-set-i_dice")).status, 200, "but its page is still there");
 });
 
+test("the shipping price comes from one setting, everywhere it's shown", async () => {
+  const env = makeEnv({ ASSETS, SHIPPING_FLAT_CENTS: "950" });
+  const config = await get(env, "/js/config.js");
+  assert.ok((config.headers.get("content-type") || "").includes("javascript"));
+  const js = await config.text();
+  assert.ok(js.includes('shopName: "Golem Craftworks"') && js.trimEnd().endsWith("window.GC_CONFIG.shippingCents = 950;"));
+
+  const shipping = await (await get(env, "/shipping/")).text();
+  assert.ok(shipping.includes("for a flat $9.50, however many") && !shipping.includes("ssr:"));
+  assert.ok((await (await get(env, "/llms.txt")).text()).includes("for a flat $9.50"));
+  const product = await (await get(env, "/product/yahtzee-set")).text();
+  assert.ok(product.includes('"shippingRate":{"@type":"MonetaryAmount","value":"9.50"'));
+
+  await worker.fetch(new Request("https://w.example/api/checkout", { method: "POST", body: JSON.stringify({ lines: [{ variationId: "V_WAL", qty: 1 }] }) }), env, ctx());
+  assert.equal(state.paymentLinks[0].checkout_options.shipping_fee.charge.amount, 950);
+});
+
 test("renaming an item in Square redirects its old address to the new one", async () => {
   const env = makeEnv({ ASSETS });
   const visit = async (path: string) => { const c = ctx(); const res = await worker.fetch(new Request("https://w.example" + path), env, c); await c.done(); return res; };

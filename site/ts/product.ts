@@ -25,6 +25,14 @@
     return { text: "In stock", cls: "" };
   }
 
+  // The nudge toward commissions, worded for what's on the page.
+  function customPrompt(p: Product) {
+    const category = (p.category || "").toLowerCase();
+    if (/\b(dice|die)\b/.test(category)) return "Want a set in colors of your own?";
+    if (/wood/.test(category)) return "Want it engraved or made in a different wood?";
+    return "Want something made just for you?";
+  }
+
   // What Square's min/max rules mean for the buyer, when it isn't obvious from the options.
   function listHint(l: ModifierList) {
     if (l.modifiers.length === 1) return l.min ? "" : "Optional";
@@ -85,7 +93,7 @@
           </div>
           <div class="product__aside">
             <p><strong style="font-family:var(--font-display)">Shipping or pickup.</strong> Ships flat-rate in the US, or pick up in Madison for free.</p>
-            <p>Want it engraved or made in a different wood? <a href="${root}commissions/">Start a commission</a>.</p>
+            <p>${customPrompt(p)} <a href="${root}commissions/">Start a commission</a>.</p>
           </div>
         </div>
       </div>`;

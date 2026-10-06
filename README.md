@@ -187,7 +187,7 @@ It matches by SKU, then by exact title, skips Square items that already have pho
 
 - **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute, with no deploy. If you also want it on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.
 - **Hide something from the website** (market-only items): put it in a Square category, add that category name to `HIDDEN_CATEGORIES` in wrangler.toml, then `npm run deploy`.
-- **Change shipping:** `SHIPPING_FLAT_CENTS` in wrangler.toml (what's charged) and `shippingCents` in `site/ts/config.ts` (what the cart shows), then `npm run deploy`.
+- **Change shipping:** `SHIPPING_FLAT_CENTS` in `worker/wrangler.toml`, then `npm run deploy`. Checkout, the cart, the shipping page and the product data for search engines all follow it. Update the shipping setting in Google Merchant Center to match.
 
 ## Known limits
 
