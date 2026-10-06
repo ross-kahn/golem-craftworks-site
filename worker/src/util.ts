@@ -64,12 +64,6 @@ export const isTrue = (v: unknown) => String(v || "").toLowerCase() === "true";
 export const slugify = (s: string) =>
   s.normalize("NFKD").replace(/[\u0300-\u036f'’"]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-// "can&#39;t" -> "can't". Text from Etsy and Square arrives with characters written as HTML codes.
-const NAMED_ENTITIES: Record<string, string> = { nbsp: " ", lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" };
-export const decodeEntities = (s: string) =>
-  s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, dec, hex, name) =>
-    dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : NAMED_ENTITIES[name.toLowerCase()] ?? m);
-
 export const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 // Append a line to a short rolling activity log in KV, visible at /admin/status.

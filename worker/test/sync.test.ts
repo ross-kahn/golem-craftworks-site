@@ -198,6 +198,17 @@ test("storefront: an item marked sold out in Square shows as sold, even when sto
   assert.equal(await qty(), 0);
 });
 
+test("storefront: newest pieces come first, and editing one doesn't move it", async () => {
+  const [dice, yahtzee] = state.catalog;
+  dice.created_at = "2026-03-01T00:00:00Z"; dice.updated_at = "2026-10-06T00:00:00Z"; // old, just edited
+  yahtzee.created_at = "2026-09-15T00:00:00Z"; yahtzee.updated_at = "2026-09-15T00:00:00Z";
+  const order = async () => (await square.buildStorefront(makeEnv())).products.map((p) => p.id);
+  assert.deepEqual(await order(), ["I_YZ", "I_DICE"]);
+  // Added in the same batch: alphabetical, so the order is steady.
+  dice.created_at = yahtzee.created_at;
+  assert.deepEqual(await order(), ["I_DICE", "I_YZ"]);
+});
+
 test("storefront: descriptions keep their paragraphs", async () => {
   const d = state.catalog[1].item_data;
   d.description_plaintext = "One.\nTwo:\nA, B\nThree & <four>";
@@ -206,6 +217,23 @@ test("storefront: descriptions keep their paragraphs", async () => {
   assert.equal(await text(), "One.\n\nTwo:\nA, B\n\n- Walnut\n- Maple\n\nThree & <four> 'five' six");
   delete d.description_html;
   assert.equal(await text(), "One.\nTwo:\nA, B\nThree & <four>", "plain text is the fallback");
+});
+
+test("storefront: dice sets share one description, with Square's text as the set-specific part", async () => {
+  const d = state.catalog[0].item_data;
+  d.name = '"EMBER" TTRPG Dice Set';
+  d.description_html = "<p>Glows like a $5 campfire.</p>";
+  const text = async () => (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_DICE")!.description;
+  const paragraphs = (await text()).split("\n\n");
+  assert.deepEqual(paragraphs.slice(0, 3), ["EMBER 8-Piece Dice Set", "Tabletop Gaming Dice for Dungeons & Dragons (D&D), Pathfinder, Call of Cthulhu, Shadowrun, and more", "Glows like a $5 campfire."]);
+  assert.equal(paragraphs.at(-1), "Thanks for checking out my work!");
+
+  // A description not yet trimmed in Square doesn't say everything twice.
+  d.description_html = "<p>EMBER 8-Piece Dice Set</p><p>Glows like a $5 campfire.</p><p>Thanks for checking out my work, cheers!</p>";
+  assert.deepEqual((await text()).split("\n\n"), paragraphs);
+
+  delete d.description_html; d.description_plaintext = "";
+  assert.deepEqual((await text()).split("\n\n"), paragraphs.filter((p) => !p.startsWith("Glows")), "nothing set-specific: the template alone");
 });
 
 test("storefront: modifier lists carry Square's defaults and limits", async () => {

@@ -1,5 +1,6 @@
 // Square: catalog, inventory, checkout links, webhook verification.
-import { hmacSha256Base64, enc8, safeEqual, slugify, decodeEntities } from "./util.ts";
+import { hmacSha256Base64, enc8, safeEqual, slugify } from "./util.ts";
+import { diceSetName, diceSetDescription, htmlToText } from "./descriptions.ts";
 import type { Env, Fulfillment, SquareCount, SquareObject, StorefrontModifierList, StorefrontProduct } from "./types.ts";
 
 const DEFAULT_VERSION = "2025-05-21"; // first version with the current modifier fields (defaults, min/max)
@@ -206,16 +207,21 @@ export async function buildStorefront(env: Env) {
       .filter((v) => v !== null);
     if (!vs.length) continue;
 
+    // The formatted description first: Square's plain-text copy runs every paragraph together.
+    const text = htmlToText(d.description_html) || d.description_plaintext || d.description || "";
+    const set = diceSetName(d.name ?? "");
+
     products.push({
       id: item.id,
       slug: slugify(d.name ?? "") || item.id.toLowerCase(),
       name: d.name ?? "",
-      // The formatted description first: Square's plain-text copy runs every paragraph together.
-      description: stripHtml(d.description_html) || d.description_plaintext || d.description || "",
+      // Dice sets share one description (descriptions.ts); Square's text is the set-specific part of it.
+      description: set ? diceSetDescription(set, text) : text,
       category: cats[0] || "",
       images,
       variations: vs,
       modifierLists: modifierLists(item, related, loc),
+      createdAt: item.created_at,
       updatedAt: item.updated_at
     });
   }
@@ -225,7 +231,9 @@ export async function buildStorefront(env: Env) {
   products.forEach((p) => taken.set(p.slug, (taken.get(p.slug) || 0) + 1));
   products.forEach((p) => { if (taken.get(p.slug)! > 1) p.slug += `-${p.id.slice(-6).toLowerCase()}`; });
 
-  products.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  // Newest pieces first, by when they were added to Square. Editing an item doesn't move it.
+  const added = (p: StorefrontProduct) => p.createdAt || p.updatedAt || "";
+  products.sort((a, b) => added(b).localeCompare(added(a)) || a.name.localeCompare(b.name));
   return { products, skuMap, counts, tracked };
 }
 
@@ -261,16 +269,6 @@ export async function catalogReport(env: Env) {
   const totals: Record<string, number> = {};
   rows.forEach((r) => { totals[r.status] = (totals[r.status] || 0) + 1; });
   return { at: new Date().toISOString(), locationId: loc, totals, items: rows };
-}
-
-// Formatted text to plain text, keeping the shape: a blank line between paragraphs, single breaks within them.
-function stripHtml(html?: string) {
-  if (!html) return "";
-  return decodeEntities(html
-    .replace(/\s*\n\s*/g, " ")
-    .replace(/<\/(p|div|ul|ol|h\d)>/gi, "\n\n").replace(/<(br\s*\/?|\/li)>/gi, "\n").replace(/<li[^>]*>/gi, "- ")
-    .replace(/<[^>]+>/g, ""))
-    .replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export async function retrieveVariations(env: Env, ids: string[]) {

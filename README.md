@@ -183,6 +183,17 @@ SQUARE_ACCESS_TOKEN=xxx node tools/import-etsy-images.ts EtsyListingsDownload.cs
 
 It matches by SKU, then by exact title, skips Square items that already have photos, and lists any Etsy listings it couldn't match.
 
+## Dice set descriptions
+
+Every dice set shares one description, kept in `worker/src/descriptions.ts`. Edit it there, then `npm run deploy`, and every set follows. A set's description in Square holds only what's particular to that set; the site drops it into the template where `{NOTES}` is. An item counts as a dice set when it's named like `"JAVA" TTRPG Dice Set`.
+
+To cut the existing Square descriptions down to their set-specific parts (once):
+
+```bash
+SQUARE_ACCESS_TOKEN=xxx node tools/clear-dice-descriptions.ts          # preview: shows what each set keeps
+SQUARE_ACCESS_TOKEN=xxx node tools/clear-dice-descriptions.ts --apply
+```
+
 ## Day to day
 
 - **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute, with no deploy. If you also want it on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.

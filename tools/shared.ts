@@ -43,3 +43,8 @@ export type SquareCall = ReturnType<typeof squareClient>;
 
 export const postJSON = (body: unknown): RequestInit =>
   ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+// Plain text to the formatted description Square stores: a paragraph per blank line, breaks within them.
+const escapeHtml = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+export const descriptionHtml = (text: string) =>
+  text.split(/\r?\n\s*\r?\n/).map((p) => p.trim()).filter(Boolean).map((p) => `<p>${escapeHtml(p).replace(/\r?\n/g, "<br>")}</p>`).join("");

@@ -104,6 +104,7 @@ export interface SquareObject {
   id: string;
   type?: string;
   is_deleted?: boolean;
+  created_at?: string;
   updated_at?: string;
   present_at_all_locations?: boolean;
   present_at_location_ids?: string[];
@@ -163,6 +164,7 @@ export interface StorefrontProduct {
   images: string[];
   variations: StorefrontVariation[];
   modifierLists: StorefrontModifierList[];
+  createdAt?: string; // when the item was added to Square: the shop's display order, newest first
   updatedAt?: string;
 }
 

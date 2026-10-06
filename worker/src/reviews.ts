@@ -6,7 +6,8 @@
 
 import * as etsyApi from "./etsy.ts";
 import { isEmail, mailReady, send } from "./commission.ts";
-import { json, logEvent, errMsg, safeEqual, decodeEntities } from "./util.ts";
+import { json, logEvent, errMsg, safeEqual } from "./util.ts";
+import { decodeEntities } from "./descriptions.ts";
 import type { Ctx, Env, EtsyReviewCache, PublicReview, SiteReview } from "./types.ts";
 
 const CACHE_KEY = "https://cache.golemcraftworks.internal/reviews";

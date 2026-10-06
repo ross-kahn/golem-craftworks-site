@@ -24,7 +24,7 @@
 
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { parseCSV, norm, squareClient, postJSON } from "./shared.ts";
+import { parseCSV, norm, squareClient, postJSON, descriptionHtml } from "./shared.ts";
 import { planListings, attributeFor, diceSetTitle } from "./etsy-listings.ts";
 import type { ListingDetails, PlannedItem, PlannedUpdate } from "./etsy-listings.ts";
 
@@ -77,10 +77,6 @@ async function catalog(type: string) {
   } while (cursor);
   return out.filter((o) => !o.is_deleted);
 }
-
-const escapeHtml = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
-const descriptionHtml = (text: string) =>
-  text.split(/\r?\n\s*\r?\n/).map((p) => p.trim()).filter(Boolean).map((p) => `<p>${escapeHtml(p).replace(/\r?\n/g, "<br>")}</p>`).join("");
 
 const attributeValues = (d: ListingDetails) => Object.fromEntries(
   Object.entries(d.metadata).map(([column, value]) => [attributeFor(column).key, { string_value: value.slice(0, ATTRIBUTE_MAX) }]));
