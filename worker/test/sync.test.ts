@@ -188,6 +188,15 @@ test("storefront: hides archived and hidden-category items, keeps stock and untr
   assert.equal(tracked.has("V_STK"), false);
 });
 
+test("storefront: an item marked sold out in Square shows as sold, even when stock isn't counted", async () => {
+  const sticker = state.catalog[2];
+  sticker.item_data.categories = [{ id: "C_DICE" }]; // otherwise hidden; its stock isn't tracked
+  const qty = async () => (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_STICKER")!.variations[0].qty;
+  assert.equal(await qty(), null);
+  sticker.item_data.variations[0].item_variation_data.location_overrides = [{ location_id: LOC, sold_out: true }];
+  assert.equal(await qty(), 0);
+});
+
 test("storefront: modifier lists carry Square's defaults and limits", async () => {
   const { products } = await square.buildStorefront(makeEnv());
   assert.deepEqual(products.find((p) => p.id === "I_DICE")!.modifierLists, []);

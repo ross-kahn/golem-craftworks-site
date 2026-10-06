@@ -96,6 +96,12 @@ function tracksInventory(variation: SquareObject, locationId: string) {
   return d.track_inventory === true;
 }
 
+// "Mark as sold out" in Square. Counts as zero stock whether or not Square is counting the item.
+function markedSoldOut(variation: SquareObject, locationId: string) {
+  const overrides = variation.item_variation_data?.location_overrides || [];
+  return overrides.some((o) => o.location_id === locationId && o.sold_out === true);
+}
+
 function categoryNames(item: SquareObject, related: Map<string, SquareObject>) {
   const d = item.item_data || {};
   const ids = (d.categories || []).map((c) => c.id);
@@ -194,7 +200,7 @@ export async function buildStorefront(env: Env) {
           name: vd.name || "Default",
           sku: vd.sku || "",
           priceCents: Number(vd.price_money.amount),
-          qty: tracksInventory(v, loc) ? (counts.get(v.id) ?? 0) : null
+          qty: markedSoldOut(v, loc) ? 0 : tracksInventory(v, loc) ? (counts.get(v.id) ?? 0) : null
         };
       })
       .filter((v) => v !== null);

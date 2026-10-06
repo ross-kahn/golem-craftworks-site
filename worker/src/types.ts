@@ -47,7 +47,7 @@ export interface SquareVariationData {
   pricing_type?: string;
   sellable?: boolean;
   track_inventory?: boolean;
-  location_overrides?: { location_id: string; track_inventory?: boolean }[];
+  location_overrides?: { location_id: string; track_inventory?: boolean; sold_out?: boolean }[];
   image_ids?: string[];
 }
 
