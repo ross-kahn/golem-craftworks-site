@@ -1,5 +1,5 @@
 // Square: catalog, inventory, checkout links, webhook verification.
-import { hmacSha256Base64, enc8, safeEqual, slugify } from "./util.ts";
+import { hmacSha256Base64, enc8, safeEqual, slugify, decodeEntities } from "./util.ts";
 import type { Env, Fulfillment, SquareCount, SquareObject, StorefrontModifierList, StorefrontProduct } from "./types.ts";
 
 const DEFAULT_VERSION = "2025-05-21"; // first version with the current modifier fields (defaults, min/max)
@@ -210,7 +210,8 @@ export async function buildStorefront(env: Env) {
       id: item.id,
       slug: slugify(d.name ?? "") || item.id.toLowerCase(),
       name: d.name ?? "",
-      description: d.description_plaintext || stripHtml(d.description_html) || d.description || "",
+      // The formatted description first: Square's plain-text copy runs every paragraph together.
+      description: stripHtml(d.description_html) || d.description_plaintext || d.description || "",
       category: cats[0] || "",
       images,
       variations: vs,
@@ -262,12 +263,14 @@ export async function catalogReport(env: Env) {
   return { at: new Date().toISOString(), locationId: loc, totals, items: rows };
 }
 
+// Formatted text to plain text, keeping the shape: a blank line between paragraphs, single breaks within them.
 function stripHtml(html?: string) {
   if (!html) return "";
-  return html
-    .replace(/<\/(p|div|li|h\d)>/gi, "\n\n").replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
-    .replace(/\n{3,}/g, "\n\n").trim();
+  return decodeEntities(html
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/<\/(p|div|ul|ol|h\d)>/gi, "\n\n").replace(/<(br\s*\/?|\/li)>/gi, "\n").replace(/<li[^>]*>/gi, "- ")
+    .replace(/<[^>]+>/g, ""))
+    .replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export async function retrieveVariations(env: Env, ids: string[]) {

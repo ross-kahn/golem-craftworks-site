@@ -265,6 +265,7 @@ export interface SiteReview {
 }
 
 export interface EtsyReviewCache {
+  v?: number;
   at: number;
   sales: number | null; // all-time sales, as shown on the Etsy shop
   count: number;

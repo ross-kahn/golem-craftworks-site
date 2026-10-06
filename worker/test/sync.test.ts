@@ -198,6 +198,16 @@ test("storefront: an item marked sold out in Square shows as sold, even when sto
   assert.equal(await qty(), 0);
 });
 
+test("storefront: descriptions keep their paragraphs", async () => {
+  const d = state.catalog[1].item_data;
+  d.description_plaintext = "One.\nTwo:\nA, B\nThree & <four>";
+  d.description_html = "<p>One.</p><p>Two:<br>A, B</p>\n<ul><li>Walnut</li><li>Maple</li></ul><p>Three &amp; &lt;four&gt; &#39;five&#39;&nbsp;six</p>";
+  const text = async () => (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_YZ")!.description;
+  assert.equal(await text(), "One.\n\nTwo:\nA, B\n\n- Walnut\n- Maple\n\nThree & <four> 'five' six");
+  delete d.description_html;
+  assert.equal(await text(), "One.\nTwo:\nA, B\nThree & <four>", "plain text is the fallback");
+});
+
 test("storefront: modifier lists carry Square's defaults and limits", async () => {
   const { products } = await square.buildStorefront(makeEnv());
   assert.deepEqual(products.find((p) => p.id === "I_DICE")!.modifierLists, []);

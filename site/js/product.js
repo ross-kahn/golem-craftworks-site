@@ -95,7 +95,7 @@
             ${(p.description || "").split(/\n{2,}/).map((para) => `<p>${esc(para)}</p>`).join("")}
           </div>
           <div class="product__aside">
-            <p><strong style="font-family:var(--font-display)">Shipping or pickup.</strong> Ships flat-rate in the US, or pick up in Madison for free.</p>
+            <p><strong style="font-family:var(--font-display)">Shipping or pickup.</strong> Ships in the US for a flat ${api.money(window.GC_CONFIG.shippingCents)}, or pick up in Madison for free.</p>
             <p>${customPrompt(p)} <a href="${root}commissions/">Start a commission</a>.</p>
           </div>
         </div>

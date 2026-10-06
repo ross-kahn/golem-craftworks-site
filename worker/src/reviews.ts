@@ -6,12 +6,13 @@
 
 import * as etsyApi from "./etsy.ts";
 import { isEmail, mailReady, send } from "./commission.ts";
-import { json, logEvent, errMsg, safeEqual } from "./util.ts";
+import { json, logEvent, errMsg, safeEqual, decodeEntities } from "./util.ts";
 import type { Ctx, Env, EtsyReviewCache, PublicReview, SiteReview } from "./types.ts";
 
 const CACHE_KEY = "https://cache.golemcraftworks.internal/reviews";
 const CACHE_TTL = 300;
 const ETSY_MAX_AGE_MS = 6 * 3600 * 1000;
+const ETSY_CACHE_VERSION = 2; // raise when the saved shape or cleaning changes, so old copies are refetched
 const LIMITS = { name: 60, text: 2000, product: 120, photos: 3, photoBytes: 1.5 * 1024 * 1024, bodyBytes: 6 * 1024 * 1024 };
 const MAX_PER_VISITOR_PER_DAY = 3;
 const MAX_PER_DAY = 40;
@@ -36,18 +37,21 @@ export async function refreshEtsyReviews(env: Env): Promise<EtsyReviewCache | nu
     all.push(...(page.results || []));
     if (!page.results || page.results.length < 100) break;
   }
+  // Etsy sends review text with characters as HTML codes ("can&#39;t").
+  const words = (r: EtsyReview) => decodeEntities(r.review || "").trim();
   const cache: EtsyReviewCache = {
+    v: ETSY_CACHE_VERSION,
     at: Date.now(),
     sales: shop.transaction_sold_count ?? null,
     count: shop.review_count ?? all.length,
     average: shop.review_average ?? null,
     // Star-only reviews count toward the average but there's nothing to show for them.
-    reviews: all.filter((r) => (r.review || "").trim() || r.image_url_fullxfull).map((r) => ({
+    reviews: all.filter((r) => words(r) || r.image_url_fullxfull).map((r) => ({
       id: `etsy-${r.transaction_id}`,
       source: "etsy",
       name: "Etsy buyer",
       rating: r.rating,
-      text: (r.review || "").trim(),
+      text: words(r),
       product: "",
       photos: r.image_url_fullxfull ? [r.image_url_fullxfull] : [],
       at: new Date(r.create_timestamp * 1000).toISOString()
@@ -62,7 +66,7 @@ async function etsyReviews(env: Env, ctx: Ctx) {
   const cached = await env.GC_KV.get<EtsyReviewCache>("reviews:etsy", "json");
   if (!etsyApi.etsyKeyReady(env)) return cached;
   const refresh = () => refreshEtsyReviews(env).catch(async (e) => { await logEvent(env, "Etsy reviews didn't refresh", { error: errMsg(e) }); return null; });
-  if (!cached) return refresh();
+  if (!cached || cached.v !== ETSY_CACHE_VERSION) return (await refresh()) || cached;
   if (Date.now() - cached.at > ETSY_MAX_AGE_MS) ctx.waitUntil(refresh());
   return cached;
 }

@@ -34,7 +34,7 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
     assert.equal(init.headers["x-api-key"], "KEY:SECRET");
     if (url.endsWith("/shops/55")) return ok({ transaction_sold_count: 1480, review_count: 3, review_average: 4.6667 });
     if (url.includes("/shops/55/reviews")) return ok({ results: [
-      { transaction_id: 1, rating: 5, review: "Gorgeous dice.", create_timestamp: 1750000000, image_url_fullxfull: "https://i.etsystatic.com/a.jpg" },
+      { transaction_id: 1, rating: 5, review: "Can&#39;t wait to gift these for D&D. &quot;Gorgeous&quot; &amp; sharp.", create_timestamp: 1750000000, image_url_fullxfull: "https://i.etsystatic.com/a.jpg" },
       { transaction_id: 2, rating: 4, review: "", create_timestamp: 1751000000 },
       { transaction_id: 3, rating: 5, review: " Fast shipping ", create_timestamp: 1752000000 }
     ] });
@@ -158,9 +158,13 @@ test("reviews: Etsy reviews and the sales count are merged in once the Etsy key 
   // The star-only review has nothing to show; newest first.
   assert.deepEqual(data.reviews.map((r: any) => [r.id, r.source, r.name, r.text, r.photos]), [
     ["etsy-3", "etsy", "Etsy buyer", "Fast shipping", []],
-    ["etsy-1", "etsy", "Etsy buyer", "Gorgeous dice.", ["https://i.etsystatic.com/a.jpg"]]
+    ["etsy-1", "etsy", "Etsy buyer", `Can't wait to gift these for D&D. "Gorgeous" & sharp.`, ["https://i.etsystatic.com/a.jpg"]]
   ]);
   const calls = etsyCalls.length;
   await listed(env);
   assert.equal(etsyCalls.length, calls, "second read comes from the stored copy");
+
+  // A copy saved before the text was cleaned up is refetched rather than shown.
+  await kv.put("reviews:etsy", JSON.stringify({ at: Date.now(), sales: 1, count: 1, average: 5, reviews: [{ id: "etsy-9", source: "etsy", name: "Etsy buyer", rating: 5, text: "can&#39;t", product: "", photos: [], at: "2026-01-01T00:00:00Z" }] }));
+  assert.ok(!JSON.stringify(await listed(env)).includes("&#39;"));
 });
