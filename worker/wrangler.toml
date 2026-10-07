@@ -37,9 +37,11 @@ custom_domain = true
 # custom_domain = true
 
 # Hourly safety check (minute 7 to stay off the top of the hour), then Etsy drafts for new dice
-# sets half an hour later. The second one is named in worker/src/index.ts (DRAFTS_CRON): change both together.
+# sets half an hour later. The third is the daily report email, at 13:17 UTC (8:17am Central in summer,
+# 7:17am in winter). The second and third are named in worker/src/index.ts (DRAFTS_CRON, REPORT_CRON):
+# change them there too.
 [triggers]
-crons = ["7 * * * *", "37 * * * *"]
+crons = ["7 * * * *", "37 * * * *", "17 13 * * *"]
 
 # Create with:  npx wrangler kv namespace create GC_KV   then paste the id here.
 [[kv_namespaces]]
@@ -79,6 +81,8 @@ ETSY_DRAFTS_AUTO_PUBLISH = "false"
 # Commission form emails (sent through Resend). EMAIL_FROM must be on a domain verified in Resend.
 EMAIL_FROM = "Golem Craftworks <commissions@golemcraftworks.com>"
 COMMISSION_TO = "commissions@golemcraftworks.com"
+# Where the "New website order" emails go. Empty = COMMISSION_TO.
+SALES_TO = "sales@golemcraftworks.com"
 
 # Secrets (set with `npx wrangler secret put NAME`, never put them in this file):
 #   SQUARE_ACCESS_TOKEN

@@ -4,7 +4,7 @@
 //   POST /api/commission        emails a commission request to the shop + a confirmation to the client
 //   GET  /product/<slug>, /shop/<slug>, /   pages built from the catalog so crawlers get the real content
 //   GET  /sitemap.xml, /robots.txt, /llms.txt, /feeds/google.xml
-//   POST /webhooks/square       Square inventory changes -> Etsy
+//   POST /webhooks/square       Square inventory changes -> Etsy; website payments -> email to the shop
 //   POST /webhooks/etsy         Etsy paid orders -> Square
 //   GET  /api/reviews           Etsy reviews + site reviews, with totals
 //   POST /api/reviews           leave a review (shows straight away unless it looks like spam)
@@ -13,9 +13,11 @@
 //   GET  /admin/catalog         every Square item and why it is or isn't on the site (needs ?token=)
 //   POST /admin/reconcile       run the hourly check now (needs ?token=)
 //   POST /admin/etsy/drafts     make Etsy drafts for new dice sets now (needs ?token=)
+//   POST /admin/report          send the daily report now, if there's anything in it (needs ?token=)
 //   GET  /admin/etsy/connect    one-time Etsy sign-in (needs ?token=)
 //   cron (hourly)               safety check + Etsy token refresh
 //   cron (hourly, half past)    Etsy drafts for new dice sets
+//   cron (daily)                emails a report if anything needs a look
 
 import * as square from "./square.ts";
 import * as etsyApi from "./etsy.ts";
@@ -23,6 +25,8 @@ import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.t
 import { createEtsyDrafts } from "./drafts.ts";
 import { commission } from "./commission.ts";
 import * as reviews from "./reviews.ts";
+import { notifySale } from "./sales.ts";
+import { dailyReport } from "./report.ts";
 import * as pages from "./pages.ts";
 import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
 import type { Ctx, DraftReport, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontCatalog, StorefrontProduct } from "./types.ts";
@@ -31,6 +35,7 @@ const PRODUCTS_CACHE_KEY = "https://cache.golemcraftworks.internal/products";
 const PRODUCTS_TTL = 60;
 const SAVED_CATALOG_MAX_AGE_MS = 15 * 60 * 1000;
 const DRAFTS_CRON = "37 * * * *"; // must match the second entry under [triggers] in wrangler.toml
+const REPORT_CRON = "17 13 * * *"; // and the third
 
 export default {
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
@@ -71,6 +76,10 @@ export default {
       })());
       return;
     }
+    if (event.cron === REPORT_CRON) {
+      ctx.waitUntil(dailyReport(env).then(() => {}, (e) => logEvent(env, "Daily report failed", { error: errMsg(e) })));
+      return;
+    }
     ctx.waitUntil((async () => {
       try { await reviews.refreshEtsyReviews(env); }
       catch (e) { await logEvent(env, "Etsy reviews didn't refresh", { error: errMsg(e) }); }
@@ -102,8 +111,10 @@ async function catalog(env: Env, ctx: Ctx, url: URL): Promise<StorefrontCatalog>
     const demo = (await res.json()) as Pick<StorefrontCatalog, "products">;
     return { products: demo.products, generatedAt: new Date().toISOString() };
   }
+  // ?fresh=1 (the cart's stock check, and the thank-you page after a sale) skips the minute-old copy and replaces it.
+  // Clearing it from the Square webhook isn't enough: that only reaches the data centre the webhook landed in.
   const cache = caches.default;
-  const hit = await cache.match(PRODUCTS_CACHE_KEY);
+  const hit = url.searchParams.has("fresh") ? undefined : await cache.match(PRODUCTS_CACHE_KEY);
   if (hit) return hit.json();
   let data: StorefrontCatalog;
   try {
@@ -133,7 +144,8 @@ async function catalog(env: Env, ctx: Ctx, url: URL): Promise<StorefrontCatalog>
 }
 
 async function products(env: Env, ctx: Ctx, url: URL) {
-  return json(await catalog(env, ctx, url), 200, { "cache-control": `public, max-age=${PRODUCTS_TTL}` });
+  // The Worker's own copy lasts a minute; browsers ask each time, so a sold piece doesn't linger on someone's screen.
+  return json(await catalog(env, ctx, url), 200, { "cache-control": "no-cache" });
 }
 
 // Pages and crawler files built from the catalog (see pages.ts). Null means "serve the static file".
@@ -228,12 +240,23 @@ async function squareWebhook(request: Request, env: Env, ctx: Ctx) {
   const raw = await request.text();
   if (!(await square.verifySquareSignature(env, request, raw))) return json({ error: "Bad signature" }, 401);
   const event: SquareWebhookEvent = JSON.parse(raw);
-  if (event.event_id) {
-    const key = `square:event:${event.event_id}`;
-    if (await env.GC_KV.get(key)) return json({ ok: true, duplicate: true });
-    await env.GC_KV.put(key, "1", { expirationTtl: 60 * 60 * 72 });
+  const seenKey = event.event_id ? `square:event:${event.event_id}` : "";
+  if (seenKey) {
+    if (await env.GC_KV.get(seenKey)) return json({ ok: true, duplicate: true });
+    await env.GC_KV.put(seenKey, "1", { expirationTtl: 60 * 60 * 72 });
   }
-  if (event.type === "inventory.count.updated") {
+  if (event.type === "payment.created" || event.type === "payment.updated") {
+    if (event.data?.object?.payment?.status === "COMPLETED") {
+      ctx.waitUntil(reviews.refreshSquareSales(env).catch((e) => logEvent(env, "Square sales count didn't refresh", { error: errMsg(e) })));
+    }
+    try { await notifySale(env, event); }
+    catch (e) {
+      // A sale nobody hears about is the worst failure here: answer with an error so Square sends it again.
+      await logEvent(env, "WEBSITE ORDER: the email to the shop failed (Square will retry). Check Square Dashboard for the order", { error: errMsg(e) });
+      if (seenKey) await env.GC_KV.delete(seenKey);
+      return json({ error: "Try again" }, 500);
+    }
+  } else if (event.type === "inventory.count.updated") {
     ctx.waitUntil((async () => {
       await purgeProducts();
       try { await handleSquareInventoryEvent(env, event); }
@@ -260,6 +283,9 @@ async function etsyWebhook(request: Request, env: Env, ctx: Ctx) {
   ctx.waitUntil((async () => {
     try { await handleEtsyEvent(env, event); }
     catch (e) { await logEvent(env, "Etsy webhook handling failed (the hourly check will retry)", { error: errMsg(e) }); }
+    // An Etsy sale moves Etsy's sales figure, so fetch it again now.
+    try { await reviews.refreshEtsyReviews(env); }
+    catch (e) { await logEvent(env, "Etsy reviews didn't refresh", { error: errMsg(e) }); }
   })());
   return json({ ok: true });
 }
@@ -314,6 +340,9 @@ async function admin(request: Request, env: Env, url: URL) {
   }
   if (url.pathname === "/admin/etsy/drafts" && request.method === "POST") {
     return json(await createEtsyDrafts(env));
+  }
+  if (url.pathname === "/admin/report" && request.method === "POST") {
+    return json(await dailyReport(env));
   }
   return json({ error: "Not found" }, 404);
 }

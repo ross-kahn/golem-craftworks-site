@@ -353,6 +353,9 @@ export async function itemsSoldSince(env: Env, since: string) {
 
 // ---------- Checkout ----------
 
+// Starts the note on every payment made through the site, which is how a website sale is told from an in-person one (sales.ts).
+export const WEBSITE_ORDER_NOTE = "Website order";
+
 export async function createPaymentLink(
   env: Env,
   { lines, fulfillment }: { lines: { variationId: string; qty: number; modifiers?: string[] }[]; fulfillment: Fulfillment }
@@ -380,7 +383,7 @@ export async function createPaymentLink(
         ? { shipping_fee: { name: "Shipping", charge: { amount: shippingCents, currency: "USD" } } }
         : {})
     },
-    payment_note: ship ? "Website order: ship" : "Website order: LOCAL PICKUP"
+    payment_note: `${WEBSITE_ORDER_NOTE}: ${ship ? "ship" : "LOCAL PICKUP"}`
   };
   const data = await sq<{ payment_link: { id: string; url: string } }>(env, "/v2/online-checkout/payment-links", { method: "POST", body });
   return data.payment_link;

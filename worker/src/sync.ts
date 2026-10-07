@@ -7,15 +7,17 @@
 //
 // Safety rules:
 //   * Webhook handlers re-read live Square counts instead of trusting payload order.
-//   * The hourly check only ever LOWERS Etsy stock. Raising Etsy stock (a restock) only
-//     happens in response to a real Square change, so a missed Etsy webhook can't relist a sold piece.
+//   * Stock counts follow Square both ways, up and down. What the sync never does is put a listing
+//     back on sale: one that sold out stays off (inactive or sold out) until it's published by hand on Etsy.
+//   * The hourly check records missed Etsy sales in Square before it compares. If it can't read
+//     Etsy's sales, it only lowers that run, so a missed sale can't be handed back out.
 //   * SYNC_DRY_RUN=true logs every change it would make without making it.
 
 import * as square from "./square.ts";
 import * as etsyApi from "./etsy.ts";
 import { logEvent, isTrue, errMsg } from "./util.ts";
 import type {
-  Env, EtsyListing, EtsyOffering, EtsyReceipt, EtsyWebhookEvent,
+  Env, EtsyListing, EtsyOffering, EtsyProduct, EtsyReceipt, EtsyWebhookEvent,
   PushResult, ReceiptResult, ReconcileReport, SquareWebhookEvent
 } from "./types.ts";
 
@@ -58,61 +60,68 @@ async function etsyListingForSku(env: Env, sku: string) {
 
 // ---------- Square -> Etsy ----------
 
+const liveOffering = (p: EtsyProduct): Partial<EtsyOffering> => (p.offerings || []).find((o) => !o.is_deleted) || {};
+const etsyQty = (p: EtsyProduct) => { const o = liveOffering(p); return o.is_enabled === false ? 0 : Number(o.quantity) || 0; };
+
 /**
- * Make the Etsy listing that carries `sku` show `qty`.
- * allowRaise=false means only lower Etsy stock (used by the hourly check).
+ * Make one Etsy listing's stock match `want` (sku -> quantity), in a single update. One result per SKU.
+ * The listing's state is only ever changed one way: a listing with nothing left is turned off.
+ * allowRaise=false means only lower Etsy stock.
  */
-export async function pushToEtsy(env: Env, sku: string, qty: number, { allowRaise = true } = {}): Promise<PushResult> {
+async function syncListing(
+  env: Env, listing: Pick<EtsyListing, "listing_id" | "state">, want: Map<string, number>, { allowRaise = true } = {}
+): Promise<PushResult[]> {
   const dry = isTrue(env.SYNC_DRY_RUN);
+  const listingId = listing.listing_id;
+  const inv = await etsyApi.getInventory(env, listingId);
+  const products = (inv.products || []).filter((p) => !p.is_deleted);
+  const skuOf = (p: EtsyProduct) => (p.sku || "").trim();
+  const active = listing.state === "active";
+
+  const results: PushResult[] = [];
+  const changes = new Map<string, number>();
+  const from = new Map<string, number>();
+  for (const [sku, qty] of want) {
+    const product = products.find((p) => skuOf(p) === sku);
+    if (!product) { results.push({ sku, skipped: "sku-not-on-listing" }); continue; }
+    const current = etsyQty(product);
+    if (qty === current) results.push({ sku, unchanged: true });
+    else if (qty > current && !allowRaise) results.push({ sku, skipped: "raise-not-allowed" });
+    else { changes.set(sku, qty); from.set(sku, current); }
+  }
+  if (!changes.size) return results;
+
+  // What's left sellable on the listing after this change? Etsy won't hold a listing at zero, so an
+  // emptied one is turned off instead, keeping its last count.
+  const remaining = products.reduce((n, p) => n + (changes.get(skuOf(p)) ?? etsyQty(p)), 0);
+  let plan: string[];
+  if (remaining === 0) plan = active ? ["deactivate-listing"] : [];
+  // Etsy marked it sold out: writing stock to it could put it back on sale (and charge the listing fee).
+  else if (listing.state === "sold_out") plan = [];
+  else plan = ["set-quantity"];
+  if (!plan.length) {
+    changes.forEach((_, sku) => results.push(remaining === 0 ? { sku, unchanged: true } : { sku, skipped: "sold-out-on-etsy" }));
+    return results;
+  }
+
+  const summary = { listingId, state: listing.state, plan, skus: [...changes].map(([sku, to]) => ({ sku, from: from.get(sku), to })) };
+  if (dry) await logEvent(env, "DRY RUN: would update Etsy", summary);
+  else {
+    if (plan[0] === "deactivate-listing") await etsyApi.setListingState(env, listingId, "inactive");
+    else await etsyApi.putInventory(env, listingId, etsyApi.inventoryForPut(inv, changes));
+    await logEvent(env, "Updated Etsy to match Square", summary);
+  }
+  changes.forEach((to, sku) => results.push({ [dry ? "dryRun" : "updated"]: true, sku, listingId, from: from.get(sku), to, state: listing.state, plan }));
+  return results;
+}
+
+/** Make the Etsy listing that carries `sku` show `qty`. */
+export async function pushToEtsy(env: Env, sku: string, qty: number, { allowRaise = true } = {}): Promise<PushResult> {
   const listingId = await etsyListingForSku(env, sku);
   if (!listingId) return { skipped: "no-etsy-listing" };
-
-  const [listing, inv] = await Promise.all([etsyApi.getListing(env, listingId), etsyApi.getInventory(env, listingId)]);
-  const products = (inv.products || []).filter((p) => !p.is_deleted);
-  const product = products.find((p) => (p.sku || "").trim() === sku);
-  if (!product) return { skipped: "sku-not-on-listing" };
-  const offering: Partial<EtsyOffering> = (product.offerings || []).find((o) => !o.is_deleted) || {};
-  const active = listing.state === "active";
-  const currentQty = active && offering.is_enabled !== false ? Number(offering.quantity) || 0 : 0;
-
-  if (qty === currentQty && (qty > 0 ? active && offering.is_enabled !== false : true)) {
-    return { unchanged: true };
-  }
-  if (qty > currentQty && !allowRaise) return { skipped: "raise-not-allowed" };
-
-  // What's left sellable on the listing after this change?
-  const remaining = products.reduce((n, p) => {
-    if ((p.sku || "").trim() === sku) return n + qty;
-    const o: Partial<EtsyOffering> = (p.offerings || []).find((x) => !x.is_deleted) || {};
-    return n + (o.is_enabled === false ? 0 : Number(o.quantity) || 0);
-  }, 0);
-
-  const plan: { action: string; qty?: number }[] = [];
-  if (qty === 0 && remaining === 0) {
-    if (active) plan.push({ action: "deactivate-listing" });
-  } else {
-    plan.push({ action: "set-quantity", qty });
-    if (!active && qty > 0) plan.push({ action: "activate-listing" });
-  }
-  if (!plan.length) return { unchanged: true };
-
-  const summary = { sku, listingId, from: currentQty, to: qty, state: listing.state, plan: plan.map((p) => p.action) };
-  if (dry) {
-    await logEvent(env, "DRY RUN: would update Etsy", summary);
-    return { dryRun: true, ...summary };
-  }
-
-  for (const step of plan) {
-    if (step.action === "deactivate-listing") {
-      await etsyApi.setListingState(env, listingId, "inactive");
-    } else if (step.action === "set-quantity") {
-      await etsyApi.putInventory(env, listingId, etsyApi.inventoryForPut(inv, new Map([[sku, qty]])));
-    } else if (step.action === "activate-listing") {
-      await etsyApi.setListingState(env, listingId, "active");
-    }
-  }
-  await logEvent(env, "Updated Etsy to match Square", summary);
-  return { updated: true, ...summary };
+  const listing = await etsyApi.getListing(env, listingId);
+  const [result] = await syncListing(env, listing, new Map([[sku, qty]]), { allowRaise });
+  return result;
 }
 
 export async function handleSquareInventoryEvent(env: Env, event: SquareWebhookEvent) {
@@ -139,7 +148,7 @@ export async function handleSquareInventoryEvent(env: Env, event: SquareWebhookE
     const sku = idToSku[id];
     if (!sku) { results.push({ id, skipped: "no-sku" }); continue; }
     try {
-      results.push(await pushToEtsy(env, sku, live.get(id) ?? 0, { allowRaise: true }));
+      results.push(await pushToEtsy(env, sku, live.get(id) ?? 0));
     } catch (e) {
       await logEvent(env, "Etsy update failed", { sku, error: errMsg(e) });
       results.push({ sku, error: errMsg(e) });
@@ -186,8 +195,9 @@ export async function handleEtsyEvent(env: Env, event: EtsyWebhookEvent) {
 
 // ---------- Hourly safety check ----------
 
-export async function reconcile(env: Env, { maxUpdates = 6 } = {}) {
-  const report: ReconcileReport = { at: new Date().toISOString(), etsySalesChecked: 0, lowered: [], etsyLowerThanSquare: [], squareOnly: [], etsyOnly: [], errors: [] };
+export async function reconcile(env: Env, { maxChecks = 10 } = {}) {
+  const report: ReconcileReport = { at: new Date().toISOString(), etsySalesChecked: 0, changed: [], notPublished: [], squareOnly: [], etsyOnly: [], errors: [] };
+  let salesChecked = false;
 
   // 1. Catch any Etsy sales whose webhook never arrived (last 3 days).
   try {
@@ -197,6 +207,7 @@ export async function reconcile(env: Env, { maxUpdates = 6 } = {}) {
     for (const r of receipts) {
       try { await recordEtsyReceipt(env, r); } catch (e) { report.errors.push(`receipt ${r.receipt_id}: ${errMsg(e)}`); }
     }
+    salesChecked = !report.errors.length;
   } catch (e) {
     report.errors.push(`receipts: ${errMsg(e)}`);
   }
@@ -208,31 +219,39 @@ export async function reconcile(env: Env, { maxUpdates = 6 } = {}) {
   const etsyMap = (await refreshEtsySkuMap(env, listings)).map;
 
   report.squareOnly = Object.keys(skuMap).filter((s) => !etsyMap[s]).sort();
-  report.etsyOnly = Object.keys(etsyMap).filter((s) => !skuMap[s]).sort();
+  // Only listings that are on sale: a sold-out or inactive one with no Square item is just a piece that's gone.
+  const onSale = new Set(listings.filter((l) => l.state === "active").flatMap((l) => (l.skus || []).map((s) => s.trim()).filter(Boolean)));
+  report.etsyOnly = [...onSale].filter((s) => !skuMap[s]).sort();
 
-  // 3. Lower Etsy wherever it shows more than Square has.
-  let updates = 0;
+  // 3. Make Etsy's counts match Square's. A listing with one SKU shows its count in the list above;
+  // one with several only shows a total, which can match while the variations don't, so its stock is read.
+  const certain: { l: EtsyListing; want: Map<string, number> }[] = [];
+  const maybe: typeof certain = [];
   for (const l of listings) {
     // Only compare SKUs whose stock Square actually counts; untracked items are left alone.
     const tracked = (l.skus || []).map((s) => s.trim()).filter((s) => skuMap[s] && trackedIds.has(skuMap[s]));
     if (!tracked.length) continue;
-    const squareTotal = tracked.reduce((n, s) => n + (counts.get(skuMap[s]) ?? 0), 0);
-    const etsyTotal = l.state === "active" ? Number(l.quantity) || 0 : 0;
-    if (squareTotal < etsyTotal) {
-      if (updates >= maxUpdates) { report.errors.push(`update limit reached; ${l.listing_id} will be checked next run`); continue; }
-      for (const s of tracked) {
-        try {
-          const r = await pushToEtsy(env, s, counts.get(skuMap[s]) ?? 0, { allowRaise: false });
-          if (r.updated || r.dryRun) report.lowered.push({ sku: s, listing: l.listing_id, to: r.to, dryRun: !!r.dryRun });
-        } catch (e) { report.errors.push(`${s}: ${errMsg(e)}`); }
+    const want = new Map(tracked.map((s) => [s, counts.get(skuMap[s]) ?? 0]));
+    const squareTotal = [...want.values()].reduce((n, q) => n + q, 0);
+    const active = l.state === "active";
+    if (!active && squareTotal > 0) report.notPublished.push({ listing: l.listing_id, title: l.title, state: l.state, square: squareTotal });
+    if (l.state === "sold_out" || (!active && squareTotal === 0)) continue; // nothing the sync would write
+    if (squareTotal !== (Number(l.quantity) || 0)) certain.push({ l, want });
+    else if ((l.skus || []).filter(Boolean).length > 1) maybe.push({ l, want });
+  }
+  // Each check is a request to Etsy and a run only gets so many. The ones that might be fine take turns.
+  const turn = maybe.length ? Math.floor(Date.now() / 3600e3) % maybe.length : 0;
+  const queue = [...certain, ...maybe.slice(turn), ...maybe.slice(0, turn)];
+  if (certain.length > maxChecks) report.errors.push(`${certain.length - maxChecks} more listings need updating; they'll be done next run`);
+  for (const { l, want } of queue.slice(0, maxChecks)) {
+    try {
+      for (const r of await syncListing(env, l, want, { allowRaise: salesChecked })) {
+        if (r.updated || r.dryRun) report.changed.push({ sku: r.sku!, listing: l.listing_id, from: r.from, to: r.to, dryRun: !!r.dryRun });
       }
-      updates++;
-    } else if (squareTotal > etsyTotal) {
-      report.etsyLowerThanSquare.push({ listing: l.listing_id, title: l.title, etsy: etsyTotal, square: squareTotal, state: l.state });
-    }
+    } catch (e) { report.errors.push(`listing ${l.listing_id}: ${errMsg(e)}`); }
   }
 
   await env.GC_KV.put("status:last-reconcile", JSON.stringify(report));
-  if (report.lowered.length || report.errors.length) await logEvent(env, "Hourly check", { lowered: report.lowered, errors: report.errors });
+  if (report.changed.length || report.errors.length) await logEvent(env, "Hourly check", { changed: report.changed, errors: report.errors });
   return report;
 }

@@ -21,13 +21,16 @@ class KV {
 }
 (globalThis as any).caches = { default: { match: async () => null, put: async () => {}, delete: async () => true } };
 
-let kv: KV, sent: any[], etsyCalls: string[], squareCalls: any[], squareDown: boolean, turnstileOk: boolean;
+let kv: KV, sent: any[], etsyCalls: string[], squareCalls: any[], squareDown: boolean, resendDown: boolean, turnstileOk: boolean;
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
 globalThis.fetch = (async (input: unknown, init: any = {}) => {
   const url = String(input);
   const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
-  if (url.includes("api.resend.com")) { sent.push(JSON.parse(init.body)); return ok({ id: "x" }); }
+  if (url.includes("api.resend.com")) {
+    if (resendDown) return new Response("down", { status: 500 });
+    sent.push(JSON.parse(init.body)); return ok({ id: "x" });
+  }
   if (url.includes("turnstile")) return ok({ success: turnstileOk });
   if (url.includes("openapi.etsy.com")) {
     etsyCalls.push(url);
@@ -39,6 +42,13 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
       { transaction_id: 3, rating: 5, review: " Fast shipping ", create_timestamp: 1752000000 }
     ] });
   }
+  if (url.endsWith("/v2/orders/ORDER1")) return ok({ order: {
+    line_items: [{ name: "Dice vault", variation_name: "Walnut", quantity: "1", modifiers: [{ name: "Engraving" }], gross_sales_money: { amount: 6500 }, total_money: { amount: 7020 } }],
+    fulfillments: [{ shipment_details: { recipient: { display_name: "Jane Doe", phone_number: "555-0100" } } }],
+    service_charges: [{ name: "Shipping", amount_money: { amount: 800 } }],
+    total_tax_money: { amount: 520 },
+    total_money: { amount: 7820 }
+  } });
   if (url.includes("/v2/orders/search")) {
     squareCalls.push(JSON.parse(init.body));
     if (squareDown) return new Response("{}", { status: 500 });
@@ -75,7 +85,7 @@ const submit = (env: Env, form: FormData, ip = "1.1.1.1") => call(env, "/api/rev
 const listed = async (env: Env) => (await (await call(env, "/api/reviews")).json()) as any;
 const stored = () => [...kv.m.keys()].filter((k) => k.startsWith("review:item:"));
 
-beforeEach(() => { kv = new KV(); sent = []; etsyCalls = []; squareCalls = []; squareDown = false; turnstileOk = true; });
+beforeEach(() => { kv = new KV(); sent = []; etsyCalls = []; squareCalls = []; squareDown = false; resendDown = false; turnstileOk = true; });
 
 test("reviews: nothing set up yet means an empty list, not an error", async () => {
   const data = await listed(makeEnv());
@@ -208,4 +218,82 @@ test("reviews: Square sales since the cutoff date are added to Etsy's sales coun
   kv = new KV(); squareCalls = [];
   assert.equal((await listed(makeEnv(etsy))).stats.sales, 1480);
   assert.equal(squareCalls.length, 0);
+});
+
+test("sales: a paid website order emails the shop once; in-person sales don't; a failed email is retried", async () => {
+  const { createHmac } = await import("node:crypto");
+  const env = makeEnv({ SQUARE_WEBHOOK_SIGNATURE_KEY: "sigkey", SQUARE_WEBHOOK_URL: "https://w.example/webhooks/square", SALES_TO: "sales@example.com" });
+  const hook = (id: string, payment: object, type = "payment.updated") => {
+    const raw = JSON.stringify({ event_id: id, type, data: { object: { payment } } });
+    const sig = createHmac("sha256", "sigkey").update(env.SQUARE_WEBHOOK_URL + raw).digest("base64");
+    return call(env, "/webhooks/square", { method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": sig } });
+  };
+  const paid = {
+    status: "COMPLETED", order_id: "ORDER1", note: "Website order: ship", buyer_email_address: "jane@example.com", total_money: { amount: 7820 },
+    processing_fee: [{ amount_money: { amount: 257 } }], receipt_url: "https://squareup.com/receipt/x",
+    shipping_address: { first_name: "Jane", last_name: "Doe", address_line_1: "1 Main St", locality: "Ithaca", administrative_district_level_1: "NY", postal_code: "14850", country: "US" }
+  };
+
+  await hook("e0", { ...paid, status: "APPROVED" }, "payment.created");
+  await hook("e1", { ...paid, note: "" }); // rung up in person
+  assert.equal(sent.length, 0);
+
+  assert.equal((await hook("e2", paid)).status, 200);
+  await hook("e3", paid); // Square reports the same payment again
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].to, ["sales@example.com"]);
+  assert.equal(sent[0].reply_to, "jane@example.com");
+  assert.equal(sent[0].subject, "New website order: Dice vault (ship)");
+  for (const part of ["SHIP TO:\nJane Doe\n1 Main St\nIthaca, NY 14850", "Buyer: Jane Doe · jane@example.com · 555-0100", "1 x Dice vault (Walnut, Engraving)  $65.00",
+    "Shipping:     $8.00", "Sales tax:    $5.20", "Total paid:   $78.20", "Square fee:   -$2.57", "You receive:  $75.63", "https://squareup.com/receipt/x", "ORDER1"]) {
+    assert.ok(sent[0].text.includes(part), part);
+  }
+
+  // Email down: Square gets an error and its retry of the same event goes through.
+  kv = new KV(); env.GC_KV = kv as unknown as KVNamespace; sent = [];
+  const pickup = { ...paid, note: "Website order: LOCAL PICKUP", processing_fee: undefined };
+  const key = env.RESEND_API_KEY; env.RESEND_API_KEY = "re_down";
+  resendDown = true;
+  assert.equal((await hook("e4", pickup)).status, 500);
+  resendDown = false; env.RESEND_API_KEY = key;
+  assert.equal((await hook("e4", pickup)).status, 200);
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].subject.endsWith("(pickup)") && sent[0].text.startsWith("LOCAL PICKUP"));
+  assert.ok(sent[0].text.includes("Square fee:   not posted yet") && !sent[0].text.includes("SHIP TO"));
+});
+
+test("daily report: quiet when all is well, one email when something needs a look, SKUs mentioned once", async () => {
+  const env = makeEnv({ SALES_TO: "sales@example.com" });
+  const report = () => call(env, "/admin/report?token=admintoken", { method: "POST" }).then((r) => r.json()) as Promise<any>;
+  const check = (extra: object = {}) => kv.put("status:last-reconcile", JSON.stringify({
+    at: new Date().toISOString(), etsySalesChecked: 0, changed: [], notPublished: [], squareOnly: [], etsyOnly: [], errors: [], ...extra }));
+  await kv.put("etsy:tokens", JSON.stringify({ access_token: "a" }));
+  await check();
+  assert.equal((await report()).sent, false);
+  assert.equal(sent.length, 0);
+
+  await check({
+    errors: ["listing 5: Etsy said no"], etsyOnly: ["yahtzee-walnut"],
+    notPublished: [{ listing: 101, title: "Ember", state: "inactive", square: 2 }]
+  });
+  const old = new Date(Date.now() - 2 * 86400000).toISOString(), recent = new Date().toISOString();
+  await kv.put("log", JSON.stringify([
+    { at: recent, message: "Etsy update failed", data: { error: "boom" } },
+    { at: recent, message: "Etsy update failed", data: { error: "older boom" } },
+    { at: recent, message: "Updated Etsy to match Square" },
+    { at: old, message: "Hourly check failed" }
+  ]));
+  assert.equal((await report()).sent, true);
+  assert.deepEqual(sent[0].to, ["sales@example.com"]);
+  assert.equal(sent[0].subject, "Golem Craftworks sync: 4 things need a look");
+  for (const part of ["listing 5: Etsy said no", "Ember: 2 in Square, Inactive on Etsy", "yahtzee-walnut", "Etsy update failed (2 times): boom"]) {
+    assert.ok(sent[0].text.includes(part), part);
+  }
+  assert.ok(!sent[0].text.includes("Hourly check failed") && !sent[0].text.includes("Updated Etsy"));
+
+  // Next day, the same SKU isn't repeated; a check that has stopped running is.
+  await kv.put("log", "[]");
+  await check({ etsyOnly: ["yahtzee-walnut"], at: new Date(Date.now() - 5 * 3600000).toISOString() });
+  await report();
+  assert.ok(sent[1].text.includes("hasn't run lately") && !sent[1].text.includes("yahtzee-walnut"));
 });

@@ -145,6 +145,8 @@ export const setListingState = (env: Env, id: number, state: string) =>
 
 // Etsy's inventory GET returns read-only fields and price objects that its PUT rejects.
 export function inventoryForPut(inv: EtsyInventory, changes: Map<string, number> /* sku -> qty */) {
+  // Etsy refuses the update unless every offering says how soon it ships. One that has none borrows the listing's.
+  const readiness = inv.products.flatMap((p) => p.offerings || []).find((o) => o.readiness_state_id)?.readiness_state_id;
   return {
     products: inv.products.filter((p) => !p.is_deleted).map((p) => {
       const sku = (p.sku || "").trim();
@@ -162,7 +164,8 @@ export function inventoryForPut(inv: EtsyInventory, changes: Map<string, number>
         offerings: (p.offerings || []).filter((o) => !o.is_deleted).map((o) => ({
           price: typeof o.price === "object" ? o.price.amount / o.price.divisor : o.price,
           quantity: has ? qty : o.quantity,
-          is_enabled: has ? qty > 0 : o.is_enabled
+          is_enabled: has ? qty > 0 : o.is_enabled,
+          ...(o.readiness_state_id || readiness ? { readiness_state_id: o.readiness_state_id || readiness } : {})
         }))
       };
     }),

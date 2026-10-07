@@ -23,6 +23,7 @@ export interface Env {
   NOINDEX?: string; // "true" keeps search engines away (the pre-launch preview address)
   EMAIL_FROM?: string;
   COMMISSION_TO?: string;
+  SALES_TO?: string; // where website order emails go (sales.ts); COMMISSION_TO if empty
   DEMO_CATALOG?: string; // set by `npm run dev`: sample products when there's no Square token
 
   // Secrets
@@ -132,7 +133,24 @@ export interface SquareCount {
 export interface SquareWebhookEvent {
   event_id?: string;
   type?: string;
-  data?: { object?: { inventory_counts?: SquareCount[] } };
+  data?: { object?: { inventory_counts?: SquareCount[]; payment?: SquarePayment } };
+}
+
+// The parts of a Square payment the sale email uses.
+export interface SquarePayment {
+  status?: string;
+  order_id?: string;
+  note?: string;
+  buyer_email_address?: string;
+  total_money?: SquareMoney;
+  processing_fee?: { amount_money?: SquareMoney }[];
+  receipt_url?: string;
+  shipping_address?: SquareAddress;
+}
+
+export interface SquareAddress {
+  first_name?: string; last_name?: string; address_line_1?: string; address_line_2?: string; address_line_3?: string;
+  locality?: string; administrative_district_level_1?: string; postal_code?: string; country?: string;
 }
 
 export interface StorefrontVariation {
@@ -324,8 +342,9 @@ export interface ReceiptResult {
 export interface ReconcileReport {
   at: string;
   etsySalesChecked: number;
-  lowered: { sku: string; listing: number; to?: number; dryRun: boolean }[];
-  etsyLowerThanSquare: { listing: number; title?: string; etsy: number; square: number; state: string }[];
+  changed: { sku: string; listing: number; from?: number; to?: number; dryRun: boolean }[];
+  // In stock in Square but not on sale on Etsy: the sync never republishes, so these wait for you.
+  notPublished: { listing: number; title?: string; state: string; square: number }[];
   squareOnly: string[];
   etsyOnly: string[];
   errors: string[];

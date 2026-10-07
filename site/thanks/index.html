@@ -31,6 +31,11 @@
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/site.js"></script>
-  <script>window.GC && window.GC.cart.clear();</script>
+  <script>
+    window.GC && window.GC.cart.clear();
+    try { sessionStorage.setItem("gc-bought", String(Date.now())); } catch (_) {}
+    // What they just bought may now be sold out: drop the saved product list so the shop shows it right away.
+    window.GC_API && window.GC_API.getProducts({ fresh: true }).catch(function () {});
+  </script>
 </body>
 </html>

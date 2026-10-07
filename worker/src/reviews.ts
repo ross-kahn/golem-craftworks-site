@@ -14,7 +14,7 @@ import { decodeEntities } from "./descriptions.ts";
 import type { Ctx, Env, EtsyReviewCache, PublicReview, SiteReview } from "./types.ts";
 
 const CACHE_KEY = "https://cache.golemcraftworks.internal/reviews";
-const CACHE_TTL = 300;
+const CACHE_TTL = 60;
 const ETSY_MAX_AGE_MS = 6 * 3600 * 1000;
 const ETSY_CACHE_VERSION = 3; // raise when the saved shape or cleaning changes, so old copies are refetched
 const LIMITS = { name: 60, text: 2000, product: 120, photos: 3, photoBytes: 1.5 * 1024 * 1024, bodyBytes: 6 * 1024 * 1024 };
@@ -76,6 +76,16 @@ export async function refreshEtsyReviews(env: Env): Promise<EtsyReviewCache | nu
   await env.GC_KV.put("reviews:etsy", JSON.stringify(cache));
   await purge();
   return cache;
+}
+
+// Straight after a Square sale: recount now instead of waiting for the hourly refresh.
+export async function refreshSquareSales(env: Env) {
+  const cached = await env.GC_KV.get<EtsyReviewCache>("reviews:etsy", "json");
+  if (!cached || !env.SQUARE_SALES_SINCE) return;
+  const squareSales = await square.itemsSoldSince(env, env.SQUARE_SALES_SINCE);
+  if (squareSales === cached.squareSales) return;
+  await env.GC_KV.put("reviews:etsy", JSON.stringify({ ...cached, squareSales }));
+  await purge();
 }
 
 async function etsyReviews(env: Env, ctx: Ctx) {

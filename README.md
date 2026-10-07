@@ -64,14 +64,17 @@ Square is the single source of truth. You only ever change stock in Square.
 | Sale at a market (Square POS) | Square lowers stock → Square tells the Worker → Worker updates the Etsy listing |
 | Sale on the website | The website checks out through Square, so Square lowers stock automatically → same path to Etsy |
 | Sale on Etsy | Etsy tells the Worker → Worker records the sale in Square |
-| You edit stock in Square (restock, new piece) | Same path to Etsy. A sold-out Etsy listing the sync turned off is turned back on. |
-| Every hour | A safety check catches any Etsy sale whose notification was missed, then lowers Etsy anywhere it shows more than Square has. It never raises Etsy stock, so it can't relist a sold piece. |
+| You edit stock in Square (restock, new piece) | Same path to Etsy: the count goes up or down to match. |
+| Every hour | A check catches any Etsy sale whose notification was missed and records it in Square, then sets every Etsy count that differs to match Square. |
+| Something sells out | The Etsy listing goes off sale. **The sync never puts a listing back on sale.** After a restock in Square, publish it yourself on Etsy (Shop Manager → Listings → Inactive or Sold out). |
 
 | A new dice set is added in Square | Within a minute or so the Worker makes an Etsy **draft** for it, for you to review and publish. See [New dice sets on Etsy](#new-dice-sets-on-etsy). |
 
 Products are matched between Square and Etsy **by SKU**. That's the one bit of setup that matters most.
 
 Apart from those dice drafts, the sync only changes stock counts on listings that already exist on both sides. It never creates a listing for anything else.
+
+Restocked pieces waiting to be published on Etsy are listed under `notPublished` in `/admin/status`. A listing the sync turned off keeps its count up to date while it waits. One that Etsy itself marked **Sold out** is left untouched, because writing stock to it could relist it and charge the listing fee; once you publish it, the next check sets its count.
 
 ## First-time setup
 
@@ -103,7 +106,7 @@ The first deploy in step 4 creates the `preview` address by itself; there is no 
 3. Later for real use, copy your **Production** access token and your shop's **Location ID** (Locations page in the Developer Console).
 4. Under **Webhooks**, add a subscription:
    - URL: `https://preview.golemcraftworks.com/webhooks/square`
-   - Events: `inventory.count.updated` and `catalog.version.updated`
+   - Events: `inventory.count.updated`, `catalog.version.updated`, `payment.created`, and `payment.updated`
    - Copy the **signature key**.
 5. Make sure the tax you charge in person is set on your items in Square. Online checkout applies the same catalog taxes.
 
@@ -308,6 +311,29 @@ In Gmail on desktop: gear icon → **See all settings** → **Accounts and Impor
 | Secured connection | TLS |
 
 If port 587 fails, use `465` with SSL. Enter the confirmation code Gmail sends, then select **Reply from the same address the message was sent to**. The same API key works for every alias. These emails count toward the same Resend daily limit as the commission form.
+
+## Daily report
+
+Once a day (13:17 UTC, early morning Central) the Worker looks at the same information as `/admin/status` and emails you at `SALES_TO` **only if something needs a look**:
+
+- Etsy disconnected, the sync left in dry-run mode, or the hourly check not running.
+- Errors from the last hourly check or from making Etsy drafts.
+- Pieces back in stock in Square that are waiting for you to publish on Etsy.
+- A SKU that's on one side only. Each is mentioned once, when it first shows up, since many are on purpose.
+- Anything that failed in the last day (an email that didn't send, Square or Etsy not answering).
+
+No email means nothing was wrong. To send it now: `curl -X POST "https://preview.golemcraftworks.com/admin/report?token=YOUR_ADMIN_TOKEN"`. The reply shows what the report contains even when no email goes out. It needs Resend, as in [Commission emails](#commission-emails).
+
+## Order emails
+
+When someone pays for a website order, the Worker emails you (at `SALES_TO` in `worker/wrangler.toml`) with the name and address to ship to (or a pickup note), the buyer's email and phone, what sold, and the money: shipping, sales tax, total paid, and Square's fee when Square has posted it. Replying writes to the buyer. Square sends the buyer their receipt; in-person sales don't trigger an email.
+
+This needs two things:
+
+- Resend set up, as in [Commission emails](#commission-emails).
+- The Square webhook subscription (setup step 3) must include `payment.created` and `payment.updated`. To add them later: Square Developer Console, your app, **Webhooks → Subscriptions**, edit the subscription and tick both. The URL and signature key stay the same.
+
+If the email fails to send, Square is told to try again, and `/admin/status` shows a line starting "WEBSITE ORDER". The same payment events also update the sales count on the site straight away.
 
 ## Reviews
 

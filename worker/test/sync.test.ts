@@ -315,12 +315,19 @@ test("Square -> Etsy: no change means no Etsy writes", async () => {
   assert.equal(calls.filter((c) => c.method !== "GET").length, 0);
 });
 
-test("Square -> Etsy: restock reactivates a listing the sync turned off", async () => {
+test("Square -> Etsy: a restock updates the count but never puts the listing back on sale", async () => {
   const env = makeEnv();
   await pushToEtsy(env, "DICE-1", 0);
-  const r = await pushToEtsy(env, "DICE-1", 1);
-  assert.deepEqual(r.plan, ["set-quantity", "activate-listing"]);
-  assert.equal(state.listings[101].state, "active");
+  const r = await pushToEtsy(env, "DICE-1", 2);
+  assert.deepEqual(r.plan, ["set-quantity"]);
+  assert.equal(state.inventories[101].put.products[0].offerings[0].quantity, 2);
+  assert.equal(state.listings[101].state, "inactive", "left for publishing by hand");
+
+  // One that Etsy marked sold out isn't written to at all.
+  state.listings[101].state = "sold_out";
+  const writes = calls.filter((c) => c.method !== "GET").length;
+  assert.equal((await pushToEtsy(env, "DICE-1", 3)).skipped, "sold-out-on-etsy");
+  assert.equal(calls.filter((c) => c.method !== "GET").length, writes);
 });
 
 test("dry run changes nothing", async () => {
@@ -383,7 +390,7 @@ test("Etsy webhook: signature verified per Etsy's scheme and sale recorded", asy
   assert.equal(stale.status, 401, "old timestamps rejected");
 });
 
-test("hourly check: catches a missed Etsy sale, lowers Etsy, never raises, ignores untracked", async () => {
+test("hourly check: catches a missed Etsy sale, matches Etsy to Square, never republishes, ignores untracked", async () => {
   const env = makeEnv();
   // Etsy shows 5 Yahtzee sets but Square has 3 (+0 cherry): should lower cherry to 0 disabled.
   // Sticker is untracked in Square: must be left alone even though Square has no count.
@@ -392,10 +399,23 @@ test("hourly check: catches a missed Etsy sale, lowers Etsy, never raises, ignor
   state.listings[101].state = "sold_out"; // Etsy marked it sold
   const report = await reconcile(env);
   assert.equal(state.counts.V_DICE, 0, "missed Etsy sale recorded");
-  assert.deepEqual(report.lowered.map((l) => l.sku), ["YZ-CHE"]);
+  assert.deepEqual(report.changed.map((l) => [l.sku, l.from, l.to]), [["YZ-CHE", 2, 0]]);
   assert.equal(state.listings[303].state, "active", "untracked sticker untouched");
   assert.equal(state.listings[101].state, "sold_out", "sold piece not relisted");
   assert.deepEqual(report.etsyOnly, []);
+  assert.deepEqual(report.notPublished, []);
+
+  // A restock in Square raises Etsy, variation by variation, even when the listing's total already matches.
+  state.counts.V_CHE = 1; state.counts.V_WAL = 2;
+  const again = await reconcile(env);
+  assert.deepEqual(again.changed.map((l) => [l.sku, l.to]).sort(), [["YZ-CHE", 1], ["YZ-WAL", 2]]);
+
+  // The dice come back into stock: reported as waiting, the sold-out listing untouched.
+  state.counts.V_DICE = 1;
+  const third = await reconcile(env);
+  assert.deepEqual(third.notPublished.map((n) => [n.listing, n.state, n.square]), [[101, "sold_out", 1]]);
+  assert.equal(state.listings[101].state, "sold_out");
+  assert.ok(!third.changed.some((c) => c.listing === 101));
 });
 
 // A new dice set in Square, and the Etsy draft that listings are modelled on.
@@ -819,4 +839,25 @@ test("admin endpoints require the token", async () => {
   const yes = await worker.fetch(new Request("https://w.example/admin/status?token=admintoken"), env, ctx());
   assert.equal(yes.status, 200);
   assert.equal(((await yes.json()) as any).etsyConnected, true);
+});
+
+test("Etsy stock updates keep each offering's readiness state, which Etsy requires", async () => {
+  const { inventoryForPut } = await import("../src/etsy.ts");
+  const offering = (extra: object) => ({ price: { amount: 4000, divisor: 100 }, quantity: 3, is_enabled: true, ...extra });
+  const put = inventoryForPut({ products: [
+    { sku: "A", offerings: [offering({ readiness_state_id: 77 })] },
+    { sku: "B", offerings: [offering({})] } // none of its own: borrows the listing's
+  ] }, new Map([["A", 1]]));
+  assert.deepEqual(put.products.map((p) => p.offerings), [
+    [{ price: 40, quantity: 1, is_enabled: true, readiness_state_id: 77 }],
+    [{ price: 40, quantity: 3, is_enabled: true, readiness_state_id: 77 }]
+  ]);
+});
+
+test("hourly check: an Etsy SKU with no Square item is only reported while its listing is on sale", async () => {
+  const env = makeEnv();
+  state.listings[404] = { listing_id: 404, state: "active", quantity: 1, skus: ["RPG-GONE"], title: "Gone" };
+  assert.deepEqual((await reconcile(env)).etsyOnly, ["RPG-GONE"]);
+  state.listings[404].state = "sold_out";
+  assert.deepEqual((await reconcile(env)).etsyOnly, []);
 });

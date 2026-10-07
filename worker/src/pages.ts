@@ -67,7 +67,7 @@ function tilePhotos(products: PublicProduct[]) {
 function page(html: string, env: Env, status = 200) {
   return new Response(html, { status, headers: {
     "content-type": "text/html; charset=utf-8",
-    "cache-control": "public, max-age=60",
+    "cache-control": "no-cache", // browsers ask each time, so sold pieces don't linger
     ...(noindex(env) ? { "x-robots-tag": "noindex" } : {})
   } });
 }

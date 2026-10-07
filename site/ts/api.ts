@@ -33,8 +33,8 @@
     }
     const url = isDemo()
       ? siteRoot() + "data/demo-products.json"
-      : cfg.apiBase.replace(/\/$/, "") + "/api/products";
-    const data = await fetchJSON<{ products?: RawProduct[] }>(url);
+      : cfg.apiBase.replace(/\/$/, "") + "/api/products" + (fresh ? "?fresh=1" : "");
+    const data = await fetchJSON<{ products?: RawProduct[] }>(url, fresh ? { cache: "no-store" } : undefined);
     const products = (data.products || []).map(normalize);
     try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), data: products })); } catch (_) {}
     return products;

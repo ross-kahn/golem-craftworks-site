@@ -7,6 +7,15 @@
   const FULFIL_KEY = "gc-fulfillment";
   const THEME_KEY = "gc-theme"; // also read by theme.ts
 
+  // The Back button can bring a page back exactly as it was left. After a purchase (the thank-you page
+  // notes the time) that would still show what was just bought, so load it again.
+  const loadedAt = Date.now();
+  window.addEventListener("pageshow", (e) => {
+    let bought = 0;
+    try { bought = Number(sessionStorage.getItem("gc-bought")) || 0; } catch (_) { /* storage unavailable */ }
+    if (e.persisted && bought > loadedAt) location.reload();
+  });
+
   const icons = {
     bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1 13H6L5 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/></svg>',
