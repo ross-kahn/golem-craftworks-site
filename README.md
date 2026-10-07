@@ -4,17 +4,20 @@ A storefront for golemcraftworks.com that sells straight from your Square invent
 
 The whole thing runs on Cloudflare's free plan as one Worker: Cloudflare serves the pages in `site/`, and the Worker code handles checkout, the commission form and the Square/Etsy sync. GitHub holds the source in a private repo and plays no part in hosting.
 
+**Before launch the shop lives at `https://preview.golemcraftworks.com`**, hidden from search engines, while `golemcraftworks.com` still shows the old link page. Every address in the setup steps below uses the preview address. [Going public](#going-public) lists what to change when the shop is ready for the main address.
+
 ```
 site/      The website. Static files, served by Cloudflare as they are.
-  index.html            Shop (home)
-  product/              Product page  (/product/?id=...)
+  index.html            Shop (home): one tile per category
+  shop/                 Category page (/shop/<category>)
+  product/              Product page  (/product/<name>)
   about/  commissions/  thanks/   Content pages
   styles/main.css       All styling
   ts/config.ts          The only file you need to edit for a basic launch
   ts/                   Shop, product, cart and form scripts (TypeScript source)
   js/                   Built from ts/ by `npm run build`. Don't edit by hand.
   assets/               Logo, favicon, hero golem
-  data/demo-products.json   Sample products used until the Worker is connected
+  data/demo-products.json   Sample products for `npm run dev` and demo mode
   .assetsignore         Files in site/ that are not published (the TypeScript source)
 worker/    Cloudflare Worker in TypeScript (Square + Etsy logic, keeps your API keys secret)
   wrangler.toml         Cloudflare settings: domain, site folder, shop options
@@ -64,11 +67,15 @@ Square is the single source of truth. You only ever change stock in Square.
 | You edit stock in Square (restock, new piece) | Same path to Etsy. A sold-out Etsy listing the sync turned off is turned back on. |
 | Every hour | A safety check catches any Etsy sale whose notification was missed, then lowers Etsy anywhere it shows more than Square has. It never raises Etsy stock, so it can't relist a sold piece. |
 
+| A new dice set is added in Square | Within a minute or so the Worker makes an Etsy **draft** for it, for you to review and publish. See [New dice sets on Etsy](#new-dice-sets-on-etsy). |
+
 Products are matched between Square and Etsy **by SKU**. That's the one bit of setup that matters most.
+
+Apart from those dice drafts, the sync only changes stock counts on listings that already exist on both sides. It never creates a listing for anything else.
 
 ## First-time setup
 
-Do these in order. Steps 1 to 4 put the shop online; 5 and 6 connect Etsy.
+Do these in order. Steps 1 to 4 put the shop online at the preview address; 5 and 6 connect Etsy. [Going public](#going-public) comes after all six.
 
 ### 1. SKUs
 
@@ -83,9 +90,11 @@ After setup, `/admin/status` lists any SKUs found on only one side so you can fi
 The Worker can only be attached to a domain that Cloudflare manages, so the domain's DNS moves from GoDaddy to Cloudflare. The domain stays registered at GoDaddy.
 
 1. Create a free Cloudflare account. In the dashboard, add the domain `golemcraftworks.com` on the Free plan.
-2. Cloudflare copies your existing DNS records. Keep any email records (`MX`, `TXT`). Delete the records for `@` and `www` that point at the old link page; the deploy creates its own and fails if others are in the way.
-3. At GoDaddy, turn off forwarding to the link page, then change the domain's nameservers to the two Cloudflare shows you.
-4. Wait until Cloudflare lists the domain as **Active**. The domain shows nothing from then until the first deploy in step 4.
+2. Cloudflare copies your existing DNS records. Keep all of them for now, including the ones for `golemcraftworks.com` and `www` that point at the old link page: the main address keeps showing the link page until you go public.
+3. At GoDaddy, change the domain's nameservers to the two Cloudflare shows you.
+4. Wait until Cloudflare lists the domain as **Active**.
+
+The first deploy in step 4 creates the `preview` address by itself; there is no DNS record to add for it.
 
 ### 3. Square
 
@@ -93,7 +102,7 @@ The Worker can only be attached to a domain that Cloudflare manages, so the doma
 2. Start in **Sandbox**: copy the sandbox access token and a sandbox location ID.
 3. Later for real use, copy your **Production** access token and your shop's **Location ID** (Locations page in the Developer Console).
 4. Under **Webhooks**, add a subscription:
-   - URL: `https://golemcraftworks.com/webhooks/square`
+   - URL: `https://preview.golemcraftworks.com/webhooks/square`
    - Events: `inventory.count.updated` and `catalog.version.updated`
    - Copy the **signature key**.
 5. Make sure the tax you charge in person is set on your items in Square. Online checkout applies the same catalog taxes.
@@ -116,42 +125,70 @@ npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
 npx wrangler secret put ADMIN_TOKEN           # any long random string, keep it private (weaker than most)
 ```
 
-The site is now at https://golemcraftworks.com in demo mode: sample products, checkout turned off.
+The site is now at https://preview.golemcraftworks.com in demo mode: sample products, checkout turned off.
 
 To show your real inventory, set `apiBase: "/"` in `site/ts/config.ts`, set your email, Instagram and Etsy links there too, and run `npm run deploy` from the project folder.
 
 `SQUARE_WEBHOOK_URL` in wrangler.toml must exactly match the URL you gave Square, or webhook signatures won't verify.
 
+The admin addresses (`/admin/...`) answer "Not found" unless `?token=` matches `ADMIN_TOKEN` exactly. Keep the token to letters and numbers: characters such as `+`, `&`, `#`, and `%` get changed on the way through an address.
+
 ### 5. Etsy
 
 1. Register an app at developers.etsy.com. Copy the **keystring** and **shared secret**.
 2. Put the keystring in `ETSY_KEYSTRING` in wrangler.toml, and from `worker/` run `npx wrangler secret put ETSY_SHARED_SECRET`.
-3. In the app's settings, add the callback URL `https://golemcraftworks.com/admin/etsy/callback`.
-4. Run `npm run deploy`, then visit `https://golemcraftworks.com/admin/etsy/connect?token=YOUR_ADMIN_TOKEN` and approve. The confirmation page shows your **shop ID**; put it in `ETSY_SHOP_ID` and deploy again.
-5. In Etsy's Webhooks portal, add an endpoint for `order.paid` pointing to `https://golemcraftworks.com/webhooks/etsy`. Copy its signing secret (starts with `whsec_`), then from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
+3. In the app's settings, add the callback URL `https://preview.golemcraftworks.com/admin/etsy/callback`. It has to match exactly; if it doesn't, Etsy's sign-in page says "The requested redirect URL is not permitted."
+4. Run `npm run deploy`, then visit `https://preview.golemcraftworks.com/admin/etsy/connect?token=YOUR_ADMIN_TOKEN` and approve. The confirmation page shows your **shop ID**; put it in `ETSY_SHOP_ID` and deploy again.
+5. In Etsy's Webhooks portal, add an endpoint for `order.paid` pointing to `https://preview.golemcraftworks.com/webhooks/etsy`. Copy its signing secret (starts with `whsec_`), then from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
 
 The hourly check also refreshes the Etsy sign-in, which otherwise expires after 90 days unused.
 
-### 6. Test safely, then go live
+### 6. Test the sync safely, then turn it on
 
 `SYNC_DRY_RUN = "true"` is the default. In this mode the Worker logs what it would change on Etsy and Square but changes nothing.
 
 1. Leave dry run on for a few days of normal selling.
-2. Check `https://golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: recent activity, SKUs missing on either side, and the last hourly check.
+2. Check `https://preview.golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: recent activity, SKUs missing on either side, and the last hourly check.
 3. When the planned changes look right, set `SYNC_DRY_RUN = "false"` and `npm run deploy`.
 4. Place one real website order for something cheap (pickup option) to confirm checkout, receipt and the Etsy update end to end.
 
-To run the hourly check on demand: `curl -X POST "https://golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
+To run the hourly check on demand: `curl -X POST "https://preview.golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
+
+## Going public
+
+This moves the shop from `preview.golemcraftworks.com` to `golemcraftworks.com` and lets search engines in. Do it once setup steps 1 to 6 are done and the shop looks right at the preview address.
+
+Pick a quiet hour. Between steps 3 and 5 below, sale notifications from Square and Etsy have nowhere to land; the hourly check picks up anything missed. After step 3 the preview address stops working, and every address in this file that says `preview.golemcraftworks.com` becomes `golemcraftworks.com`.
+
+1. **Finish the policy page.** Fill in the two placeholders in `site/shipping/index.html` (how soon orders ship, and the return policy).
+2. **Free up the main address.** In Cloudflare DNS, delete the `A` records for `golemcraftworks.com` and `www` that point at the old link page. Keep the email records (`MX`, `TXT`). The deploy creates its own records and fails if the old ones are in the way. You can also turn off forwarding at GoDaddy; nothing uses it after this.
+3. **Switch the settings** in `worker/wrangler.toml`, then run `npm run deploy`:
+   - Routes: remove the `preview.golemcraftworks.com` route and uncomment the two for `golemcraftworks.com` and `www.golemcraftworks.com`.
+   - `SITE_URL = "https://golemcraftworks.com"`
+   - `ALLOWED_ORIGINS = "https://golemcraftworks.com,https://www.golemcraftworks.com"`
+   - `SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"`
+   - `NOINDEX = "false"`
+4. **Square.** In the Developer Console under Webhooks, edit the subscription's URL to `https://golemcraftworks.com/webhooks/square`, exactly as in `SQUARE_WEBHOOK_URL`. If you make a new subscription instead of editing, it has a new signature key: from `worker/` run `npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY`.
+5. **Etsy.**
+   - In the Webhooks portal, point the `order.paid` endpoint at `https://golemcraftworks.com/webhooks/etsy`. If that gives you a new signing secret, from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
+   - In the app's settings, add the callback URL `https://golemcraftworks.com/admin/etsy/callback`. The existing Etsy connection carries over; this is only for the day you need to connect again.
+6. **Check it.**
+   - `https://golemcraftworks.com` shows the shop, and a product page opens.
+   - `https://golemcraftworks.com/robots.txt` says `Allow: /`.
+   - Change the stock of something in Square that is also listed on Etsy, then look at `https://golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: the change should be in the recent activity within a minute.
+7. **Tell the search engines.** Follow the list in the next section.
+
+Nothing changes for commission emails: they already send from `golemcraftworks.com`.
 
 ## Search engines, AI assistants and Google Shopping
 
-The Worker builds each product page in full (`/product/<name>`), plus `/sitemap.xml`, `/robots.txt`, `/llms.txt` (a plain-text guide for AI assistants) and `/feeds/google.xml` (a product feed). All of them update from Square on their own.
+The Worker builds the home page, each category page (`/shop/<category>`), and each product page (`/product/<name>`) in full, plus `/sitemap.xml`, `/robots.txt`, `/llms.txt` (a plain-text guide for AI assistants) and `/feeds/google.xml` (a product feed). All of them update from Square on their own.
 
-While `NOINDEX = "true"` in `worker/wrangler.toml`, search engines are told to stay away. That is right for the preview address. **At launch, set it to `"false"` and deploy.**
+While `NOINDEX = "true"` in `worker/wrangler.toml`, search engines are told to stay away. That is right for the preview address; [Going public](#going-public) turns it off.
 
-After launch, once:
+After going public, once:
 
-1. **Finish the policy page.** Fill in the two placeholders in `site/shipping/index.html` (how soon orders ship, and the return policy). Google requires both to be on the site.
+1. **Check the policy page** says how soon orders ship and what the return policy is. Google requires both to be on the site.
 2. **Google Search Console** (search.google.com/search-console): add `golemcraftworks.com`, verify it with the DNS record it gives you (add the TXT record in Cloudflare DNS), then under Sitemaps submit `https://golemcraftworks.com/sitemap.xml`.
 3. **Bing Webmaster Tools** (bing.com/webmasters): sign in and choose "Import from Google Search Console". That copies the site and sitemap across. ChatGPT's search draws on Bing, so this one matters for AI assistants too.
 4. **Google Merchant Center** (merchants.google.com), for free listings in the Shopping tab:
@@ -195,9 +232,40 @@ SQUARE_ACCESS_TOKEN=xxx node tools/clear-dice-descriptions.ts          # preview
 SQUARE_ACCESS_TOKEN=xxx node tools/clear-dice-descriptions.ts --apply
 ```
 
+## New dice sets on Etsy
+
+When you save a new dice set in Square, the Worker makes an Etsy draft for it, usually within a minute. It also checks at half past every hour, in case a save was missed.
+
+A Square item gets a draft when all of these are true:
+
+- It is in a category named in `ETSY_DRAFT_CATEGORIES` in wrangler.toml (now `8-piece RPG Dice`). Nothing in any other category is ever listed for you.
+- It has one variation, with a SKU, stock tracking on, and at least one in stock.
+- It is named like `"JAVA" TTRPG Dice Set`. A duplicate still called `"JAVA" TTRPG Dice Set Copy` waits until it's renamed, and `lastEtsyDraftsCheck` says so.
+- No Etsy listing in any state (active, inactive, sold out, draft, or expired) carries that SKU, and no draft was made for it before.
+
+The draft is built like this:
+
+- **Settings** are copied from the Etsy draft whose title starts with `TEMPLATE`: category, shipping profile, return policy, processing time, shop section, tags, materials, weight and size, who made it and when, and auto-renew. Change the template and later drafts follow. Attributes (the extra category details Etsy asks for) are not copied.
+- **Title** is the template's title with `TEMPLATE` replaced by the set's name: `TEMPLATE 8-Piece Dice Set | …` becomes `JAVA 8-Piece Dice Set | …`.
+- **Description, price, stock, and SKU** come from Square. The description is the shared dice description with the set's own notes in it.
+- **Photos** are the item's Square photos, up to 10, in the same order.
+
+Then review the draft on Etsy and publish it. Etsy charges its listing fee when you publish, not for the draft. Once it's published, the stock sync looks after it like any other listing.
+
+Things to know:
+
+- **Dry run.** While `SYNC_DRY_RUN = "true"`, nothing is created. `/admin/status` shows which SKUs are waiting under `lastEtsyDraftsCheck`, and the recent activity says what would be made.
+- **A few at a time.** Each run can only do so much, mostly because of photos: one set with 10 photos, or two with 4 each. If you save several sets in a row, the rest are picked up on the next save or the next hourly check. `lastEtsyDraftsCheck` in `/admin/status` lists what is still waiting.
+- **Photos follow Square.** When you change a dice item's photos in Square (say, swapping a quick placeholder for proper ones), its Etsy listing's photos are replaced with Square's, in Square's order, usually within a minute. This goes for drafts and published listings alike, including dice listings that were on Etsy before this was set up. Photo changes made on Etsy are overwritten the next time the Square photos change. Removing every photo in Square leaves Etsy's as they are.
+- **Nothing else follows.** Title, description, and price are set when the draft is made. Later changes to them in Square don't reach Etsy. To run it now: `curl -X POST "https://preview.golemcraftworks.com/admin/etsy/drafts?token=YOUR_ADMIN_TOKEN"`.
+- **Once per SKU.** If you delete a draft on Etsy, it isn't made again.
+- **A draft's stock isn't kept in step.** If the set sells before you publish, don't publish the draft. If you do, the hourly check turns the listing off within the hour.
+- **Publishing without review.** Set `ETSY_DRAFTS_AUTO_PUBLISH = "true"` and deploy. Each new set is then listed straight away, and Etsy charges its fee each time.
+- **Turning it off.** Set `ETSY_DRAFT_CATEGORIES = ""` and deploy.
+
 ## Day to day
 
-- **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute, with no deploy. If you also want it on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.
+- **New piece:** add it in Square with a SKU, price, photo and stock count. It appears on the site within a minute, with no deploy. A dice set gets an Etsy draft made for it within a minute or so. For anything else you want on Etsy, create the Etsy listing with the same SKU; the sync picks it up within the hour.
 - **Hide something from the website** (market-only items): put it in a Square category, add that category name to `HIDDEN_CATEGORIES` in wrangler.toml, then `npm run deploy`.
 - **Change shipping:** `SHIPPING_FLAT_CENTS` in `worker/wrangler.toml`, then `npm run deploy`. Checkout, the cart, the shipping page and the product data for search engines all follow it. Update the shipping setting in Google Merchant Center to match.
 

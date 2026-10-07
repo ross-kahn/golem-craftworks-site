@@ -36,9 +36,10 @@ custom_domain = true
 # pattern = "www.golemcraftworks.com"
 # custom_domain = true
 
-# Hourly safety check (minute 7 to stay off the top of the hour).
+# Hourly safety check (minute 7 to stay off the top of the hour), then Etsy drafts for new dice
+# sets half an hour later. The second one is named in worker/src/index.ts (DRAFTS_CRON): change both together.
 [triggers]
-crons = ["7 * * * *"]
+crons = ["7 * * * *", "37 * * * *"]
 
 # Create with:  npx wrangler kv namespace create GC_KV   then paste the id here.
 [[kv_namespaces]]
@@ -65,7 +66,12 @@ ONLINE_CATEGORIES = ""
 # Optional: never list items in these Square categories online (e.g. "Market only").
 HIDDEN_CATEGORIES = "In-Person"
 # Start with "true": the Worker logs what it WOULD change on Etsy/Square without changing anything.
-SYNC_DRY_RUN = "true"
+SYNC_DRY_RUN = "false"
+# New items in these Square categories get an Etsy draft made for them (comma-separated). Empty = never.
+# Settings are copied from the Etsy draft whose title starts with "TEMPLATE".
+ETSY_DRAFT_CATEGORIES = "8-piece RPG Dice"
+# "true" publishes those drafts straight away (Etsy charges its listing fee). Leave "false" to review each one first.
+ETSY_DRAFTS_AUTO_PUBLISH = "false"
 # Commission form emails (sent through Resend). EMAIL_FROM must be on a domain verified in Resend.
 EMAIL_FROM = "Golem Craftworks <commissions@golemcraftworks.com>"
 COMMISSION_TO = "golemcraftworks@gmail.com"

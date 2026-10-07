@@ -100,12 +100,12 @@ export async function etsyPublic<T>(env: Env, path: string): Promise<T> {
 export async function etsy<T>(
   env: Env,
   pathOrUrl: string,
-  { method = "GET", json, form }: { method?: string; json?: unknown; form?: Record<string, string> } = {}
+  { method = "GET", json, form, file }: { method?: string; json?: unknown; form?: Record<string, string>; file?: FormData } = {}
 ): Promise<T> {
   const token = await etsyAccessToken(env);
   const url = pathOrUrl.startsWith("http") ? pathOrUrl : API + pathOrUrl;
   const headers: Record<string, string> = { "x-api-key": apiKey(env), authorization: `Bearer ${token}` };
-  let body: string | undefined;
+  let body: string | FormData | undefined = file; // a file upload sets its own content type
   if (json) { headers["content-type"] = "application/json"; body = JSON.stringify(json); }
   if (form) { headers["content-type"] = "application/x-www-form-urlencoded"; body = new URLSearchParams(form).toString(); }
   const res = await fetch(url, { method, headers, body });
@@ -174,6 +174,26 @@ export function inventoryForPut(inv: EtsyInventory, changes: Map<string, number>
 
 export const putInventory = (env: Env, id: number, body: unknown) =>
   etsy<unknown>(env, `/listings/${id}/inventory`, { method: "PUT", json: body });
+
+// A new draft listing. `form` uses Etsy's own field names; lists are comma-separated.
+export const createDraftListing = (env: Env, form: Record<string, string>) =>
+  etsy<EtsyListing>(env, `/shops/${env.ETSY_SHOP_ID}/listings`, { method: "POST", form });
+
+// `overwrite` puts the photo in place of the one already at that position.
+export function uploadListingImage(env: Env, id: number, image: Blob, rank: number, overwrite = false) {
+  const file = new FormData();
+  file.append("image", image, `photo-${rank}.jpg`);
+  file.append("rank", String(rank));
+  if (overwrite) file.append("overwrite", "true");
+  return etsy<unknown>(env, `/shops/${env.ETSY_SHOP_ID}/listings/${id}/images`, { method: "POST", file });
+}
+
+export async function getListingImages(env: Env, id: number) {
+  return (await etsy<{ results?: { listing_image_id: number; rank?: number }[] }>(env, `/listings/${id}/images`)).results || [];
+}
+
+export const deleteListingImage = (env: Env, id: number, imageId: number) =>
+  etsy<unknown>(env, `/shops/${env.ETSY_SHOP_ID}/listings/${id}/images/${imageId}`, { method: "DELETE" });
 
 export async function recentPaidReceipts(env: Env, sinceSeconds: number) {
   const data = await etsy<{ results?: EtsyReceipt[] }>(

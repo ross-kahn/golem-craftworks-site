@@ -17,6 +17,8 @@ export interface Env {
   ONLINE_CATEGORIES?: string;
   HIDDEN_CATEGORIES?: string;
   SYNC_DRY_RUN?: string;
+  ETSY_DRAFT_CATEGORIES?: string; // Square categories whose new items get an Etsy draft (drafts.ts)
+  ETSY_DRAFTS_AUTO_PUBLISH?: string; // "true" publishes those drafts straight away
   NOINDEX?: string; // "true" keeps search engines away (the pre-launch preview address)
   EMAIL_FROM?: string;
   COMMISSION_TO?: string;
@@ -191,11 +193,31 @@ export interface EtsyListing {
   quantity?: number;
   skus?: string[];
   title?: string;
+  // Settings a new draft copies from the template listing (drafts.ts).
+  who_made?: string;
+  when_made?: string;
+  taxonomy_id?: number;
+  shipping_profile_id?: number | null;
+  return_policy_id?: number | null;
+  shop_section_id?: number | null;
+  tags?: string[];
+  materials?: string[];
+  is_supply?: boolean;
+  should_auto_renew?: boolean;
+  processing_min?: number | null;
+  processing_max?: number | null;
+  item_weight?: number | null;
+  item_weight_unit?: string | null;
+  item_length?: number | null;
+  item_width?: number | null;
+  item_height?: number | null;
+  item_dimensions_unit?: string | null;
 }
 
 export interface EtsyOffering {
   price: number | { amount: number; divisor: number };
   quantity: number;
+  readiness_state_id?: number; // how soon it ships (an Etsy processing profile)
   is_enabled?: boolean;
   is_deleted?: boolean;
 }
@@ -304,6 +326,16 @@ export interface ReconcileReport {
   etsyLowerThanSquare: { listing: number; title?: string; etsy: number; square: number; state: string }[];
   squareOnly: string[];
   etsyOnly: string[];
+  errors: string[];
+}
+
+export interface DraftReport {
+  at: string;
+  dryRun: boolean;
+  created: { sku: string; listingId: number; title: string; photos: number; published: boolean }[];
+  waiting: string[]; // SKUs that qualify but weren't made this run
+  photosUpdated: { sku: string; listingId: number; photos: number }[];
+  photosWaiting: string[]; // SKUs whose Square photos changed but Etsy's weren't replaced this run
   errors: string[];
 }
 

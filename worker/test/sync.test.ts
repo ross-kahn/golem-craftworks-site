@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import worker from "../src/index.ts";
 import * as square from "../src/square.ts";
 import { pushToEtsy, recordEtsyReceipt, reconcile } from "../src/sync.ts";
+import { createEtsyDrafts } from "../src/drafts.ts";
 import type { Env, LogLine } from "../src/types.ts";
 
 // ---------- fakes ----------
@@ -67,6 +68,9 @@ function freshState() {
       303: inv([["STK", 9, true]])
     },
     receipts: [],
+    drafts: [],
+    images: {} as Record<string, { listing_image_id: number; rank: number; text: string }[]>, // Etsy's photos, by listing
+    imageIds: 0,
     squareAdjustments: [],
     paymentLinks: []
   };
@@ -147,6 +151,29 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
       if (method === "PUT") { state.inventories[m[1]] = { ...state.inventories[m[1]], put: body }; return ok({}); }
       return ok(structuredClone(state.inventories[m[1]]));
     }
+    if (/\/shops\/\d+\/listings$/.test(url) && method === "POST") {
+      const id = 900 + state.drafts.length;
+      const form = Object.fromEntries(new URLSearchParams(init.body));
+      state.drafts.push({ id, form, photos: [] });
+      state.listings[id] = { listing_id: id, state: "draft", title: form.title, skus: [] };
+      return ok(state.listings[id]);
+    }
+    if ((m = url.match(/\/shops\/\d+\/listings\/(\d+)\/images$/)) && method === "POST") {
+      const rank = Number(init.body.get("rank")), text = await init.body.get("image").text();
+      state.drafts.find((d: any) => d.id === Number(m![1]))?.photos.push(`${rank}:${text}`);
+      const held = (state.images[m[1]] ||= []);
+      if (init.body.get("overwrite") === "true") state.images[m[1]] = held.filter((i: any) => i.rank !== rank);
+      state.images[m[1]].push({ listing_image_id: ++state.imageIds, rank, text });
+      return ok({});
+    }
+    if ((m = url.match(/\/shops\/\d+\/listings\/(\d+)\/images\/(\d+)$/)) && method === "DELETE") {
+      state.images[m[1]] = state.images[m[1]].filter((i: any) => i.listing_image_id !== Number(m![2]));
+      return new Response(null, { status: 204 });
+    }
+    if ((m = url.match(/\/listings\/(\d+)\/images$/))) {
+      if (!state.listings[m[1]]) return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
+      return ok({ results: structuredClone(state.images[m[1]] || []) });
+    }
     if ((m = url.match(/\/shops\/\d+\/listings\/(\d+)$/)) && method === "PATCH") {
       const st = new URLSearchParams(init.body).get("state");
       state.listings[m[1]].state = st;
@@ -156,6 +183,8 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
     if (url.includes("/receipts/")) return ok(state.receipts[0]);
     if (url.includes("/receipts?")) return ok({ results: state.receipts });
   }
+  // ---- Photos held by Square ----
+  if (url.startsWith("https://img/")) return new Response("photo " + url);
   throw new Error("Unexpected fetch " + method + " " + url);
 }) as typeof fetch;
 
@@ -367,6 +396,141 @@ test("hourly check: catches a missed Etsy sale, lowers Etsy, never raises, ignor
   assert.equal(state.listings[303].state, "active", "untracked sticker untouched");
   assert.equal(state.listings[101].state, "sold_out", "sold piece not relisted");
   assert.deepEqual(report.etsyOnly, []);
+});
+
+// A new dice set in Square, and the Etsy draft that listings are modelled on.
+function newDiceSet() {
+  state.catalog.push(item("I_JAVA", '"JAVA" TTRPG Dice Set', [variation("V_JAVA", "Default", 5500, "DICE-JAVA", true)], { cat: "C_DICE", image: "IMG1" }));
+  state.counts.V_JAVA = 1;
+  state.listings[500] = {
+    listing_id: 500, state: "draft", title: "TEMPLATE 8-Piece Dice Set | Handmade D&amp;D Dice", skus: [],
+    who_made: "i_did", when_made: "made_to_order", taxonomy_id: 2078, shipping_profile_id: 11, return_policy_id: 12, shop_section_id: null,
+    tags: ["dnd dice", "ttrpg"], materials: ["resin"], is_supply: false, should_auto_renew: true, item_weight: 4, item_weight_unit: "oz"
+  };
+  state.inventories[500] = { products: [{ sku: "", offerings: [{ price: { amount: 100, divisor: 100 }, quantity: 1, is_enabled: true, readiness_state_id: 77 }] }] };
+}
+
+test("new dice sets get an Etsy draft copied from the template, once", async () => {
+  newDiceSet();
+  const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
+  const report = await createEtsyDrafts(env);
+  assert.deepEqual(report.created, [{ sku: "DICE-JAVA", listingId: 900, title: "JAVA 8-Piece Dice Set | Handmade D&D Dice", photos: 1, published: false }]);
+  assert.deepEqual(report.errors, []);
+
+  const draft = state.drafts[0];
+  assert.deepEqual(draft.form, {
+    title: "JAVA 8-Piece Dice Set | Handmade D&D Dice", description: draft.form.description, price: "55.00", quantity: "1", type: "physical",
+    who_made: "i_did", when_made: "made_to_order", taxonomy_id: "2078", shipping_profile_id: "11", return_policy_id: "12",
+    tags: "dnd dice,ttrpg", materials: "resin", is_supply: "false", should_auto_renew: "true", item_weight: "4", item_weight_unit: "oz",
+    readiness_state_id: "77"
+  });
+  assert.ok(draft.form.description.startsWith("JAVA 8-Piece Dice Set"), "the shared dice description");
+  assert.deepEqual(state.inventories[900].put.products, [{ sku: "DICE-JAVA", property_values: [], offerings: [{ price: 55, quantity: 1, is_enabled: true, readiness_state_id: 77 }] }]);
+  assert.deepEqual(draft.photos, ["1:photo https://img/yz.jpg"]);
+  assert.equal(state.listings[900].state, "draft", "left for review");
+
+  // A duplicated item that hasn't been renamed yet waits, and says why.
+  state.catalog.push(item("I_COPY", '"JAVA" TTRPG Dice Set Copy', [variation("V_COPY", "Default", 5500, "DICE-COPY", true)], { cat: "C_DICE" }));
+  state.counts.V_COPY = 1;
+  const copy = await createEtsyDrafts(env);
+  assert.deepEqual(copy.created, []);
+  assert.match(copy.errors[0], /^DICE-COPY: no draft, because '"JAVA" TTRPG Dice Set Copy' isn't named like/);
+  state.catalog.pop();
+
+  // Already on Etsy (Ember), not a dice category (Yahtzee), and already drafted (JAVA): nothing more is made.
+  delete state.listings[900]; // even if the draft is deleted on Etsy
+  assert.deepEqual((await createEtsyDrafts(env)).created, []);
+  assert.equal(state.drafts.length, 1);
+  // The stock sync leaves drafts alone.
+  assert.deepEqual(await pushToEtsy(env, "DICE-JAVA", 1), { skipped: "no-etsy-listing" });
+});
+
+test("saving a new dice set in Square makes its Etsy draft straight away", async () => {
+  const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
+  const send = async (event: object) => {
+    const raw = JSON.stringify(event);
+    const sig = createHmac("sha256", "sigkey").update(env.SQUARE_WEBHOOK_URL + raw).digest("base64");
+    const c = ctx();
+    await worker.fetch(new Request("https://w.example/webhooks/square", { method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": sig } }), env, c);
+    await c.done();
+  };
+  // An ordinary change: nothing new, so Etsy's listings aren't even looked up again.
+  await send({ event_id: "c0", type: "catalog.version.updated" });
+  calls = [];
+  await send({ event_id: "c1", type: "catalog.version.updated" });
+  assert.equal(calls.filter((c) => c.url.includes("etsy")).length, 0);
+
+  // Square reports the new item, then its stock, moments apart: one draft.
+  newDiceSet();
+  await Promise.all([
+    send({ event_id: "c2", type: "catalog.version.updated" }),
+    send({ event_id: "c3", type: "inventory.count.updated", data: { object: { inventory_counts: [
+      { catalog_object_id: "V_JAVA", catalog_object_type: "ITEM_VARIATION", location_id: LOC, state: "IN_STOCK", quantity: "1" }] } } })
+  ]);
+  assert.deepEqual(state.drafts.map((d: any) => d.form.title), ["JAVA 8-Piece Dice Set | Handmade D&D Dice"]);
+});
+
+test("new photos in Square replace the ones on Etsy, for drafts and listings already there", async () => {
+  newDiceSet();
+  const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
+  const etsyPhotos = (id: number) => state.images[id].sort((a: any, b: any) => a.rank - b.rank).map((i: any) => i.text);
+  const photo = (id: string, url: string) => state.related.push({ id, type: "IMAGE", image_data: { url } });
+  // Ember has been on Etsy all along, with two photos put there by hand.
+  state.images[101] = [{ listing_image_id: 1, rank: 1, text: "etsy one" }, { listing_image_id: 2, rank: 2, text: "etsy two" }];
+  state.imageIds = 2;
+
+  await createEtsyDrafts(env); // JAVA gets its draft with the placeholder photo
+  assert.deepEqual(etsyPhotos(900), ["photo https://img/yz.jpg"]);
+  assert.deepEqual(etsyPhotos(101), ["etsy one", "etsy two"], "a listing's own photos stay until Square's change");
+
+  // Better photos for JAVA, and a first photo for Ember.
+  photo("IMG_A", "https://img/java-a.jpg"); photo("IMG_B", "https://img/java-b.jpg"); photo("IMG_E", "https://img/ember.jpg");
+  state.catalog.find((i: any) => i.id === "I_JAVA").item_data.image_ids = ["IMG_A", "IMG_B"];
+  state.catalog[0].item_data.image_ids = ["IMG_E"];
+  const dry = await createEtsyDrafts({ ...env, SYNC_DRY_RUN: "true" });
+  assert.deepEqual([dry.photosUpdated, dry.photosWaiting.sort()], [[], ["DICE-1", "DICE-JAVA"]]);
+
+  const report = await createEtsyDrafts(env, { quick: true });
+  assert.deepEqual(report.photosUpdated.map((u) => [u.sku, u.listingId, u.photos]).sort(), [["DICE-1", 101, 1], ["DICE-JAVA", 900, 2]]);
+  assert.deepEqual(etsyPhotos(900), ["photo https://img/java-a.jpg", "photo https://img/java-b.jpg"]);
+  assert.deepEqual(etsyPhotos(101), ["photo https://img/ember.jpg"], "the extra one from before is gone");
+  assert.deepEqual(report.errors, []);
+
+  // Nothing changed since: Etsy isn't touched. Taking every photo off in Square doesn't empty the listing.
+  calls = [];
+  state.catalog[0].item_data.image_ids = [];
+  assert.deepEqual((await createEtsyDrafts(env, { quick: true })).photosUpdated, []);
+  assert.equal(calls.filter((c) => c.url.includes("etsy")).length, 0);
+
+  // A draft deleted on Etsy is reported once, then left alone.
+  delete state.listings[900];
+  state.catalog.find((i: any) => i.id === "I_JAVA").item_data.image_ids = ["IMG_B"];
+  assert.match((await createEtsyDrafts(env, { quick: true })).errors[0], /DICE-JAVA \(listing 900\): photos not updated/);
+  assert.deepEqual((await createEtsyDrafts(env, { quick: true })).errors, []);
+});
+
+test("Etsy drafts: dry run, publishing straight away, and a missing template", async () => {
+  newDiceSet();
+  const dry = await createEtsyDrafts(makeEnv({ ETSY_DRAFT_CATEGORIES: "dice", SYNC_DRY_RUN: "true" }));
+  assert.deepEqual([dry.dryRun, dry.created, dry.waiting], [true, [], ["DICE-JAVA"]]);
+  assert.equal(calls.filter((c) => c.method !== "GET" && c.url.includes("etsy")).length, 0, "nothing changed on Etsy");
+
+  assert.deepEqual((await createEtsyDrafts(makeEnv())).waiting, [], "off unless categories are named");
+
+  const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice", ETSY_DRAFTS_AUTO_PUBLISH: "true" });
+  const report = await createEtsyDrafts(env);
+  assert.equal(report.created[0].published, true);
+  assert.equal(state.listings[900].state, "active");
+
+  // A set with more photos than this run can send waits for the next one.
+  state.drafts = [];
+  const tight = await createEtsyDrafts(makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" }), { budget: 3 });
+  assert.deepEqual([tight.created, tight.waiting], [[], ["DICE-JAVA"]]);
+
+  delete state.listings[500];
+  const none = await createEtsyDrafts(makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" }));
+  assert.equal(none.created.length, 0);
+  assert.match(none.errors[0], /TEMPLATE/);
 });
 
 test("checkout: blocks sold items and builds a Square link with shipping and taxes", async () => {

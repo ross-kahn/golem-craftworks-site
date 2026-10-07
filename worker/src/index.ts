@@ -12,21 +12,25 @@
 //   GET  /admin/status          sync health (needs ?token=ADMIN_TOKEN)
 //   GET  /admin/catalog         every Square item and why it is or isn't on the site (needs ?token=)
 //   POST /admin/reconcile       run the hourly check now (needs ?token=)
+//   POST /admin/etsy/drafts     make Etsy drafts for new dice sets now (needs ?token=)
 //   GET  /admin/etsy/connect    one-time Etsy sign-in (needs ?token=)
 //   cron (hourly)               safety check + Etsy token refresh
+//   cron (hourly, half past)    Etsy drafts for new dice sets
 
 import * as square from "./square.ts";
 import * as etsyApi from "./etsy.ts";
 import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.ts";
+import { createEtsyDrafts } from "./drafts.ts";
 import { commission } from "./commission.ts";
 import * as reviews from "./reviews.ts";
 import * as pages from "./pages.ts";
 import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
-import type { Ctx, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontCatalog, StorefrontProduct } from "./types.ts";
+import type { Ctx, DraftReport, Env, EtsyTokens, EtsyWebhookEvent, LogLine, ReconcileReport, SquareWebhookEvent, StorefrontCatalog, StorefrontProduct } from "./types.ts";
 
 const PRODUCTS_CACHE_KEY = "https://cache.golemcraftworks.internal/products";
 const PRODUCTS_TTL = 60;
 const SAVED_CATALOG_MAX_AGE_MS = 15 * 60 * 1000;
+const DRAFTS_CRON = "37 * * * *"; // must match the second entry under [triggers] in wrangler.toml
 
 export default {
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
@@ -58,7 +62,15 @@ export default {
     }
   },
 
-  async scheduled(_event: unknown, env: Env, ctx: Ctx): Promise<void> {
+  async scheduled(event: { cron?: string }, env: Env, ctx: Ctx): Promise<void> {
+    // Etsy drafts for new dice sets run on their own schedule: each run has a limited number of requests.
+    if (event.cron === DRAFTS_CRON) {
+      ctx.waitUntil((async () => {
+        try { await createEtsyDrafts(env); }
+        catch (e) { await logEvent(env, "Etsy drafts check failed", { error: errMsg(e) }); }
+      })());
+      return;
+    }
     ctx.waitUntil((async () => {
       try { await reviews.refreshEtsyReviews(env); }
       catch (e) { await logEvent(env, "Etsy reviews didn't refresh", { error: errMsg(e) }); }
@@ -226,11 +238,19 @@ async function squareWebhook(request: Request, env: Env, ctx: Ctx) {
       await purgeProducts();
       try { await handleSquareInventoryEvent(env, event); }
       catch (e) { await logEvent(env, "Square webhook handling failed", { error: errMsg(e) }); }
+      await draftsAfterChange(env);
     })());
   } else if (event.type && event.type.startsWith("catalog.")) {
-    ctx.waitUntil(purgeProducts());
+    ctx.waitUntil((async () => { await purgeProducts(); await draftsAfterChange(env); })());
   }
   return json({ ok: true });
+}
+
+// A new dice set gets its Etsy draft, and changed photos reach Etsy, as soon as Square reports it. The budget is smaller than the
+// hourly run's: this shares its requests with the stock update above.
+async function draftsAfterChange(env: Env) {
+  try { await createEtsyDrafts(env, { quick: true, budget: 22 }); }
+  catch (e) { await logEvent(env, "Etsy drafts check failed", { error: errMsg(e) }); }
 }
 
 async function etsyWebhook(request: Request, env: Env, ctx: Ctx) {
@@ -270,8 +290,9 @@ async function admin(request: Request, env: Env, url: URL) {
     return html(`<p>Etsy is connected. You can close this tab.</p>${shopLine}`);
   }
   if (url.pathname === "/admin/status") {
-    const [last, log, tokens] = await Promise.all([
+    const [last, drafts, log, tokens] = await Promise.all([
       env.GC_KV.get<ReconcileReport>("status:last-reconcile", "json"),
+      env.GC_KV.get<DraftReport>("status:last-drafts", "json"),
       env.GC_KV.get<LogLine[]>("log", "json"),
       env.GC_KV.get<EtsyTokens>("etsy:tokens", "json")
     ]);
@@ -279,6 +300,7 @@ async function admin(request: Request, env: Env, url: URL) {
       etsyConnected: !!tokens,
       dryRun: env.SYNC_DRY_RUN === "true",
       lastHourlyCheck: last,
+      lastEtsyDraftsCheck: drafts,
       recentActivity: log || []
     });
   }
@@ -289,6 +311,9 @@ async function admin(request: Request, env: Env, url: URL) {
   }
   if (url.pathname === "/admin/reconcile" && request.method === "POST") {
     return json(await reconcile(env));
+  }
+  if (url.pathname === "/admin/etsy/drafts" && request.method === "POST") {
+    return json(await createEtsyDrafts(env));
   }
   return json({ error: "Not found" }, 404);
 }
