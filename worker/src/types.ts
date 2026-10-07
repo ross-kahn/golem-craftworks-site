@@ -20,6 +20,7 @@ export interface Env {
   NOINDEX?: string; // "true" keeps search engines away (the pre-launch preview address)
   EMAIL_FROM?: string;
   COMMISSION_TO?: string;
+  DEMO_CATALOG?: string; // set by `npm run dev`: sample products when there's no Square token
 
   // Secrets
   SQUARE_ACCESS_TOKEN: string;

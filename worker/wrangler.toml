@@ -10,7 +10,7 @@ not_found_handling = "404-page"
 run_worker_first = [
   "/api/*", "/webhooks/*", "/admin/*",
   # Built from the catalog so search engines and AI crawlers see real content (worker/src/pages.ts).
-  "/", "/product/*", "/sitemap.xml", "/robots.txt", "/llms.txt", "/feeds/*",
+  "/", "/product/*", "/shop/*", "/sitemap.xml", "/robots.txt", "/llms.txt", "/feeds/*",
   # These two show the shipping price, which is filled in from SHIPPING_FLAT_CENTS below.
   "/js/config.js", "/shipping/"
 ]

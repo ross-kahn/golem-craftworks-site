@@ -2,13 +2,15 @@
 // don't run page scripts, get the real content:
 //
 //   /product/<slug>     the product page, complete: name, price, photos, description, product data
-//   /                   the home page with the product grid filled in
+//   /shop/<slug>        a category page with its product grid filled in
+//   /                   the home page with one tile per category
 //   /sitemap.xml  /robots.txt  /llms.txt  /feeds/google.xml
 //
 // The pages start from the static files in site/ and fill the <!--ssr:…--> slots. The browser scripts
 // then take over as before.
 
 import type { Env, PublicProduct, StorefrontCatalog } from "./types.ts";
+import { slugify } from "./util.ts";
 
 // KV: every address a product has been served at -> its Square id (kept up to date in index.ts).
 export const ADDRESSES_KEY = "product:addresses";
@@ -34,6 +36,33 @@ const priceLabel = (p: PublicProduct) => {
   const lo = Math.min(...prices(p)), hi = Math.max(...prices(p));
   return lo === hi ? money(lo) : `From ${money(lo)}`;
 };
+
+// Categories as the shop shows them: each has its own page at /shop/<slug>, in A-to-Z order with
+// "Other" (anything without a Square category) last. api.ts and home.ts on the site do the same.
+const OTHER = "Other";
+const categoryOf = (p: PublicProduct) => p.category || OTHER;
+
+interface Category { name: string; slug: string; products: PublicProduct[] }
+
+function categories(catalog: StorefrontCatalog): Category[] {
+  const bySlug = new Map<string, Category>();
+  for (const p of catalog.products) {
+    const name = categoryOf(p), slug = slugify(name);
+    const c = bySlug.get(slug) || { name, slug, products: [] };
+    c.products.push(p);
+    bySlug.set(slug, c);
+  }
+  return [...bySlug.values()].sort((a, b) => Number(a.name === OTHER) - Number(b.name === OTHER) || a.name.localeCompare(b.name));
+}
+
+// Up to four photos for a category's tile: one from each piece, newest first, then their second photos, and so on.
+function tilePhotos(products: PublicProduct[]) {
+  const out: string[] = [];
+  for (let i = 0; out.length < 4 && products.some((p) => p.images.length > i); i++) {
+    for (const p of products) if (p.images[i] && out.length < 4) out.push(p.images[i]);
+  }
+  return out;
+}
 
 function page(html: string, env: Env, status = 200) {
   return new Response(html, { status, headers: {
@@ -90,7 +119,7 @@ function productData(p: PublicProduct, link: string, env: Env) {
 function productBody(p: PublicProduct) {
   const stock = madeToOrder(p) ? "Made to order" : inStock(p) ? "In stock" : "Sold";
   return `
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Shop</a>${p.category ? ` / <a href="/?category=${encodeURIComponent(p.category)}">${esc(p.category)}</a>` : ""}</nav>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Shop</a> / <a href="/shop/${slugify(categoryOf(p))}">${esc(categoryOf(p))}</a></nav>
       <div class="product">
         <div class="gallery">
           <div class="gallery__main">${p.images.length ? `<img src="${esc(p.images[0])}" alt="${esc(p.name)}" data-main>` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}</div>
@@ -120,10 +149,7 @@ export async function productPage(env: Env, url: URL, catalog: StorefrontCatalog
     if (moved) return Response.redirect(new URL(`/product/${moved.slug}`, url).toString(), 301);
   }
   const html = p && (await template(env, url, "/product/"));
-  if (!p || !html) {
-    const missing = await template(env, url, "/404.html");
-    return missing ? page(missing, env, 404) : new Response("Not found", { status: 404 });
-  }
+  if (!p || !html) return missingPage(env, url);
 
   const link = `${origin(env, url)}/product/${p.slug}`;
   const title = `${p.name} · ${SHOP}`;
@@ -145,17 +171,78 @@ export async function productPage(env: Env, url: URL, catalog: StorefrontCatalog
   return page(fill(fill(html, "head", head), "product", productBody(p)), env);
 }
 
-export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
-  const html = await template(env, url, "/");
-  if (!html) return null;
-  // Sold pieces stay reachable by their own address and the sitemap; the grid opens on what's available.
-  const cards = catalog.products.filter(inStock).map((p) => `
+// Sold pieces stay reachable by their own address and the sitemap; the grids open on what's available.
+const cards = (products: PublicProduct[]) => products.filter(inStock).map((p) => `
           <li class="card"><a href="/product/${esc(p.slug)}">
             <div class="card__media">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}</div>
             <h3 class="card__name">${esc(p.name)}</h3>
             <div class="card__meta"><span class="card__price">${priceLabel(p)}</span></div>
           </a></li>`).join("");
-  return page(fill(html, "grid", cards), env);
+
+async function missingPage(env: Env, url: URL) {
+  const missing = await template(env, url, "/404.html");
+  return missing ? page(missing, env, 404) : new Response("Not found", { status: 404 });
+}
+
+export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
+  const all = categories(catalog);
+  // The old filter address (/?category=Dice) now has a page of its own.
+  const old = url.searchParams.get("category");
+  if (old) {
+    const hit = all.find((c) => c.name === old);
+    return Response.redirect(new URL(hit ? `/shop/${hit.slug}` : "/", url).toString(), 301);
+  }
+  const html = await template(env, url, "/");
+  if (!html) return null;
+  // One tile per category with something available, showing its newest few photos.
+  const tiles = all.map((c) => ({ ...c, products: c.products.filter(inStock) })).filter((c) => c.products.length).map((c) => {
+    const photos = tilePhotos(c.products);
+    const n = c.products.length;
+    return `
+          <li class="cat"><a href="/shop/${c.slug}">
+            <div class="cat__media" data-n="${photos.length}">${photos.length
+              ? photos.map((src) => `<img src="${esc(src)}" alt="" loading="lazy" decoding="async">`).join("")
+              : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}</div>
+            <h3 class="cat__name">${esc(c.name)}</h3>
+            <p class="cat__count">${n} ${n === 1 ? "piece" : "pieces"}</p>
+          </a></li>`;
+  }).join("");
+  return page(fill(html, "grid", tiles), env);
+}
+
+export async function categoryPage(env: Env, url: URL, catalog: StorefrontCatalog) {
+  const slug = decodeURIComponent(url.pathname.replace(/^\/shop\//, ""));
+  // Styles and scripts are linked relative to /shop/<slug>, so a trailing slash would break them.
+  if (slug.endsWith("/")) return Response.redirect(new URL(`/shop/${slug.replace(/\/+$/, "")}`, url).toString(), 301);
+  const all = categories(catalog);
+  const c = all.find((x) => x.slug === slug);
+  const html = c && (await template(env, url, "/shop/"));
+  if (!c || !html) return missingPage(env, url);
+
+  const link = `${origin(env, url)}/shop/${c.slug}`;
+  const title = `${c.name} · ${SHOP}`;
+  const available = c.products.filter(inStock);
+  const n = available.length;
+  const description = n
+    ? `${c.name}: ${n} handmade ${n === 1 ? "piece" : "pieces"} available now from ${SHOP} in Madison, Wisconsin.`
+    : `${c.name}, made by hand at ${SHOP} in Madison, Wisconsin.`;
+  const image = available.map((p) => p.images[0]).find(Boolean) || `${origin(env, url)}/assets/logo.png`;
+  const head = [
+    `<title>${esc(title)}</title>`,
+    `<meta name="description" content="${esc(description)}">`,
+    `<link rel="canonical" href="${esc(link)}">`,
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="${SHOP}">`,
+    `<meta property="og:title" content="${esc(title)}">`,
+    `<meta property="og:description" content="${esc(description)}">`,
+    `<meta property="og:url" content="${esc(link)}">`,
+    `<meta property="og:image" content="${esc(image)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`
+  ].join("\n  ");
+  const filters = all.map((x) =>
+    `<a class="chip" href="/shop/${x.slug}"${x === c ? ' aria-current="page"' : ""}>${esc(x.name)}</a>`).join("");
+  const slots = { head, title: esc(c.name), crumb: esc(c.name), filters, grid: cards(available) };
+  return page(Object.entries(slots).reduce((out, [name, content]) => fill(out, name, content), html), env);
 }
 
 // ---------- The shipping price, from SHIPPING_FLAT_CENTS ----------
@@ -185,7 +272,9 @@ export function sitemap(env: Env, url: URL, catalog: StorefrontCatalog) {
     `  <url><loc>${esc(base + path)}</loc>${lastmod ? `<lastmod>${esc(lastmod.slice(0, 10))}</lastmod>` : ""}</url>`;
   return file(
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    [...STATIC_PAGES.map((p) => entry(p)), ...catalog.products.map((p) => entry(`/product/${p.slug}`, p.updatedAt))].join("\n") +
+    [...STATIC_PAGES.map((p) => entry(p)),
+      ...categories(catalog).filter((c) => c.products.some(inStock)).map((c) => entry(`/shop/${c.slug}`)),
+      ...catalog.products.map((p) => entry(`/product/${p.slug}`, p.updatedAt))].join("\n") +
     `\n</urlset>\n`, "application/xml");
 }
 
@@ -203,17 +292,18 @@ export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
   const base = origin(env, url);
   const line = (p: PublicProduct) =>
     `- [${p.name}](${base}/product/${p.slug}): ${priceLabel(p)}, ${madeToOrder(p) ? "made to order" : inStock(p) ? "in stock" : "sold"}. ${oneLine(p.description, 140)}`;
-  const categories = [...new Set(catalog.products.map((p) => p.category || "Other"))];
+  const all = categories(catalog);
   return file([
     `# ${SHOP}`, "",
     `> ${TAGLINE} Everything is designed and made by one person, Ross. Orders ship within the US for a flat ${money(shippingCents(env))} or can be picked up in Madison for free. Custom commissions are welcome.`, "",
     "## Pages", "",
-    `- [Shop](${base}/): everything currently available`,
+    `- [Shop](${base}/): everything currently available, by category`,
+    ...all.map((c) => `- [${c.name}](${base}/shop/${c.slug})`),
     `- [Commissions](${base}/commissions/): how custom orders work, and the request form`,
     `- [Reviews](${base}/reviews/): reviews from Etsy buyers and from this site`,
     `- [About](${base}/about/): who makes the pieces and how`,
     `- [Shipping and returns](${base}/shipping/)`, "",
-    ...categories.flatMap((c) => [`## ${c}`, "", ...catalog.products.filter((p) => (p.category || "Other") === c).map(line), ""])
+    ...all.flatMap((c) => [`## ${c.name}`, "", ...c.products.map(line), ""])
   ].join("\n"), "text/markdown");
 }
 

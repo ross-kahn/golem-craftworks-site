@@ -48,6 +48,7 @@ npm run deploy
 
 - **What needs a deploy:** any change to `site/`, `worker/src/` or `worker/wrangler.toml`. Secrets set with `wrangler secret put` take effect at once and need no deploy.
 - **Local preview without Cloudflare:** `cd site && python3 -m http.server 8000`, then open http://localhost:8000. This serves the pages only, so it only works in demo mode (`apiBase: ""`).
+- **`npm run dev` with sample products:** with no Square token set, `npm run dev` shows the sample products in `site/data/demo-products.json` (dice sets and woodworks, with coloured squares for photos). Checkout doesn't work there.
 - **`npm run dev` with real data:** put the secrets in `worker/.dev.vars`, one `NAME=value` per line. Git ignores that file. Use sandbox Square credentials there.
 - **Undo a bad deploy:** `npx wrangler rollback` from `worker/` goes back to the previous version.
 

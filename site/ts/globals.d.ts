@@ -57,7 +57,8 @@ interface Variation extends RawVariation {
   available: number;
 }
 
-interface Product extends Omit<RawProduct, "variations" | "modifierLists" | "unique"> {
+interface Product extends Omit<RawProduct, "category" | "variations" | "modifierLists" | "unique"> {
+  category: string; // "Other" when Square has none
   variations: Variation[];
   modifierLists: ModifierList[];
   soldOut: boolean;
@@ -124,6 +125,8 @@ interface GCApi {
   priceLabel(p: Product): string;
   isDemo(): boolean;
   siteRoot(): string;
+  slugify(s: string): string;
+  categoryLink(name: string): string;
 }
 
 type CartAddResult = { ok: true } | { ok: false; reason: string };

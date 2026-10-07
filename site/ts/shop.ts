@@ -1,4 +1,4 @@
-// Home page: product grid with category filters.
+// Category page: the product grid for one category, with links to the others.
 (function () {
   const api = window.GC_API;
   const { esc, root } = window.GC;
@@ -7,7 +7,9 @@
   const soldToggle = document.querySelector<HTMLInputElement>("[data-show-sold]")!;
   const noticeEl = document.querySelector<HTMLElement>("[data-notice]")!;
   let products: Product[] = [];
-  let category = new URLSearchParams(location.search).get("category") || "All";
+  // /shop/<slug> when the Worker serves the page, /shop/?category=… in demo mode.
+  const slug = api.slugify(new URLSearchParams(location.search).get("category") ||
+    decodeURIComponent((location.pathname.split("/shop/")[1] || "").replace(/\/$/, "")));
 
   // The Worker serves each product at a readable address. Demo mode has no Worker, so it uses the plain page.
   const productLink = (p: Product) =>
@@ -18,9 +20,7 @@
     const media = img
       ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`
       : `<div class="ph"><img src="${root}assets/logo.png" alt=""></div>`;
-    let mark = "";
-    if (p.soldOut) mark = `<span class="soldmark">Sold</span>`;
-    else if (p.unique) mark = `<span class="hexmark">One of a kind</span>`;
+    const mark = p.soldOut ? `<span class="soldmark">Sold</span>` : "";
 
     let stock = "";
     if (!p.soldOut && !p.unique) {
@@ -41,17 +41,20 @@
       </li>`;
   }
 
+  // A to Z, with "Other" last: the same order as the home page.
   function renderFilters() {
-    const cats = ["All", ...new Set(products.map((p) => p.category).filter(Boolean))];
-    if (!cats.includes(category)) category = "All";
-    filtersEl.innerHTML = cats.map((c) =>
-      `<button class="chip" type="button" aria-pressed="${c === category}" data-cat="${esc(c)}">${esc(c)}</button>`
+    const names = new Map<string, string>();
+    products.forEach((p) => { if (!names.has(api.slugify(p.category))) names.set(api.slugify(p.category), p.category); });
+    const cats = [...names].sort(([, a], [, b]) => Number(a === "Other") - Number(b === "Other") || a.localeCompare(b));
+    filtersEl.innerHTML = cats.map(([s, name]) =>
+      `<a class="chip" href="${esc(api.categoryLink(name))}"${s === slug ? ' aria-current="page"' : ""}>${esc(name)}</a>`
     ).join("");
+    return names.get(slug);
   }
 
   function render() {
     const showSold = soldToggle.checked;
-    const list = products.filter((p) => (category === "All" || p.category === category) && (showSold || !p.soldOut));
+    const list = products.filter((p) => api.slugify(p.category) === slug && (showSold || !p.soldOut));
     if (!list.length) {
       grid.innerHTML = `<li class="empty" style="grid-column:1/-1">
         Nothing here right now. ${showSold ? "" : `Turn on “Show sold pieces” to see past work, or `}
@@ -61,26 +64,7 @@
     grid.innerHTML = list.map(card).join("");
   }
 
-  filtersEl.addEventListener("click", (e) => {
-    const b = (e.target as Element).closest<HTMLElement>("[data-cat]");
-    if (!b) return;
-    category = b.dataset.cat!;
-    const url = new URL(location.href);
-    if (category === "All") url.searchParams.delete("category"); else url.searchParams.set("category", category);
-    history.replaceState(null, "", url);
-    renderFilters(); render();
-  });
   soldToggle.addEventListener("change", render);
-
-  // A quiet line of proof under the hero buttons: rating, review count, Etsy sales. Hidden until there's something to say.
-  api.getReviews().then(({ stats }) => {
-    const proof = document.querySelector<HTMLElement>("[data-proof]");
-    const parts = [
-      stats.average !== null ? `★ ${stats.average.toFixed(1)} from ${stats.count.toLocaleString("en-US")} ${stats.count === 1 ? "review" : "reviews"}` : "",
-      stats.etsySales !== null ? `${stats.etsySales.toLocaleString("en-US")} sales on Etsy` : ""
-    ].filter(Boolean);
-    if (proof && parts.length) { proof.textContent = parts.join(" · "); proof.hidden = false; }
-  }).catch(() => { /* the line just stays hidden */ });
 
   // The Worker may have filled the grid already; only show placeholders when it's empty.
   if (!grid.children.length) grid.innerHTML = Array.from({ length: 8 }, () => `<li><div class="skeleton"></div><div class="skeleton-line"></div></li>`).join("");
@@ -92,7 +76,15 @@
         noticeEl.hidden = false;
         noticeEl.innerHTML = `<p>Demo mode: these are sample products. Set <code>apiBase</code> to "/" in ts/config.ts and run <code>npm run deploy</code> to show your live Square inventory.</p>`;
       }
-      renderFilters(); render();
+      const name = renderFilters();
+      if (!name) {
+        soldToggle.closest<HTMLElement>("label")!.hidden = true;
+        grid.innerHTML = `<li class="empty" style="grid-column:1/-1">That category isn't here. <a href="${root}">Go to the shop</a>.</li>`;
+        return;
+      }
+      document.title = `${name} · Golem Craftworks`;
+      document.querySelectorAll<HTMLElement>("[data-category-name]").forEach((el) => { el.textContent = name; });
+      render();
     })
     .catch(() => {
       grid.innerHTML = `<li class="empty" style="grid-column:1/-1">The shop couldn't load right now. Refresh the page, or find me on <a href="${esc(window.GC_CONFIG.etsyUrl)}">Etsy</a> in the meantime.</li>`;

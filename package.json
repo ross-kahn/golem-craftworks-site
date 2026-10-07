@@ -11,7 +11,7 @@
     "watch": "node node_modules/typescript/lib/tsc.js -p site --watch",
     "typecheck": "node node_modules/typescript/lib/tsc.js -b site worker tools",
     "test": "node --test worker/test/*.test.ts tools/test/*.test.ts",
-    "dev": "node node_modules/wrangler/bin/wrangler.js dev --cwd worker",
+    "dev": "node node_modules/wrangler/bin/wrangler.js dev --cwd worker --var DEMO_CATALOG:true",
     "deploy": "node node_modules/wrangler/bin/wrangler.js deploy --cwd worker"
   },
   "devDependencies": {

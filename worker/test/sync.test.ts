@@ -483,15 +483,72 @@ test("product pages are complete before any script runs", async () => {
   assert.ok((await (await get(env, "/product/?id=I_YZ")).text()).includes("<!--ssr:product-->"));
 });
 
-test("home page lists what's available; same-named items get distinct addresses", async () => {
-  state.catalog[0].item_data.name = "Yahtzee set";
-  state.counts.V_DICE = 0;
+test("home page shows a tile per category with something available", async () => {
   const env = makeEnv({ ASSETS });
   const html = await (await get(env, "/")).text();
+  assert.ok(html.includes('<a href="/shop/dice">') && html.includes('<a href="/shop/game-sets">'));
+  assert.ok(html.indexOf("/shop/dice") < html.indexOf("/shop/game-sets"), "A to Z");
+  assert.ok(html.includes('<div class="cat__media" data-n="1"><img src="https://img/yz.jpg"') && html.includes("<p class=\"cat__count\">1 piece</p>"));
+  assert.ok(!html.includes("/product/") && !html.includes("ssr:"), "products are on the category pages");
+  assert.ok(html.includes("Hardwood boxes and dice, made one at a time."), "the rest of the page is intact");
+
+  state.counts.V_DICE = 0;
+  assert.ok(!(await (await get(env, "/")).text()).includes("/shop/dice"), "nothing available, no tile");
+  // A category with few pieces fills its tile from their other photos.
+  state.catalog[1].item_data.image_ids = ["IMG1", "IMG2", "IMG3"];
+  state.related.push({ id: "IMG2", type: "IMAGE", image_data: { url: "https://img/yz2.jpg" } }, { id: "IMG3", type: "IMAGE", image_data: { url: "https://img/yz3.jpg" } });
+  assert.ok((await (await get(env, "/")).text()).includes('data-n="3"><img src="https://img/yz.jpg" alt="" loading="lazy" decoding="async"><img src="https://img/yz2.jpg"'));
+
+  // The old filter addresses lead to the category pages.
+  const old = await get(env, "/?category=Game%20sets");
+  assert.deepEqual([old.status, old.headers.get("location")], [301, "https://w.example/shop/game-sets"]);
+  assert.equal((await get(env, "/?category=Gone")).headers.get("location"), "https://w.example/");
+});
+
+test("category pages list what's available; same-named items get distinct addresses", async () => {
+  state.catalog[0].item_data.name = "Yahtzee set";
+  state.catalog[0].item_data.categories = [{ id: "C_GAME" }];
+  state.counts.V_DICE = 0;
+  const env = makeEnv({ ASSETS, NOINDEX: undefined });
+  const res = await get(env, "/shop/game-sets");
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.ok(html.includes("<title>Game sets · Golem Craftworks</title>"));
+  assert.ok(html.includes('<link rel="canonical" href="https://golemcraftworks.com/shop/game-sets">'));
+  assert.ok(html.includes("Game sets: 1 handmade piece available now"));
+  assert.ok(/<h1[^>]*>Game sets<\/h1>/.test(html) && html.includes('<a class="chip" href="/shop/game-sets" aria-current="page">Game sets</a>'));
   assert.ok(html.includes('<a href="/product/yahtzee-set-i_yz">') && html.includes(">From $60<"));
   assert.ok(!html.includes("/product/yahtzee-set-i_dice"), "the sold one isn't in the grid");
-  assert.ok(html.includes("Hardwood boxes and dice, made one at a time."), "the rest of the page is intact");
+  assert.ok(!html.includes("ssr:") && html.includes('<script src="../js/shop.js"></script>'));
+  assert.equal((html.match(/<title>/g) || []).length, 1);
   assert.equal((await get(env, "/product/yahtzee-set-i_dice")).status, 200, "but its page is still there");
+  assert.ok((await (await get(env, "/product/yahtzee-set-i_yz")).text()).includes('<a href="/shop/game-sets">Game sets</a>'));
+
+  // Nothing in Square's categories: it goes under Other.
+  state.catalog[0].item_data.categories = [];
+  state.counts.V_DICE = 1;
+  const other = await (await get(env, "/shop/other")).text();
+  assert.ok(other.includes("<title>Other · Golem Craftworks</title>") && other.includes("/product/yahtzee-set-i_dice"));
+  const home = await (await get(env, "/")).text();
+  assert.ok(home.indexOf("/shop/game-sets") < home.indexOf("/shop/other"), "Other comes last");
+
+  assert.equal((await get(env, "/shop/no-such-category")).status, 404);
+  assert.equal((await get(env, "/shop/market-only")).status, 404, "hidden categories have no page");
+  const slash = await get(env, "/shop/game-sets/");
+  assert.deepEqual([slash.status, slash.headers.get("location")], [301, "https://w.example/shop/game-sets"]);
+  // The bare page (demo mode's ?category= address) is still the static file.
+  assert.ok((await (await get(env, "/shop/?category=Dice")).text()).includes("<!--ssr:grid-->"));
+});
+
+test("npm run dev without a Square token shows the sample products", async () => {
+  const env = makeEnv({ ASSETS, DEMO_CATALOG: "true", SQUARE_ACCESS_TOKEN: "" });
+  const home = await (await get(env, "/")).text();
+  assert.ok(home.includes('<a href="/shop/8-piece-rpg-dice">') && home.includes('<a href="/shop/woodworks">') && home.includes('data-n="4"'));
+  const wood = await (await get(env, "/shop/woodworks")).text();
+  assert.ok(wood.includes('<a href="/product/yahtzee-set">'));
+  assert.equal((await get(env, "/product/ember-ttrpg-dice-set")).status, 200);
+  // With a token, the setting does nothing.
+  assert.ok(!(await (await get(makeEnv({ ASSETS, DEMO_CATALOG: "true" }), "/")).text()).includes("/shop/woodworks"));
 });
 
 test("the shipping price comes from one setting, everywhere it's shown", async () => {
@@ -533,7 +590,7 @@ test("renaming an item in Square redirects its old address to the new one", asyn
 test("crawler files: sitemap, robots, llms.txt and the Google feed", async () => {
   const live = makeEnv({ ASSETS, NOINDEX: "false" });
   const map = await (await get(live, "/sitemap.xml")).text();
-  for (const path of ["/", "/reviews/", "/shipping/", "/product/yahtzee-set", "/product/ember-dice-set"]) {
+  for (const path of ["/", "/reviews/", "/shipping/", "/shop/dice", "/shop/game-sets", "/product/yahtzee-set", "/product/ember-dice-set"]) {
     assert.ok(map.includes(`<loc>https://golemcraftworks.com${path}</loc>`), path);
   }
   assert.ok(map.includes("<lastmod>2026-09-01</lastmod>") && !map.includes("sticker"));
@@ -544,6 +601,7 @@ test("crawler files: sitemap, robots, llms.txt and the Google feed", async () =>
 
   const llms = await (await get(live, "/llms.txt")).text();
   assert.ok(llms.startsWith("# Golem Craftworks") && llms.includes("## Game sets"));
+  assert.ok(llms.includes("- [Game sets](https://golemcraftworks.com/shop/game-sets)"));
   assert.ok(llms.includes("- [Yahtzee set](https://golemcraftworks.com/product/yahtzee-set): From $60, in stock."));
 
   const feed = await (await get(live, "/feeds/google.xml")).text();

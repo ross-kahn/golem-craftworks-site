@@ -2,7 +2,7 @@
 //   GET  /api/products          storefront catalog from Square (cached ~60s)
 //   POST /api/checkout          creates a Square checkout link
 //   POST /api/commission        emails a commission request to the shop + a confirmation to the client
-//   GET  /product/<slug>, /     pages built from the catalog so crawlers get the real content
+//   GET  /product/<slug>, /shop/<slug>, /   pages built from the catalog so crawlers get the real content
 //   GET  /sitemap.xml, /robots.txt, /llms.txt, /feeds/google.xml
 //   POST /webhooks/square       Square inventory changes -> Etsy
 //   POST /webhooks/etsy         Etsy paid orders -> Square
@@ -35,7 +35,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
     try {
-      if (url.pathname === "/api/products" && request.method === "GET") return withCors(await products(env, ctx), cors);
+      if (url.pathname === "/api/products" && request.method === "GET") return withCors(await products(env, ctx, url), cors);
       if (url.pathname === "/api/checkout" && request.method === "POST") return withCors(await checkout(request, env), cors);
       if (url.pathname === "/api/commission" && request.method === "POST") return withCors(await commission(request, env), cors);
       if (url.pathname === "/api/reviews" && request.method === "GET") return withCors(await reviews.list(env, ctx), cors);
@@ -82,7 +82,14 @@ function withCors(res: Response, cors: Record<string, string>) {
 
 // The catalog as the site sees it, cached for a minute. If Square can't be reached, the last good
 // copy is used so product pages keep working.
-async function catalog(env: Env, ctx: Ctx): Promise<StorefrontCatalog> {
+async function catalog(env: Env, ctx: Ctx, url: URL): Promise<StorefrontCatalog> {
+  // `npm run dev` with no Square token: the sample products in site/data/demo-products.json, so the
+  // pages can be worked on without any secrets. DEMO_CATALOG is only ever set by that command.
+  if (env.DEMO_CATALOG === "true" && !env.SQUARE_ACCESS_TOKEN && env.ASSETS) {
+    const res = await env.ASSETS.fetch(new Request(new URL("/data/demo-products.json", url)));
+    const demo = (await res.json()) as Pick<StorefrontCatalog, "products">;
+    return { products: demo.products, generatedAt: new Date().toISOString() };
+  }
   const cache = caches.default;
   const hit = await cache.match(PRODUCTS_CACHE_KEY);
   if (hit) return hit.json();
@@ -113,8 +120,8 @@ async function catalog(env: Env, ctx: Ctx): Promise<StorefrontCatalog> {
   return data;
 }
 
-async function products(env: Env, ctx: Ctx) {
-  return json(await catalog(env, ctx), 200, { "cache-control": `public, max-age=${PRODUCTS_TTL}` });
+async function products(env: Env, ctx: Ctx, url: URL) {
+  return json(await catalog(env, ctx, url), 200, { "cache-control": `public, max-age=${PRODUCTS_TTL}` });
 }
 
 // Pages and crawler files built from the catalog (see pages.ts). Null means "serve the static file".
@@ -124,9 +131,10 @@ async function builtPage(env: Env, ctx: Ctx, url: URL) {
   if (path === "/js/config.js") return pages.siteConfig(env, url);
   if (path === "/shipping/") return pages.shippingPage(env, url);
   const isProduct = path.startsWith("/product/") && path !== "/product/";
-  if (!isProduct && !["/", "/sitemap.xml", "/llms.txt", "/feeds/google.xml"].includes(path)) return null;
+  const isCategory = path.startsWith("/shop/") && path !== "/shop/";
+  if (!isProduct && !isCategory && !["/", "/sitemap.xml", "/llms.txt", "/feeds/google.xml"].includes(path)) return null;
   let data: StorefrontCatalog;
-  try { data = await catalog(env, ctx); }
+  try { data = await catalog(env, ctx, url); }
   catch (e) {
     // The home page still works without the catalog: the browser script loads it. The rest have nothing to show.
     await logEvent(env, "Page built without the catalog", { path, error: errMsg(e) });
@@ -134,6 +142,7 @@ async function builtPage(env: Env, ctx: Ctx, url: URL) {
     data = { products: [], generatedAt: new Date().toISOString() };
   }
   if (isProduct) return pages.productPage(env, url, data);
+  if (isCategory) return pages.categoryPage(env, url, data);
   if (path === "/") return pages.homePage(env, url, data);
   if (path === "/sitemap.xml") return pages.sitemap(env, url, data);
   if (path === "/llms.txt") return pages.llms(env, url, data);

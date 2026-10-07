@@ -7,24 +7,26 @@ import { DICE_SET_TEMPLATE, diceSetDescription, htmlToText } from "../../worker/
 
 const APPLEBANE = "I swear I made up the name \"applebane\" because of the red and green in the dice. Still works!";
 const full = (name: string, notes: string) => DICE_SET_TEMPLATE.replace("{NAME}", name).replace("{NOTES}", notes);
+// The template's own lines, so the test follows whatever the wording is today.
+const [title, subtitle, ...body] = DICE_SET_TEMPLATE.split("\n").filter((l) => l.trim() && !l.includes("{NOTES}"));
+// An older wording of a template line: it opens the same way and ends differently.
+const older = (line: string) => line.replace(/[.!]?$/, ", cheers!");
 
 test("dice descriptions are cut down to what's particular to each set", () => {
   const plan = planNotes([
     { id: "A", name: '"APPLEBANE" TTRPG Dice Set', description: full("APPLEBANE", APPLEBANE) },
     // Pasted from APPLEBANE and never changed.
     { id: "B", name: '"MYSTIC" TTRPG Dice Set', description: full("MYSTIC", APPLEBANE) },
-    // Older wording, an emoji in the title, the lineup on one line, and two notes of its own.
+    // Older wording, an emoji in the title, and two notes of its own.
     { id: "C", name: '"JAVA" TTRPG Dice Set', description: [
-      "☕️ JAVA 8-Piece Dice Set\nTabletop Gaming Dice for Dungeons & Dragons (D&D), Pathfinder, and more",
+      `☕️ ${title.replace("{NAME}", "JAVA")}\n${older(subtitle)}`,
       "Inspired by that perfect cup of coffee.",
-      "This set comes with the full lineup: D4, D6, D8, D10, D12, D20, D100 (percentile die), and a D2 coin. The D2 can pull double duty as a coin flip.",
-      "I make these by hand in my shop in Madison, WI. Every set is one-of-a-kind.",
+      ...body.slice(0, -1).map(older),
       "Costs $55 & worth it.",
-      "Perfect for your in-person or online campaigns.",
-      "Thanks for checking out my work, cheers!"
+      older(body.at(-1)!)
     ].join("\n\n") },
     { id: "D", name: '"DEVA" TTRPG Dice Set', description: "Radiant." },
-    { id: "E", name: "Heirloom Yahtzee Set", description: "Thanks for checking out my work!" }
+    { id: "E", name: "Heirloom Yahtzee Set", description: body.at(-1)! }
   ]);
 
   assert.deepEqual(plan.map((s) => [s.name, s.notes, s.changed]), [

@@ -49,7 +49,7 @@
 
     mount.innerHTML = `
       <nav class="crumbs" aria-label="Breadcrumb">
-        <a href="${root}">Shop</a>${p.category ? ` / <a href="${root}?category=${encodeURIComponent(p.category)}">${esc(p.category)}</a>` : ""}
+        <a href="${root}">Shop</a> / <a href="${esc(api.categoryLink(p.category))}">${esc(p.category)}</a>
       </nav>
       <div class="product">
         <div class="gallery">

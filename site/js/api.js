@@ -2,7 +2,7 @@
 // Talks to the Cloudflare Worker (or demo data when no Worker is configured).
 (function () {
     const cfg = window.GC_CONFIG;
-    const CACHE_KEY = "gc-products-v2";
+    const CACHE_KEY = "gc-products-v3";
     const CACHE_MS = 60 * 1000;
     const isDemo = () => !cfg.apiBase;
     function siteRoot() {
@@ -63,6 +63,7 @@
         });
         return {
             ...p,
+            category: p.category || "Other",
             variations,
             modifierLists,
             soldOut: totalAvailable === 0,
@@ -76,6 +77,10 @@
         const all = await getProducts();
         return all.find((p) => p.id === id || p.slug === id) || null;
     }
+    // The same as slugify in worker/src/util.ts, which builds the category addresses: "Game sets" -> "game-sets".
+    const slugify = (s) => s.normalize("NFKD").replace(/[̀-ͯ'’"]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    // The Worker serves each category at a readable address. Demo mode has no Worker, so it uses the plain page.
+    const categoryLink = (name) => isDemo() ? `${siteRoot()}shop/?category=${encodeURIComponent(name)}` : `${siteRoot()}shop/${slugify(name)}`;
     async function createCheckout({ lines, fulfillment }) {
         if (isDemo()) {
             const err = new Error("Checkout is turned off in demo mode. Connect the Worker in ts/config.ts to take real orders.");
@@ -121,5 +126,5 @@
             return "";
         return p.minPrice === p.maxPrice ? money(p.minPrice) : `From ${money(p.minPrice)}`;
     }
-    window.GC_API = { getProducts, getProduct, createCheckout, sendCommission, getReviews, sendReview, money, priceLabel, isDemo, siteRoot };
+    window.GC_API = { getProducts, getProduct, createCheckout, sendCommission, getReviews, sendReview, money, priceLabel, isDemo, siteRoot, slugify, categoryLink };
 })();
