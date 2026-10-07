@@ -115,7 +115,7 @@
 
   // Sent as a form rather than JSON because it can carry photos.
   async function sendReview(data: FormData) {
-    return fetchJSON<{ ok: boolean }>(cfg.apiBase.replace(/\/$/, "") + "/api/reviews", { method: "POST", body: data });
+    return fetchJSON<{ ok: boolean; review?: Review }>(cfg.apiBase.replace(/\/$/, "") + "/api/reviews", { method: "POST", body: data });
   }
 
   function money(cents: number | null | undefined): string {

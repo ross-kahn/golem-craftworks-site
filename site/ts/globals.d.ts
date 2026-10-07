@@ -120,7 +120,7 @@ interface GCApi {
   createCheckout(order: { lines: CartLine[]; fulfillment: Fulfillment }): Promise<{ url?: string }>;
   sendCommission(data: CommissionData): Promise<{ ok: boolean; confirmationSent: boolean }>;
   getReviews(): Promise<ReviewData>;
-  sendReview(data: FormData): Promise<{ ok: boolean }>;
+  sendReview(data: FormData): Promise<{ ok: boolean; review?: Review }>;
   money(cents: number | null | undefined): string;
   priceLabel(p: Product): string;
   isDemo(): boolean;

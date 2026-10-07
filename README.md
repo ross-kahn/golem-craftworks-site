@@ -309,6 +309,22 @@ In Gmail on desktop: gear icon → **See all settings** → **Accounts and Impor
 
 If port 587 fails, use `465` with SSL. Enter the confirmation code Gmail sends, then select **Reply from the same address the message was sent to**. The same API key works for every alias. These emails count toward the same Resend daily limit as the commission form.
 
+## Reviews
+
+The reviews page shows Etsy reviews plus ones left on the site. A review left on the site shows straight away, and you get an email with a link to hide or delete it. One with a web address in it is held back as likely spam until you press **Show on the site** from that link. Every site review is also listed at `https://preview.golemcraftworks.com/admin/reviews?token=YOUR_ADMIN_TOKEN`. The notification email uses the same Resend setup as [Commission emails](#commission-emails).
+
+### Spam check (Turnstile)
+
+Cloudflare Turnstile is a free check that the visitor is a person, usually without asking them to do anything. It's off until both keys below are set. Without it the form still has a hidden trap field, a too-fast-to-be-human timer, and a limit of three reviews a day per visitor.
+
+1. In the Cloudflare dashboard, open **Turnstile** and add a widget. Name it anything, add the hostname `golemcraftworks.com` (this covers `preview.golemcraftworks.com` too), and leave the mode on **Managed**.
+2. Copy the **site key** into `turnstileSiteKey` in `site/ts/config.ts`. This one is public, so it's fine in the repo.
+3. Copy the **secret key**, then from `worker/` run `npx wrangler secret put TURNSTILE_SECRET` and paste it.
+4. Run `npm run deploy` straight after. Between steps 3 and 4 the Worker expects the check but the page doesn't show it yet, so reviews sent in that gap are refused.
+5. Open the reviews page: a small Cloudflare box appears above the Send button. Send a test review to make sure it goes through.
+
+To turn it off again, empty `turnstileSiteKey`, run `npx wrangler secret delete TURNSTILE_SECRET` from `worker/`, and deploy.
+
 ## GitHub
 
 The repo is private and is only a backup and history of the source. It holds no secrets: API keys live in Cloudflare (`wrangler secret put`) and in `worker/.dev.vars`, which git ignores. Never paste a key into `wrangler.toml` or any other tracked file.

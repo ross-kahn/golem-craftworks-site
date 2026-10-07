@@ -280,8 +280,8 @@ export interface PublicReview {
 // A review left on the site, as stored. No email address: that only goes out in the notification email.
 export interface SiteReview {
   id: string;
-  key: string; // secret for this review's approval link
-  status: "pending" | "approved";
+  key: string; // secret for this review's private link (hide, show, delete)
+  status: "pending" | "approved"; // hidden | showing
   name: string;
   rating: number;
   text: string;

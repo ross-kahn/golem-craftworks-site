@@ -83,11 +83,12 @@ test("reviews: nothing set up yet means an empty list, not an error", async () =
   assert.equal(etsyCalls.length, 0, "placeholder Etsy settings are not called");
 });
 
-test("reviews: a submitted review is held for approval and the email is only ever emailed", async () => {
+test("reviews: a submitted review shows straight away, can be taken down, and the email is only ever emailed", async () => {
   const env = makeEnv();
   const res = await submit(env, reviewForm({}, [JPEG]));
   assert.equal(res.status, 200);
-  assert.equal((await listed(env)).reviews.length, 0, "not public until approved");
+  assert.equal(((await res.json()) as any).review.text, "Love the vault.");
+  assert.equal((await listed(env)).reviews.length, 1, "public without approval");
 
   // The shop gets the address as reply-to; storage never sees it.
   assert.equal(sent.length, 1);
@@ -98,15 +99,19 @@ test("reviews: a submitted review is held for approval and the email is only eve
   const record = JSON.parse(kv.m.get(stored()[0]) as string);
   const link = `/admin/review?id=${record.id}&key=${record.key}`;
   assert.ok(sent[0].text.includes("https://golemcraftworks.com" + link));
+  assert.ok(sent[0].text.includes("showing on the site now"));
 
-  // The photo is private until approval, and opening the link changes nothing.
-  assert.equal((await call(env, `/api/reviews/photo/${record.id}/0`)).status, 404);
-  assert.equal((await call(env, `/api/reviews/photo/${record.id}/0?key=${record.key}`)).status, 200);
+  // Opening the link changes nothing: taking a review down needs a button press.
   assert.equal((await call(env, link)).status, 200);
-  assert.equal((await listed(env)).reviews.length, 0);
+  assert.equal((await listed(env)).reviews.length, 1);
   assert.equal((await call(env, `/admin/review?id=${record.id}&key=wrong`)).status, 404);
 
+  // Hidden: off the site, photo private again. Shown: back.
   const act = (action: string) => call(env, "/admin/review", { method: "POST", body: new URLSearchParams({ id: record.id, key: record.key, action }) });
+  await act("hide");
+  assert.equal((await listed(env)).reviews.length, 0);
+  assert.equal((await call(env, `/api/reviews/photo/${record.id}/0`)).status, 404);
+  assert.equal((await call(env, `/api/reviews/photo/${record.id}/0?key=${record.key}`)).status, 200);
   await act("approve");
   const data = await listed(env);
   assert.deepEqual(data.reviews.map((r: any) => [r.source, r.name, r.rating, r.text, r.product, r.photos]),
@@ -146,6 +151,13 @@ test("reviews: bots, bad input and floods are turned away", async () => {
   assert.equal((await submit(guarded, reviewForm())).status, 403, "no token at all");
   assert.equal((await submit(guarded, reviewForm({ "cf-turnstile-response": "tok" }), "9.9.9.9")).status, 200);
 
+  // A review with a link in it is kept but hidden until it's looked at.
+  const before = sent.length;
+  const spam = await submit(env, reviewForm({ text: "Great dice, see www.cheap-pills.example" }), "3.3.3.3");
+  assert.deepEqual(await spam.json(), { ok: true });
+  assert.ok(!JSON.stringify(await listed(env)).includes("cheap-pills"));
+  assert.ok(sent[before].subject.startsWith("New review to check") && sent[before].text.includes("hidden until you show it"));
+
   // Three a day per visitor.
   for (let i = 0; i < 3; i++) assert.equal((await submit(env, reviewForm(), "2.2.2.2")).status, 200);
   assert.equal((await submit(env, reviewForm(), "2.2.2.2")).status, 429);
@@ -158,7 +170,7 @@ test("reviews: without email set up the review is still kept, and the admin list
   assert.ok(!JSON.stringify(await kv.get("log", "json")).includes("jane@example.com"));
   assert.equal((await call(env, "/admin/reviews")).status, 404);
   const page = await (await call(env, "/admin/reviews?token=admintoken")).text();
-  assert.ok(page.includes("Love the vault.") && page.includes("pending"));
+  assert.ok(page.includes("Love the vault.") && page.includes("showing"));
 });
 
 test("reviews: Etsy reviews and the sales count are merged in once the Etsy key is set", async () => {

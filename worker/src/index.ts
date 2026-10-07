@@ -6,9 +6,9 @@
 //   GET  /sitemap.xml, /robots.txt, /llms.txt, /feeds/google.xml
 //   POST /webhooks/square       Square inventory changes -> Etsy
 //   POST /webhooks/etsy         Etsy paid orders -> Square
-//   GET  /api/reviews           Etsy reviews + approved site reviews, with totals
-//   POST /api/reviews           leave a review (held for approval)
-//   GET  /admin/reviews         every site review (needs ?token=); each has its own approval link
+//   GET  /api/reviews           Etsy reviews + site reviews, with totals
+//   POST /api/reviews           leave a review (shows straight away unless it looks like spam)
+//   GET  /admin/reviews         every site review (needs ?token=); each has its own link to hide or delete it
 //   GET  /admin/status          sync health (needs ?token=ADMIN_TOKEN)
 //   GET  /admin/catalog         every Square item and why it is or isn't on the site (needs ?token=)
 //   POST /admin/reconcile       run the hourly check now (needs ?token=)

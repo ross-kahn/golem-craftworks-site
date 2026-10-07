@@ -2,7 +2,8 @@
 //
 //   * Etsy reviews are read with the app key alone (no shop sign-in) and cached in KV.
 //   * The sales count is Etsy's all-time figure plus Square sales since SQUARE_SALES_SINCE.
-//   * Site reviews wait for approval before they show. Each one has its own private link for that.
+//   * Site reviews show straight away, unless one has a link in it (the mark of spam): that one waits for a look.
+//     Each review has its own private link for hiding or deleting it.
 //   * The reviewer's email goes to the shop in the notification email and is never stored or logged.
 
 import * as etsyApi from "./etsy.ts";
@@ -128,8 +129,11 @@ async function overLimit(env: Env, request: Request) {
   return false;
 }
 
+// Real reviews almost never carry a web address; spam nearly always does.
+const LINK = /https?:|www\.|\.(com|net|org|ru|info|biz|xyz|top|shop)\b/i;
+
 async function passesTurnstile(env: Env, request: Request, token: string) {
-  if (!env.TURNSTILE_SECRET) return true; // not set up yet: the other checks and approval still apply
+  if (!env.TURNSTILE_SECRET) return true; // not set up yet: the other checks still apply
   if (!token) return false;
   const res = await fetch(TURNSTILE_URL, {
     method: "POST",
@@ -180,14 +184,17 @@ export async function submit(request: Request, env: Env) {
   const review: SiteReview = {
     id: crypto.randomUUID(),
     key: crypto.randomUUID().replace(/-/g, ""),
-    status: "pending",
+    status: "approved",
     name, rating, text,
     product: field("product", LIMITS.product),
     photoTypes: photos.map((p) => p.type),
     at: new Date().toISOString()
   };
   await Promise.all(photos.map((p, i) => env.GC_KV.put(photoKey(review.id, i), p.bytes)));
+  const held = LINK.test(`${name} ${text} ${review.product}`);
+  if (held) review.status = "pending";
   await env.GC_KV.put(itemKey(review.id), JSON.stringify(review));
+  if (!held) await rebuildIndex(env);
 
   // The email address leaves here and only here.
   let notified = false;
@@ -197,11 +204,12 @@ export async function submit(request: Request, env: Env) {
         from: env.EMAIL_FROM,
         to: [env.COMMISSION_TO],
         reply_to: email,
-        subject: `New review to approve: ${"★".repeat(rating)} from ${name}`,
+        subject: `New review${held ? " to check" : ""}: ${"★".repeat(rating)} from ${name}`,
         text:
           `${name} <${email}> left a ${rating}-star review${review.product ? ` of ${review.product}` : ""}` +
           `${photos.length ? ` with ${photos.length} photo${photos.length > 1 ? "s" : ""}` : ""}.\n\n${text}\n\n` +
-          `It won't show on the site until you approve it:\n${moderationUrl(env, request, review)}\n\n--\n` +
+          (held ? `It has a link in it, so it's hidden until you show it:` : `It's showing on the site now. To hide or delete it:`) +
+          `\n${moderationUrl(env, request, review)}\n\n--\n` +
           `Reply to this email to write to ${name} directly. Their address isn't stored anywhere else.`
       });
       notified = true;
@@ -209,8 +217,8 @@ export async function submit(request: Request, env: Env) {
       await logEvent(env, "Review notification email failed", { id: review.id, error: errMsg(e) });
     }
   }
-  if (!notified) await logEvent(env, "New review is waiting at /admin/reviews (no notification email was sent)", { id: review.id });
-  return json({ ok: true });
+  if (!notified) await logEvent(env, `New review ${held ? "is waiting" : "was posted (see it)"} at /admin/reviews (no notification email was sent)`, { id: review.id });
+  return json(held ? { ok: true } : { ok: true, review: toPublic(review) });
 }
 
 function moderationUrl(env: Env, request: Request, r: SiteReview) {
@@ -237,7 +245,7 @@ export async function photo(env: Env, url: URL) {
   } });
 }
 
-// ---------- Approval ----------
+// ---------- Hiding and deleting ----------
 
 async function allSiteReviews(env: Env) {
   const out: SiteReview[] = [];
@@ -253,14 +261,17 @@ async function allSiteReviews(env: Env) {
   return out.sort((a, b) => b.at.localeCompare(a.at));
 }
 
-// The approved reviews, in the shape the site shows, kept under one key so the page needs one read.
-async function rebuildIndex(env: Env) {
-  const approved = (await allSiteReviews(env)).filter((r) => r.status === "approved");
-  const index: PublicReview[] = approved.map((r) => ({
+function toPublic(r: SiteReview): PublicReview {
+  return {
     id: r.id, source: "site", name: r.name, rating: r.rating, text: r.text, product: r.product,
     photos: r.photoTypes.map((_, i) => `/api/reviews/photo/${r.id}/${i}`),
     at: r.at
-  }));
+  };
+}
+
+// The reviews that are showing, in the shape the site shows, kept under one key so the page needs one read.
+async function rebuildIndex(env: Env) {
+  const index = (await allSiteReviews(env)).filter((r) => r.status === "approved").map(toPublic);
   await env.GC_KV.put("reviews:site", JSON.stringify(index));
   await purge();
 }
@@ -273,12 +284,12 @@ const page = (body: string, status = 200) => new Response(
 
 function card(r: SiteReview) {
   return `<p><strong>${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</strong> ${esc(r.name)}${r.product ? ` · ${esc(r.product)}` : ""}` +
-    ` · ${esc(r.at.slice(0, 10))} · <em>${r.status}</em></p><p style="white-space:pre-line">${esc(r.text)}</p>` +
+    ` · ${esc(r.at.slice(0, 10))} · <em>${r.status === "approved" ? "showing" : "hidden"}</em></p><p style="white-space:pre-line">${esc(r.text)}</p>` +
     r.photoTypes.map((_, i) => `<img src="/api/reviews/photo/${r.id}/${i}?key=${r.key}" alt="" style="max-width:100%;margin:0 0 12px;display:block">`).join("");
 }
 
 // /admin/reviews?token=...   every review, newest first
-// /admin/review?id=&key=     one review with Approve / Hide / Delete buttons (the link in the notification email)
+// /admin/review?id=&key=     one review with Show / Hide / Delete buttons (the link in the notification email)
 export async function moderate(request: Request, env: Env, url: URL) {
   if (url.pathname === "/admin/reviews") {
     if (!(env.ADMIN_TOKEN && safeEqual(url.searchParams.get("token") || "", env.ADMIN_TOKEN))) return json({ error: "Not found" }, 404);
@@ -288,7 +299,7 @@ export async function moderate(request: Request, env: Env, url: URL) {
       `<hr>${card(r)}<p><a href="/admin/review?id=${r.id}&key=${r.key}">Open</a></p>`).join("") : "<p>None yet.</p>"));
   }
 
-  // Changes only happen on a button press, so a mail scanner opening the link can't approve anything.
+  // Changes only happen on a button press, so a mail scanner opening the link can't change anything.
   const params = request.method === "POST" ? new URLSearchParams(await request.text()) : url.searchParams;
   const id = params.get("id") || "";
   const review = /^[0-9a-f-]{36}$/.test(id) ? await env.GC_KV.get<SiteReview>(itemKey(id), "json") : null;
@@ -311,6 +322,6 @@ export async function moderate(request: Request, env: Env, url: URL) {
     `<form method="post" action="/admin/review" style="display:inline"><input type="hidden" name="id" value="${review.id}">` +
     `<input type="hidden" name="key" value="${review.key}"><button name="action" value="${action}" style="font:inherit;padding:8px 16px;margin-right:8px">${label}</button></form>`;
   return page(`<h1>Review from ${esc(review.name)}</h1>${card(review)}<p>` +
-    (review.status === "approved" ? button("hide", "Hide from the site") : button("approve", "Approve and show on the site")) +
+    (review.status === "approved" ? button("hide", "Hide from the site") : button("approve", "Show on the site")) +
     button("delete", "Delete") + `</p>`);
 }

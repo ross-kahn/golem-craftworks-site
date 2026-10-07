@@ -113,9 +113,10 @@
       for (const f of files) data.append("photos", await shrink(f), "photo.jpg");
       data.set("elapsed", String(Date.now() - opened));
       say("Sending…");
-      await api.sendReview(data);
+      const sent = await api.sendReview(data);
       form.reset();
-      say("Thank you! Your review is in. It will appear here once I've read it.");
+      if (sent.review) { reviews.unshift(sent.review); render(); }
+      say(sent.review ? "Thank you! Your review is posted." : "Thank you! Your review is in.");
     } catch (e) {
       const err = e as ApiError;
       say(err.status && err.body && err.body.error ? err.message : "Your review didn't send. Try again in a moment.", true);
