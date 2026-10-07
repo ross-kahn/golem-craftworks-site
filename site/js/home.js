@@ -48,12 +48,12 @@
         }
         grid.innerHTML = cats.map((c) => tile(c.name, c.list)).join("");
     }
-    // A quiet line of proof under the hero buttons: rating, review count, Etsy sales. Hidden until there's something to say.
+    // A quiet line of proof under the hero buttons: rating, review count, sales. Hidden until there's something to say.
     api.getReviews().then(({ stats }) => {
         const proof = document.querySelector("[data-proof]");
         const parts = [
             stats.average !== null ? `★ ${stats.average.toFixed(1)} from ${stats.count.toLocaleString("en-US")} ${stats.count === 1 ? "review" : "reviews"}` : "",
-            stats.etsySales !== null ? `${stats.etsySales.toLocaleString("en-US")} sales on Etsy` : ""
+            stats.sales != null ? `${stats.sales.toLocaleString("en-US")} sales` : ""
         ].filter(Boolean);
         if (proof && parts.length) {
             proof.textContent = parts.join(" · ");

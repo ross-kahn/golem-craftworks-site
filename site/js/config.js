@@ -9,7 +9,7 @@ window.GC_CONFIG = {
     etsyUrl: "https://golemcraftworks.etsy.com",
     // Optional spam check on the review form (Cloudflare Turnstile). Leave empty to go without it.
     // Needs the matching TURNSTILE_SECRET set on the Worker.
-    turnstileSiteKey: "",
+    turnstileSiteKey: "0x4AAAAAAFQn6FgSfJO7ndZm",
     shippingLabel: "Flat-rate shipping, US only",
     // Don't change the price here. The Worker replaces this with SHIPPING_FLAT_CENTS from
     // worker/wrangler.toml, the one place the shipping price is set. This number is only used

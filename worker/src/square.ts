@@ -316,6 +316,41 @@ export async function recordExternalSale(
   });
 }
 
+// ---------- Sales count ----------
+
+interface OrderLine { quantity?: string }
+interface SquareOrder { state?: string; tenders?: unknown[]; line_items?: OrderLine[]; returns?: { return_line_items?: OrderLine[] }[] }
+
+// Items sold in Square (website and in person) in orders made since a date, less anything returned.
+// A paid website order stays OPEN until it's marked shipped, so paid counts as sold, not only COMPLETED.
+export async function itemsSoldSince(env: Env, since: string) {
+  const qty = (lines?: OrderLine[]) => (lines || []).reduce((n, l) => n + (Number(l.quantity) || 0), 0);
+  let total = 0;
+  let cursor: string | undefined;
+  do {
+    const data = await sq<{ orders?: SquareOrder[]; cursor?: string }>(env, "/v2/orders/search", {
+      method: "POST",
+      body: {
+        location_ids: [env.SQUARE_LOCATION_ID],
+        query: {
+          filter: {
+            state_filter: { states: ["OPEN", "COMPLETED"] },
+            date_time_filter: { created_at: { start_at: new Date(since).toISOString() } }
+          }
+        },
+        limit: 500,
+        cursor
+      }
+    });
+    for (const o of data.orders || []) {
+      if (o.state === "COMPLETED" || (o.tenders && o.tenders.length)) total += qty(o.line_items);
+      for (const r of o.returns || []) total -= qty(r.return_line_items);
+    }
+    cursor = data.cursor;
+  } while (cursor);
+  return Math.max(0, Math.round(total));
+}
+
 // ---------- Checkout ----------
 
 export async function createPaymentLink(

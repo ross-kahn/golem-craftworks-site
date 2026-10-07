@@ -80,7 +80,7 @@ interface Review {
 
 interface ReviewData {
   reviews: Review[];
-  stats: { count: number; average: number | null; etsySales: number | null };
+  stats: { count: number; average: number | null; sales: number | null };
 }
 
 type Fulfillment = "ship" | "pickup";

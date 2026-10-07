@@ -41,7 +41,7 @@
         const s = data.stats;
         const parts = [
             s.average !== null ? `${stars(Math.round(s.average))} ${s.average.toFixed(1)} from ${s.count.toLocaleString("en-US")} ${s.count === 1 ? "review" : "reviews"}` : "",
-            s.etsySales !== null ? `${s.etsySales.toLocaleString("en-US")} sales on Etsy` : ""
+            s.sales != null ? `${s.sales.toLocaleString("en-US")} sales` : ""
         ].filter(Boolean);
         summaryEl.innerHTML = parts.join(" · ");
         summaryEl.hidden = !parts.length;
@@ -108,9 +108,13 @@
                 data.append("photos", await shrink(f), "photo.jpg");
             data.set("elapsed", String(Date.now() - opened));
             say("Sending…");
-            await api.sendReview(data);
+            const sent = await api.sendReview(data);
             form.reset();
-            say("Thank you! Your review is in. It will appear here once I've read it.");
+            if (sent.review) {
+                reviews.unshift(sent.review);
+                render();
+            }
+            say(sent.review ? "Thank you! Your review is posted." : "Thank you! Your review is in.");
         }
         catch (e) {
             const err = e;

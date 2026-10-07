@@ -14,6 +14,7 @@ export interface Env {
   ETSY_KEYSTRING: string;
   ETSY_SHOP_ID: string;
   SHIPPING_FLAT_CENTS?: string;
+  SQUARE_SALES_SINCE?: string; // date from which Square sales are added to the public sales count (reviews.ts)
   ONLINE_CATEGORIES?: string;
   HIDDEN_CATEGORIES?: string;
   SYNC_DRY_RUN?: string;
@@ -293,6 +294,7 @@ export interface EtsyReviewCache {
   v?: number;
   at: number;
   sales: number | null; // all-time sales, as shown on the Etsy shop
+  squareSales?: number; // items sold in Square since SQUARE_SALES_SINCE
   count: number;
   average: number | null;
   reviews: PublicReview[];

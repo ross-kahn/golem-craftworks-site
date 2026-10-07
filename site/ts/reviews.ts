@@ -47,7 +47,7 @@
     const s = data.stats;
     const parts = [
       s.average !== null ? `${stars(Math.round(s.average))} ${s.average.toFixed(1)} from ${s.count.toLocaleString("en-US")} ${s.count === 1 ? "review" : "reviews"}` : "",
-      s.etsySales !== null ? `${s.etsySales.toLocaleString("en-US")} sales on Etsy` : ""
+      s.sales != null ? `${s.sales.toLocaleString("en-US")} sales` : ""
     ].filter(Boolean);
     summaryEl.innerHTML = parts.join(" · ");
     summaryEl.hidden = !parts.length;

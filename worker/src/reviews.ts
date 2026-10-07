@@ -1,10 +1,12 @@
-// Reviews: Etsy's reviews and sales count, plus reviews left on the site.
+// Reviews: Etsy's reviews and the sales count, plus reviews left on the site.
 //
 //   * Etsy reviews are read with the app key alone (no shop sign-in) and cached in KV.
+//   * The sales count is Etsy's all-time figure plus Square sales since SQUARE_SALES_SINCE.
 //   * Site reviews wait for approval before they show. Each one has its own private link for that.
 //   * The reviewer's email goes to the shop in the notification email and is never stored or logged.
 
 import * as etsyApi from "./etsy.ts";
+import * as square from "./square.ts";
 import { isEmail, mailReady, send } from "./commission.ts";
 import { json, logEvent, errMsg, safeEqual } from "./util.ts";
 import { decodeEntities } from "./descriptions.ts";
@@ -13,7 +15,7 @@ import type { Ctx, Env, EtsyReviewCache, PublicReview, SiteReview } from "./type
 const CACHE_KEY = "https://cache.golemcraftworks.internal/reviews";
 const CACHE_TTL = 300;
 const ETSY_MAX_AGE_MS = 6 * 3600 * 1000;
-const ETSY_CACHE_VERSION = 2; // raise when the saved shape or cleaning changes, so old copies are refetched
+const ETSY_CACHE_VERSION = 3; // raise when the saved shape or cleaning changes, so old copies are refetched
 const LIMITS = { name: 60, text: 2000, product: 120, photos: 3, photoBytes: 1.5 * 1024 * 1024, bodyBytes: 6 * 1024 * 1024 };
 const MAX_PER_VISITOR_PER_DAY = 3;
 const MAX_PER_DAY = 40;
@@ -28,6 +30,17 @@ const purge = () => caches.default.delete(CACHE_KEY);
 
 interface EtsyShop { transaction_sold_count?: number; review_count?: number; review_average?: number }
 interface EtsyReview { transaction_id: number; rating: number; review?: string; image_url_fullxfull?: string; create_timestamp: number }
+
+// Etsy's figure already includes Square sales from when Etsy's own Square integration was connected,
+// so Square is only counted from the day that was turned off. If Square can't be reached, keep the last count.
+async function squareSales(env: Env) {
+  if (!env.SQUARE_SALES_SINCE) return 0;
+  try { return await square.itemsSoldSince(env, env.SQUARE_SALES_SINCE); }
+  catch (e) {
+    await logEvent(env, "Square sales count didn't refresh", { error: errMsg(e) });
+    return (await env.GC_KV.get<EtsyReviewCache>("reviews:etsy", "json"))?.squareSales ?? 0;
+  }
+}
 
 export async function refreshEtsyReviews(env: Env): Promise<EtsyReviewCache | null> {
   if (!etsyApi.etsyKeyReady(env)) return null;
@@ -44,6 +57,7 @@ export async function refreshEtsyReviews(env: Env): Promise<EtsyReviewCache | nu
     v: ETSY_CACHE_VERSION,
     at: Date.now(),
     sales: shop.transaction_sold_count ?? null,
+    squareSales: await squareSales(env),
     count: shop.review_count ?? all.length,
     average: shop.review_average ?? null,
     // Star-only reviews count toward the average but there's nothing to show for them.
@@ -84,9 +98,10 @@ export async function list(env: Env, ctx: Ctx) {
   const etsyCount = etsy?.count || 0;
   const count = etsyCount + mine.length;
   const stars = (etsy?.average || 0) * etsyCount + mine.reduce((n, r) => n + r.rating, 0);
+  const sales = etsy && etsy.sales !== null ? etsy.sales + (etsy.squareSales || 0) : null;
   const res = json({
     reviews,
-    stats: { count, average: count ? Math.round((stars / count) * 10) / 10 : null, etsySales: etsy?.sales ?? null }
+    stats: { count, average: count ? Math.round((stars / count) * 10) / 10 : null, sales }
   }, 200, { "cache-control": `public, max-age=${CACHE_TTL}` });
   ctx.waitUntil(caches.default.put(CACHE_KEY, res.clone()));
   return res;

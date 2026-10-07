@@ -21,7 +21,7 @@ class KV {
 }
 (globalThis as any).caches = { default: { match: async () => null, put: async () => {}, delete: async () => true } };
 
-let kv: KV, sent: any[], etsyCalls: string[], turnstileOk: boolean;
+let kv: KV, sent: any[], etsyCalls: string[], squareCalls: any[], squareDown: boolean, turnstileOk: boolean;
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
 globalThis.fetch = (async (input: unknown, init: any = {}) => {
@@ -37,6 +37,16 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
       { transaction_id: 1, rating: 5, review: "Can&#39;t wait to gift these for D&D. &quot;Gorgeous&quot; &amp; sharp.", create_timestamp: 1750000000, image_url_fullxfull: "https://i.etsystatic.com/a.jpg" },
       { transaction_id: 2, rating: 4, review: "", create_timestamp: 1751000000 },
       { transaction_id: 3, rating: 5, review: " Fast shipping ", create_timestamp: 1752000000 }
+    ] });
+  }
+  if (url.includes("/v2/orders/search")) {
+    squareCalls.push(JSON.parse(init.body));
+    if (squareDown) return new Response("{}", { status: 500 });
+    return ok({ orders: [
+      { state: "COMPLETED", tenders: [{}], line_items: [{ quantity: "2" }, { quantity: "1" }] },
+      { state: "OPEN", tenders: [{}], line_items: [{ quantity: "1" }] }, // paid website order, not shipped yet
+      { state: "OPEN", line_items: [{ quantity: "5" }] }, // unpaid
+      { state: "COMPLETED", returns: [{ return_line_items: [{ quantity: "1" }] }] }
     ] });
   }
   throw new Error("Unexpected fetch " + url);
@@ -65,11 +75,11 @@ const submit = (env: Env, form: FormData, ip = "1.1.1.1") => call(env, "/api/rev
 const listed = async (env: Env) => (await (await call(env, "/api/reviews")).json()) as any;
 const stored = () => [...kv.m.keys()].filter((k) => k.startsWith("review:item:"));
 
-beforeEach(() => { kv = new KV(); sent = []; etsyCalls = []; turnstileOk = true; });
+beforeEach(() => { kv = new KV(); sent = []; etsyCalls = []; squareCalls = []; squareDown = false; turnstileOk = true; });
 
 test("reviews: nothing set up yet means an empty list, not an error", async () => {
   const data = await listed(makeEnv());
-  assert.deepEqual(data, { reviews: [], stats: { count: 0, average: null, etsySales: null } });
+  assert.deepEqual(data, { reviews: [], stats: { count: 0, average: null, sales: null } });
   assert.equal(etsyCalls.length, 0, "placeholder Etsy settings are not called");
 });
 
@@ -101,7 +111,7 @@ test("reviews: a submitted review is held for approval and the email is only eve
   const data = await listed(env);
   assert.deepEqual(data.reviews.map((r: any) => [r.source, r.name, r.rating, r.text, r.product, r.photos]),
     [["site", "Jane", 5, "Love the vault.", "Dice vault", [`/api/reviews/photo/${record.id}/0`]]]);
-  assert.deepEqual(data.stats, { count: 1, average: 5, etsySales: null });
+  assert.deepEqual(data.stats, { count: 1, average: 5, sales: null });
   const img = await call(env, `/api/reviews/photo/${record.id}/0`);
   assert.equal(img.headers.get("content-type"), "image/jpeg");
   assert.equal(new Uint8Array(await img.arrayBuffer()).length, JPEG.length);
@@ -154,7 +164,7 @@ test("reviews: without email set up the review is still kept, and the admin list
 test("reviews: Etsy reviews and the sales count are merged in once the Etsy key is set", async () => {
   const env = makeEnv({ ETSY_KEYSTRING: "KEY", ETSY_SHARED_SECRET: "SECRET", ETSY_SHOP_ID: "55" });
   const data = await listed(env);
-  assert.deepEqual(data.stats, { count: 3, average: 4.7, etsySales: 1480 });
+  assert.deepEqual(data.stats, { count: 3, average: 4.7, sales: 1480 });
   // The star-only review has nothing to show; newest first.
   assert.deepEqual(data.reviews.map((r: any) => [r.id, r.source, r.name, r.text, r.photos]), [
     ["etsy-3", "etsy", "Etsy buyer", "Fast shipping", []],
@@ -167,4 +177,23 @@ test("reviews: Etsy reviews and the sales count are merged in once the Etsy key 
   // A copy saved before the text was cleaned up is refetched rather than shown.
   await kv.put("reviews:etsy", JSON.stringify({ at: Date.now(), sales: 1, count: 1, average: 5, reviews: [{ id: "etsy-9", source: "etsy", name: "Etsy buyer", rating: 5, text: "can&#39;t", product: "", photos: [], at: "2026-01-01T00:00:00Z" }] }));
   assert.ok(!JSON.stringify(await listed(env)).includes("&#39;"));
+});
+
+test("reviews: Square sales since the cutoff date are added to Etsy's sales count", async () => {
+  const etsy = { ETSY_KEYSTRING: "KEY", ETSY_SHARED_SECRET: "SECRET", ETSY_SHOP_ID: "55" };
+  const env = makeEnv({ ...etsy, SQUARE_SALES_SINCE: "2026-10-04" });
+  // 3 + 1 paid, the unpaid order ignored, 1 returned.
+  assert.equal((await listed(env)).stats.sales, 1480 + 3);
+  assert.deepEqual(squareCalls[0].location_ids, ["LOC1"]);
+  assert.equal(squareCalls[0].query.filter.date_time_filter.created_at.start_at, "2026-10-04T00:00:00.000Z");
+
+  // Square being down keeps the last count rather than dropping it.
+  squareDown = true;
+  const { refreshEtsyReviews } = await import("../src/reviews.ts");
+  assert.equal((await refreshEtsyReviews(env))?.squareSales, 3);
+
+  // No cutoff date: Etsy's figure alone, and Square isn't asked.
+  kv = new KV(); squareCalls = [];
+  assert.equal((await listed(makeEnv(etsy))).stats.sales, 1480);
+  assert.equal(squareCalls.length, 0);
 });

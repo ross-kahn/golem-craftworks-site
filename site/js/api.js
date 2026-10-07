@@ -107,7 +107,7 @@
         const data = await fetchJSON(isDemo()
             ? siteRoot() + "data/demo-reviews.json"
             : cfg.apiBase.replace(/\/$/, "") + "/api/reviews");
-        return { reviews: data.reviews || [], stats: data.stats || { count: 0, average: null, etsySales: null } };
+        return { reviews: data.reviews || [], stats: data.stats || { count: 0, average: null, sales: null } };
     }
     // Sent as a form rather than JSON because it can carry photos.
     async function sendReview(data) {

@@ -293,6 +293,22 @@ Setup:
 
 Each visitor is limited to 5 requests an hour. Failures show up in `/admin/status`.
 
+### Sending from a golemcraftworks.com address in Gmail
+
+Gmail can send as `anything@golemcraftworks.com` by handing the mail to Resend. The address has to receive mail first (Cloudflare → Email → Email Routing, forwarding to the shop Gmail), because Gmail emails a confirmation code to it.
+
+In Gmail on desktop: gear icon → **See all settings** → **Accounts and Import** → **Send mail as** → **Add another email address**. Enter the name and address, leave **Treat as an alias** checked, then fill in:
+
+| Field | Value |
+|---|---|
+| SMTP Server | `smtp.resend.com` |
+| Port | `587` |
+| Username | `resend` (literally that word) |
+| Password | a Resend API key (use one made for Gmail, separate from the Worker's, with "Sending access") |
+| Secured connection | TLS |
+
+If port 587 fails, use `465` with SSL. Enter the confirmation code Gmail sends, then select **Reply from the same address the message was sent to**. The same API key works for every alias. These emails count toward the same Resend daily limit as the commission form.
+
 ## GitHub
 
 The repo is private and is only a backup and history of the source. It holds no secrets: API keys live in Cloudflare (`wrangler secret put`) and in `worker/.dev.vars`, which git ignores. Never paste a key into `wrangler.toml` or any other tracked file.
