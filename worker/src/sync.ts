@@ -15,6 +15,7 @@
 
 import * as square from "./square.ts";
 import * as etsyApi from "./etsy.ts";
+import { invert, sift, sum, unique } from "radashi";
 import { logEvent, isTrue, errMsg } from "./util.ts";
 import type {
   Env,
@@ -132,10 +133,7 @@ async function syncListing(
 
   // What's left sellable on the listing after this change? Etsy won't hold a listing at zero, so an
   // emptied one is turned off instead, keeping its last count.
-  const remaining = products.reduce(
-    (n, p) => n + (changes.get(skuOf(p)) ?? etsyQty(p)),
-    0,
-  );
+  const remaining = sum(products, (p) => changes.get(skuOf(p)) ?? etsyQty(p));
   let plan: string[];
   if (remaining === 0) plan = active ? ["deactivate-listing"] : [];
   // Etsy marked it sold out: writing stock to it could put it back on sale (and charge the listing fee).
@@ -207,23 +205,19 @@ export async function handleSquareInventoryEvent(
   const counts =
     (event.data && event.data.object && event.data.object.inventory_counts) ||
     [];
-  const ids = [
-    ...new Set(
-      counts
-        .filter(
-          (c) =>
-            c.location_id === env.SQUARE_LOCATION_ID &&
-            c.catalog_object_type === "ITEM_VARIATION",
-        )
-        .map((c) => c.catalog_object_id),
-    ),
-  ];
+  const ids = unique(
+    counts
+      .filter(
+        (c) =>
+          c.location_id === env.SQUARE_LOCATION_ID &&
+          c.catalog_object_type === "ITEM_VARIATION",
+      )
+      .map((c) => c.catalog_object_id),
+  );
   if (!ids.length) return [];
 
   const skuMap = await getSquareSkuMap(env);
-  const idToSku: Record<string, string> = Object.fromEntries(
-    Object.entries(skuMap).map(([sku, id]) => [id, sku]),
-  );
+  const idToSku: Record<string, string> = invert(skuMap);
   const missing = ids.filter((id) => !idToSku[id]);
   if (missing.length) {
     for (const v of await square.retrieveVariations(env, missing)) {
@@ -369,7 +363,7 @@ export async function reconcile(env: Env, { maxChecks = 10 } = {}) {
   const onSale = new Set(
     listings
       .filter((l) => l.state === "active")
-      .flatMap((l) => (l.skus || []).map((s) => s.trim()).filter(Boolean)),
+      .flatMap((l) => sift((l.skus || []).map((s) => s.trim()))),
   );
   report.etsyOnly = [...onSale].filter((s) => !skuMap[s]).sort();
 
@@ -384,7 +378,7 @@ export async function reconcile(env: Env, { maxChecks = 10 } = {}) {
       .filter((s) => skuMap[s] && trackedIds.has(skuMap[s]));
     if (!tracked.length) continue;
     const want = new Map(tracked.map((s) => [s, counts.get(skuMap[s]) ?? 0]));
-    const squareTotal = [...want.values()].reduce((n, q) => n + q, 0);
+    const squareTotal = sum([...want.values()]);
     const active = l.state === "active";
     if (!active && squareTotal > 0)
       report.notPublished.push({

@@ -1,5 +1,6 @@
 // Small helpers shared across the Worker.
 import type { Env, LogLine } from "./types.ts";
+import { withoutSlash } from "../../shared/text.ts";
 
 export const json = (
   data: unknown,
@@ -10,27 +11,6 @@ export const json = (
     status,
     headers: { "content-type": "application/json; charset=utf-8", ...headers },
   });
-
-export function corsHeaders(
-  env: Env,
-  request: Request,
-): Record<string, string> {
-  const origin = request.headers.get("origin") || "";
-  const allowed = (env.ALLOWED_ORIGINS || env.SITE_URL || "")
-    .split(",")
-    .map((s) => s.trim().replace(/\/$/, ""))
-    .filter(Boolean);
-  const ok = allowed.includes(origin) || allowed.includes("*");
-  return ok
-    ? {
-        "access-control-allow-origin": origin,
-        "access-control-allow-methods": "GET, POST, OPTIONS",
-        "access-control-allow-headers": "content-type",
-        "access-control-max-age": "86400",
-        vary: "origin",
-      }
-    : { vary: "origin" };
-}
 
 const enc = new TextEncoder();
 
@@ -79,14 +59,38 @@ export const enc8 = (s: string) => enc.encode(s);
 
 export const isTrue = (v: unknown) => String(v || "").toLowerCase() === "true";
 
-// `"JAVA" TTRPG Dice Set` -> `java-ttrpg-dice-set`
-export const slugify = (s: string) =>
-  s
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f'’"]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+// The site's own address, without a slash on the end. `url` is the request, for when SITE_URL isn't set.
+export const siteUrl = (env: Env, url?: URL) =>
+  withoutSlash(env.SITE_URL || url?.origin || "");
+
+// A bare page for the admin addresses, which stand apart from the site and its stylesheet.
+const ADMIN_STYLE =
+  "body{font:17px/1.5 system-ui;padding:32px;max-width:60ch;margin:auto}" +
+  ".review-text{white-space:pre-line}" +
+  ".review-photo{display:block;max-width:100%;margin:0 0 12px}" +
+  ".action{display:inline}" +
+  ".action button{font:inherit;padding:8px 16px;margin-right:8px}";
+export const adminPage = (title: string, body: string, status = 200) =>
+  new Response(
+    `<!doctype html><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex">` +
+      `<title>${title}</title><style>${ADMIN_STYLE}</style><body>${body}</body>`,
+    {
+      status,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
+      },
+    },
+  );
+
+// Admin addresses carry ?token=ADMIN_TOKEN. With no token set, nothing gets in.
+export const isAdmin = (env: Env, url: URL) =>
+  !!env.ADMIN_TOKEN &&
+  safeEqual(url.searchParams.get("token") || "", env.ADMIN_TOKEN);
+
+export const visitorIp = (request: Request) =>
+  request.headers.get("cf-connecting-ip") || "";
 
 export const errMsg = (e: unknown) =>
   e instanceof Error ? e.message : String(e);
@@ -107,4 +111,32 @@ export async function logEvent(env: Env, message: string, data?: unknown) {
   } catch (e) {
     console.log("log write failed", errMsg(e));
   }
+}
+
+// True for the first to ask; anyone asking again within `ttl` seconds is told no.
+// For work that two runs seconds apart shouldn't both do.
+export async function claim(env: Env, key: string, ttl: number) {
+  if (await env.GC_KV.get(key)) return false;
+  await env.GC_KV.put(key, "1", { expirationTtl: ttl });
+  return true;
+}
+
+// Counts this request against each [key, most allowed]. True, with nothing counted, if any is already full.
+// The counts are forgotten after `ttl` seconds.
+export async function overLimit(
+  env: Env,
+  limits: (readonly [key: string, max: number])[],
+  ttl: number,
+) {
+  if (!env.GC_KV) return false;
+  const counts = await Promise.all(
+    limits.map(async ([key]) => Number(await env.GC_KV.get(key)) || 0),
+  );
+  if (counts.some((n, i) => n >= limits[i][1])) return true;
+  await Promise.all(
+    limits.map(([key], i) =>
+      env.GC_KV.put(key, String(counts[i] + 1), { expirationTtl: ttl }),
+    ),
+  );
+  return false;
 }

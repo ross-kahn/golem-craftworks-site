@@ -2,6 +2,8 @@
 //   {NAME}   the set's name, from the Square item name: `"JAVA" TTRPG Dice Set` -> JAVA
 //   {NOTES}  whatever is typed in that item's description in Square (left out when there's nothing)
 
+import { htmlToText, words } from "../../shared/text.ts";
+
 export const DICE_SET_TEMPLATE = `{NAME} 8-Piece Dice Set
 
 Tabletop Gaming Dice for Dungeons & Dragons (D&D), Pathfinder, Call of Cthulhu, Shadowrun, and more
@@ -22,11 +24,6 @@ Thanks for checking out my work!`;
 export const diceSetName = (itemName: string) =>
   itemName.trim().match(/^"(.+)" TTRPG Dice Set$/)?.[1] ?? null;
 
-const words = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 const opening = (s: string) => words(s).split(" ").slice(0, 4).join(" ");
 
 // A line of the template, or an older wording of one: it opens with the same four words. The title
@@ -61,36 +58,14 @@ export function diceSetDescription(name: string, squareText: string) {
     .trim();
 }
 
-// "can&#39;t" -> "can't". Text from Etsy and Square arrives with characters written as HTML codes.
-const NAMED_ENTITIES: Record<string, string> = {
-  nbsp: " ",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  amp: "&",
-};
-export const decodeEntities = (s: string) =>
-  s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, dec, hex, name) =>
-    dec
-      ? String.fromCodePoint(Number(dec))
-      : hex
-        ? String.fromCodePoint(parseInt(hex, 16))
-        : (NAMED_ENTITIES[name.toLowerCase()] ?? m),
-  );
-
-// Formatted text to plain text, keeping the shape: a blank line between paragraphs, single breaks within them.
-export function htmlToText(html?: string) {
-  if (!html) return "";
-  return decodeEntities(
-    html
-      .replace(/\s*\n\s*/g, " ")
-      .replace(/<\/(p|div|ul|ol|h\d)>/gi, "\n\n")
-      .replace(/<(br\s*\/?|\/li)>/gi, "\n")
-      .replace(/<li[^>]*>/gi, "- ")
-      .replace(/<[^>]+>/g, ""),
-  )
-    .replace(/[ \t]*\n[ \t]*/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
+// An item's description as Square holds it. The formatted one first: Square's plain-text copy runs
+// every paragraph together.
+export const squareDescription = (d: {
+  description_html?: string;
+  description_plaintext?: string;
+  description?: string;
+}) =>
+  htmlToText(d.description_html) ||
+  d.description_plaintext ||
+  d.description ||
+  "";

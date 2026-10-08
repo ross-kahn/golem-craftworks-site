@@ -6,18 +6,23 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks",
-    "build": "node node_modules/typescript/lib/tsc.js -p site",
-    "watch": "node node_modules/typescript/lib/tsc.js -p site --watch",
-    "typecheck": "node node_modules/typescript/lib/tsc.js -b site worker tools",
-    "test": "node --test worker/test/*.test.ts tools/test/*.test.ts",
-    "dev": "node node_modules/wrangler/bin/wrangler.js dev --cwd worker --var DEMO_CATALOG:true",
-    "deploy": "node node_modules/wrangler/bin/wrangler.js deploy --cwd worker"
+    "build": "esbuild \"site/ts/pages/*.ts\" --bundle --minify --sourcemap --target=es2020 --outdir=site/js --log-level=warning",
+    "typecheck": "tsc -b site worker tools",
+    "pretest": "npm run build",
+    "test": "node --test \"worker/test/*.test.ts\" \"tools/test/*.test.ts\" \"shared/test/*.test.ts\"",
+    "dev": "wrangler dev --cwd worker --var DEMO_CATALOG:true",
+    "deploy": "wrangler deploy --cwd worker"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261004.1",
     "@types/node": "^22",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",
     "wrangler": "^4.147.0"
+  },
+  "dependencies": {
+    "radashi": "^12.9.6",
+    "valibot": "^1.5.0"
   }
 }

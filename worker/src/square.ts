@@ -1,6 +1,13 @@
 // Square: catalog, inventory, checkout links, webhook verification.
-import { hmacSha256Base64, enc8, safeEqual, slugify } from "./util.ts";
-import { diceSetName, diceSetDescription, htmlToText } from "./descriptions.ts";
+import { cluster, counting, sift, sum, unique } from "radashi";
+import { hmacSha256Base64, enc8, safeEqual, siteUrl } from "./util.ts";
+import { paged } from "../../shared/paged.ts";
+import { csvList, slugify } from "../../shared/text.ts";
+import {
+  diceSetName,
+  diceSetDescription,
+  squareDescription,
+} from "./descriptions.ts";
 import type {
   Env,
   Fulfillment,
@@ -63,9 +70,8 @@ export async function sq<T>(
 export async function fetchCatalog(env: Env, { includeDeleted = false } = {}) {
   const items: SquareObject[] = [];
   const related = new Map<string, SquareObject>();
-  let cursor: string | undefined;
-  do {
-    const data = await sq<CatalogResponse>(env, "/v2/catalog/search", {
+  const search = (cursor?: string) =>
+    sq<CatalogResponse>(env, "/v2/catalog/search", {
       method: "POST",
       body: {
         object_types: ["ITEM"],
@@ -75,32 +81,32 @@ export async function fetchCatalog(env: Env, { includeDeleted = false } = {}) {
         limit: 1000,
       },
     });
-    (data.objects || []).forEach((o) => items.push(o));
+  for await (const data of paged(search)) {
+    items.push(...(data.objects || []));
     (data.related_objects || []).forEach((o) => related.set(o.id, o));
-    cursor = data.cursor;
-  } while (cursor);
+  }
   return { items, related };
 }
 
 // Current IN_STOCK counts for variation ids at our location. Returns Map(id -> number).
 export async function fetchCounts(env: Env, variationIds: string[]) {
   const counts = new Map<string, number>();
-  for (let i = 0; i < variationIds.length; i += 500) {
-    let cursor: string | undefined;
-    do {
-      const data = await sq<{ counts?: SquareCount[]; cursor?: string }>(
+  for (const ids of cluster(variationIds, 500)) {
+    const retrieve = (cursor?: string) =>
+      sq<{ counts?: SquareCount[]; cursor?: string }>(
         env,
         "/v2/inventory/counts/batch-retrieve",
         {
           method: "POST",
           body: {
-            catalog_object_ids: variationIds.slice(i, i + 500),
+            catalog_object_ids: ids,
             location_ids: [env.SQUARE_LOCATION_ID],
             states: ["IN_STOCK"],
             cursor,
           },
         },
       );
+    for await (const data of paged(retrieve)) {
       (data.counts || []).forEach((c) => {
         if (
           c.state === "IN_STOCK" &&
@@ -109,8 +115,7 @@ export async function fetchCounts(env: Env, variationIds: string[]) {
           counts.set(c.catalog_object_id, Math.floor(Number(c.quantity) || 0));
         }
       });
-      cursor = data.cursor;
-    } while (cursor);
+    }
   }
   return counts;
 }
@@ -140,15 +145,21 @@ function markedSoldOut(variation: SquareObject, locationId: string) {
   );
 }
 
+// ONLINE_CATEGORIES and HIDDEN_CATEGORIES as lists, in lower case for comparing.
+function categoryRules(env: Env) {
+  return {
+    onlineCats: csvList(env.ONLINE_CATEGORIES?.toLowerCase()),
+    hiddenCats: csvList(env.HIDDEN_CATEGORIES?.toLowerCase()),
+  };
+}
+
 function categoryNames(item: SquareObject, related: Map<string, SquareObject>) {
   const d = item.item_data || {};
   const ids = (d.categories || []).map((c) => c.id);
   if (d.category_id) ids.push(d.category_id);
   if (d.reporting_category && d.reporting_category.id)
     ids.push(d.reporting_category.id);
-  return [...new Set(ids)]
-    .map((id) => related.get(id)?.category_data?.name)
-    .filter((name): name is string => !!name);
+  return sift(unique(ids).map((id) => related.get(id)?.category_data?.name));
 }
 
 // The modifier lists on an item ("Handmade dice +$15"), with Square's min/max rules and default selections.
@@ -235,14 +246,7 @@ function modifierLists(
 export async function buildStorefront(env: Env) {
   const { items, related } = await fetchCatalog(env);
   const loc = env.SQUARE_LOCATION_ID;
-  const onlineCats = (env.ONLINE_CATEGORIES || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  const hiddenCats = (env.HIDDEN_CATEGORIES || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+  const { onlineCats, hiddenCats } = categoryRules(env);
 
   const candidates: {
     item: SquareObject;
@@ -285,9 +289,7 @@ export async function buildStorefront(env: Env) {
         (id) => imageIds.includes(id) || imageIds.push(id),
       ),
     );
-    const images = imageIds
-      .map((id) => related.get(id)?.image_data?.url)
-      .filter((url): url is string => !!url);
+    const images = sift(imageIds.map((id) => related.get(id)?.image_data?.url));
 
     const vs = variations
       .map((v) => {
@@ -310,12 +312,7 @@ export async function buildStorefront(env: Env) {
       .filter((v) => v !== null);
     if (!vs.length) continue;
 
-    // The formatted description first: Square's plain-text copy runs every paragraph together.
-    const text =
-      htmlToText(d.description_html) ||
-      d.description_plaintext ||
-      d.description ||
-      "";
+    const text = squareDescription(d);
     const set = diceSetName(d.name ?? "");
 
     products.push({
@@ -334,10 +331,9 @@ export async function buildStorefront(env: Env) {
   }
 
   // Two items with the same name can't share an address: each gets the end of its Square id added.
-  const taken = new Map<string, number>();
-  products.forEach((p) => taken.set(p.slug, (taken.get(p.slug) || 0) + 1));
+  const taken = counting(products, (p) => p.slug);
   products.forEach((p) => {
-    if (taken.get(p.slug)! > 1) p.slug += `-${p.id.slice(-6).toLowerCase()}`;
+    if (taken[p.slug] > 1) p.slug += `-${p.id.slice(-6).toLowerCase()}`;
   });
 
   // Newest pieces first, by when they were added to Square. Editing an item doesn't move it.
@@ -353,13 +349,7 @@ export async function buildStorefront(env: Env) {
 export async function catalogReport(env: Env) {
   const { items, related } = await fetchCatalog(env, { includeDeleted: true });
   const loc = env.SQUARE_LOCATION_ID;
-  const csv = (v?: string) =>
-    (v || "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-  const onlineCats = csv(env.ONLINE_CATEGORIES),
-    hiddenCats = csv(env.HIDDEN_CATEGORIES);
+  const { onlineCats, hiddenCats } = categoryRules(env);
   const rows = items
     .map((item) => {
       const d = item.item_data || {};
@@ -393,17 +383,16 @@ export async function catalogReport(env: Env) {
         name: d.name || "",
         categories: cats,
         updatedAt: item.updated_at,
-        skus: variations
-          .map((v) => v.item_variation_data?.sku || "")
-          .filter(Boolean),
+        skus: sift(variations.map((v) => v.item_variation_data?.sku)),
       };
     })
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-  const totals: Record<string, number> = {};
-  rows.forEach((r) => {
-    totals[r.status] = (totals[r.status] || 0) + 1;
-  });
-  return { at: new Date().toISOString(), locationId: loc, totals, items: rows };
+  return {
+    at: new Date().toISOString(),
+    locationId: loc,
+    totals: counting(rows, (r) => r.status),
+    items: rows,
+  };
 }
 
 export async function retrieveVariations(env: Env, ids: string[]) {
@@ -475,37 +464,32 @@ interface SquareOrder {
 // A paid website order stays OPEN until it's marked shipped, so paid counts as sold, not only COMPLETED.
 export async function itemsSoldSince(env: Env, since: string) {
   const qty = (lines?: OrderLine[]) =>
-    (lines || []).reduce((n, l) => n + (Number(l.quantity) || 0), 0);
+    sum(lines || [], (l) => Number(l.quantity) || 0);
   let total = 0;
-  let cursor: string | undefined;
-  do {
-    const data = await sq<{ orders?: SquareOrder[]; cursor?: string }>(
-      env,
-      "/v2/orders/search",
-      {
-        method: "POST",
-        body: {
-          location_ids: [env.SQUARE_LOCATION_ID],
-          query: {
-            filter: {
-              state_filter: { states: ["OPEN", "COMPLETED"] },
-              date_time_filter: {
-                created_at: { start_at: new Date(since).toISOString() },
-              },
+  const search = (cursor?: string) =>
+    sq<{ orders?: SquareOrder[]; cursor?: string }>(env, "/v2/orders/search", {
+      method: "POST",
+      body: {
+        location_ids: [env.SQUARE_LOCATION_ID],
+        query: {
+          filter: {
+            state_filter: { states: ["OPEN", "COMPLETED"] },
+            date_time_filter: {
+              created_at: { start_at: new Date(since).toISOString() },
             },
           },
-          limit: 500,
-          cursor,
         },
+        limit: 500,
+        cursor,
       },
-    );
+    });
+  for await (const data of paged(search)) {
     for (const o of data.orders || []) {
       if (o.state === "COMPLETED" || (o.tenders && o.tenders.length))
         total += qty(o.line_items);
       for (const r of o.returns || []) total -= qty(r.return_line_items);
     }
-    cursor = data.cursor;
-  } while (cursor);
+  }
   return Math.max(0, Math.round(total));
 }
 
@@ -526,7 +510,6 @@ export async function createPaymentLink(
 ) {
   const ship = fulfillment !== "pickup";
   const shippingCents = Number(env.SHIPPING_FLAT_CENTS || 0);
-  const site = (env.SITE_URL || "").replace(/\/$/, "");
   const body = {
     idempotency_key: crypto.randomUUID(),
     order: {
@@ -544,7 +527,7 @@ export async function createPaymentLink(
       pricing_options: { auto_apply_taxes: !ship },
     },
     checkout_options: {
-      redirect_url: `${site}/thanks/`,
+      redirect_url: `${siteUrl(env)}/thanks/`,
       ask_for_shipping_address: ship,
       allow_tipping: false,
       enable_coupon: true, // lets buyers enter codes made in Square Dashboard (Marketing > Coupons)

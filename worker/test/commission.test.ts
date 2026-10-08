@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { commission, isEmail, parseCommission } from "../src/commission.ts";
+import { commission, parseCommission } from "../src/commission.ts";
+import { isEmail } from "../../shared/validate.ts";
 import type { Env } from "../src/types.ts";
 
 const env = (extra: object = {}) =>

@@ -8,9 +8,22 @@
 
 import * as etsyApi from "./etsy.ts";
 import * as square from "./square.ts";
-import { isEmail, mailReady, send } from "./commission.ts";
-import { json, logEvent, errMsg, safeEqual } from "./util.ts";
-import { decodeEntities } from "./descriptions.ts";
+import { alphabetical, sum } from "radashi";
+import { mailReady, send } from "./email.ts";
+import { check } from "../../shared/validate.ts";
+import { Review, REVIEW_MAX_PHOTOS } from "../../shared/forms.ts";
+import {
+  json,
+  logEvent,
+  errMsg,
+  safeEqual,
+  isAdmin,
+  adminPage,
+  siteUrl,
+  overLimit,
+  visitorIp,
+} from "./util.ts";
+import { decodeEntities, esc } from "../../shared/text.ts";
 import type {
   Ctx,
   Env,
@@ -24,10 +37,6 @@ const CACHE_TTL = 60;
 const ETSY_MAX_AGE_MS = 6 * 3600 * 1000;
 const ETSY_CACHE_VERSION = 3; // raise when the saved shape or cleaning changes, so old copies are refetched
 const LIMITS = {
-  name: 60,
-  text: 2000,
-  product: 120,
-  photos: 3,
   photoBytes: 1.5 * 1024 * 1024,
   bodyBytes: 6 * 1024 * 1024,
 };
@@ -155,14 +164,15 @@ export async function list(env: Env, ctx: Ctx) {
     env.GC_KV.get<PublicReview[]>("reviews:site", "json"),
   ]);
   const mine = site || [];
-  const reviews = [...mine, ...(etsy?.reviews || [])].sort((a, b) =>
-    b.at.localeCompare(a.at),
+  const reviews = alphabetical(
+    [...mine, ...(etsy?.reviews || [])],
+    (r) => r.at,
+    "desc",
   );
 
   const etsyCount = etsy?.count || 0;
   const count = etsyCount + mine.length;
-  const stars =
-    (etsy?.average || 0) * etsyCount + mine.reduce((n, r) => n + r.rating, 0);
+  const stars = (etsy?.average || 0) * etsyCount + sum(mine, (r) => r.rating);
   const sales =
     etsy && etsy.sales !== null ? etsy.sales + (etsy.squareSales || 0) : null;
   const res = json(
@@ -194,25 +204,6 @@ function imageType(bytes: Uint8Array) {
   return null;
 }
 
-async function overLimit(env: Env, request: Request) {
-  const day = Math.floor(Date.now() / 86400000);
-  const ip = request.headers.get("cf-connecting-ip") || "unknown";
-  const keys = [
-    [`review:rate:${ip}:${day}`, MAX_PER_VISITOR_PER_DAY],
-    [`review:rate:all:${day}`, MAX_PER_DAY],
-  ] as const;
-  const counts = await Promise.all(
-    keys.map(async ([k]) => Number(await env.GC_KV.get(k)) || 0),
-  );
-  if (counts.some((n, i) => n >= keys[i][1])) return true;
-  await Promise.all(
-    keys.map(([k], i) =>
-      env.GC_KV.put(k, String(counts[i] + 1), { expirationTtl: 2 * 86400 }),
-    ),
-  );
-  return false;
-}
-
 // Real reviews almost never carry a web address; spam nearly always does.
 const LINK = /https?:|www\.|\.(com|net|org|ru|info|biz|xyz|top|shop)\b/i;
 
@@ -225,7 +216,7 @@ async function passesTurnstile(env: Env, request: Request, token: string) {
     body: new URLSearchParams({
       secret: env.TURNSTILE_SECRET,
       response: token,
-      remoteip: request.headers.get("cf-connecting-ip") || "",
+      remoteip: visitorIp(request),
     }).toString(),
   });
   const data = (await res.json().catch(() => ({}))) as { success?: boolean };
@@ -244,37 +235,24 @@ export async function submit(request: Request, env: Env) {
   } catch {
     return json({ error: "Invalid request." }, 400);
   }
-  const field = (name: string, max: number) => {
-    const v = form.get(name);
-    return typeof v === "string" ? v.trim().slice(0, max) : "";
-  };
+  const { data, missing } = check(Review, Object.fromEntries(form.entries()));
 
   // A hidden field real visitors never fill in, and a form sent faster than anyone can type.
   // Pretend it worked so bots don't retry.
-  if (field("website", 10) || Number(field("elapsed", 12)) < MIN_FILL_MS)
-    return json({ ok: true });
+  if (data.website || data.elapsed < MIN_FILL_MS) return json({ ok: true });
 
-  const name = field("name", LIMITS.name).replace(/\s+/g, " ");
-  const email = field("email", 254);
-  const text = field("text", LIMITS.text);
-  const rating = Number(field("rating", 1));
-  const missing: string[] = [];
-  if (!name) missing.push("your name");
-  if (!isEmail(email)) missing.push("a valid email");
-  if (!(Number.isInteger(rating) && rating >= 1 && rating <= 5))
-    missing.push("a star rating");
-  if (!text) missing.push("a few words about it");
   if (missing.length)
     return json(
       { error: `Add ${missing.join(", ")} to send your review.`, missing },
       400,
     );
+  const { name, email, text, rating } = data;
 
   const files = form
     .getAll("photos")
     .filter((f): f is File => typeof f !== "string" && f.size > 0);
-  if (files.length > LIMITS.photos)
-    return json({ error: `Add up to ${LIMITS.photos} photos.` }, 400);
+  if (files.length > REVIEW_MAX_PHOTOS)
+    return json({ error: `Add up to ${REVIEW_MAX_PHOTOS} photos.` }, 400);
   const photos: { type: string; bytes: ArrayBuffer }[] = [];
   for (const f of files) {
     if (f.size > LIMITS.photoBytes)
@@ -289,15 +267,21 @@ export async function submit(request: Request, env: Env) {
     photos.push({ type, bytes });
   }
 
-  if (
-    !(await passesTurnstile(env, request, field("cf-turnstile-response", 4000)))
-  ) {
+  if (!(await passesTurnstile(env, request, data["cf-turnstile-response"]))) {
     return json(
       { error: "The spam check didn't pass. Reload the page and try again." },
       403,
     );
   }
-  if (await overLimit(env, request))
+  const day = Math.floor(Date.now() / 86400000);
+  const limits = [
+    [
+      `review:rate:${visitorIp(request) || "unknown"}:${day}`,
+      MAX_PER_VISITOR_PER_DAY,
+    ],
+    [`review:rate:all:${day}`, MAX_PER_DAY],
+  ] as const;
+  if (await overLimit(env, [...limits], 2 * 86400))
     return json(
       { error: "That's a lot of reviews in one day. Try again tomorrow." },
       429,
@@ -310,7 +294,7 @@ export async function submit(request: Request, env: Env) {
     name,
     rating,
     text,
-    product: field("product", LIMITS.product),
+    product: data.product,
     photoTypes: photos.map((p) => p.type),
     at: new Date().toISOString(),
   };
@@ -358,8 +342,7 @@ export async function submit(request: Request, env: Env) {
 }
 
 function moderationUrl(env: Env, request: Request, r: SiteReview) {
-  const base = (env.SITE_URL || new URL(request.url).origin).replace(/\/$/, "");
-  return `${base}/admin/review?id=${r.id}&key=${r.key}`;
+  return `${siteUrl(env, new URL(request.url))}/admin/review?id=${r.id}&key=${r.key}`;
 }
 
 // ---------- Photos ----------
@@ -405,7 +388,7 @@ async function allSiteReviews(env: Env) {
     }
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
-  return out.sort((a, b) => b.at.localeCompare(a.at));
+  return alphabetical(out, (r) => r.at, "desc");
 }
 
 function toPublic(r: SiteReview): PublicReview {
@@ -430,30 +413,17 @@ async function rebuildIndex(env: Env) {
   await purge();
 }
 
-const esc = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const page = (body: string, status = 200) =>
-  new Response(
-    `<!doctype html><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex"><title>Reviews · Golem Craftworks</title>` +
-      `<body style="font:17px/1.5 system-ui;padding:32px;max-width:60ch;margin:auto">${body}</body>`,
-    {
-      status,
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
-        "referrer-policy": "no-referrer",
-      },
-    },
-  );
+  adminPage("Reviews · Golem Craftworks", body, status);
 
 function card(r: SiteReview) {
   return (
     `<p><strong>${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</strong> ${esc(r.name)}${r.product ? ` · ${esc(r.product)}` : ""}` +
-    ` · ${esc(r.at.slice(0, 10))} · <em>${r.status === "approved" ? "showing" : "hidden"}</em></p><p style="white-space:pre-line">${esc(r.text)}</p>` +
+    ` · ${esc(r.at.slice(0, 10))} · <em>${r.status === "approved" ? "showing" : "hidden"}</em></p><p class="review-text">${esc(r.text)}</p>` +
     r.photoTypes
       .map(
         (_, i) =>
-          `<img src="/api/reviews/photo/${r.id}/${i}?key=${r.key}" alt="" style="max-width:100%;margin:0 0 12px;display:block">`,
+          `<img src="/api/reviews/photo/${r.id}/${i}?key=${r.key}" alt="" class="review-photo">`,
       )
       .join("")
   );
@@ -463,13 +433,7 @@ function card(r: SiteReview) {
 // /admin/review?id=&key=     one review with Show / Hide / Delete buttons (the link in the notification email)
 export async function moderate(request: Request, env: Env, url: URL) {
   if (url.pathname === "/admin/reviews") {
-    if (
-      !(
-        env.ADMIN_TOKEN &&
-        safeEqual(url.searchParams.get("token") || "", env.ADMIN_TOKEN)
-      )
-    )
-      return json({ error: "Not found" }, 404);
+    if (!isAdmin(env, url)) return json({ error: "Not found" }, 404);
     const all = await allSiteReviews(env);
     const rank = (r: SiteReview) => (r.status === "pending" ? 0 : 1);
     return page(
@@ -518,8 +482,8 @@ export async function moderate(request: Request, env: Env, url: URL) {
     }
   }
   const button = (action: string, label: string) =>
-    `<form method="post" action="/admin/review" style="display:inline"><input type="hidden" name="id" value="${review.id}">` +
-    `<input type="hidden" name="key" value="${review.key}"><button name="action" value="${action}" style="font:inherit;padding:8px 16px;margin-right:8px">${label}</button></form>`;
+    `<form method="post" action="/admin/review" class="action"><input type="hidden" name="id" value="${review.id}">` +
+    `<input type="hidden" name="key" value="${review.key}"><button name="action" value="${action}">${label}</button></form>`;
   return page(
     `<h1>Review from ${esc(review.name)}</h1>${card(review)}<p>` +
       (review.status === "approved"

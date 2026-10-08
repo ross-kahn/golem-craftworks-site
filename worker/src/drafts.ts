@@ -18,9 +18,10 @@
 
 import * as square from "./square.ts";
 import * as etsyApi from "./etsy.ts";
-import { decodeEntities, diceSetName } from "./descriptions.ts";
+import { diceSetName } from "./descriptions.ts";
+import { csvList, decodeEntities } from "../../shared/text.ts";
 import { getEtsySkuMap } from "./sync.ts";
-import { logEvent, isTrue, errMsg } from "./util.ts";
+import { logEvent, isTrue, errMsg, claim } from "./util.ts";
 import type { DraftReport, Env, EtsyListing } from "./types.ts";
 
 const DRAFTED_KEY = "etsy:drafted"; // sku -> the listing made for it
@@ -51,11 +52,8 @@ const COPIED = [
   "item_dimensions_unit",
 ] as const;
 
-const csv = (s?: string) =>
-  (s || "")
-    .split(",")
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
+// Long enough for one run to finish with a set before another may pick it up.
+const CLAIM_SECONDS = 120;
 
 // `TEMPLATE 8-Piece Dice Set | Handmade…` -> `JAVA 8-Piece Dice Set | Handmade…`
 export const draftTitle = (templateTitle: string, name: string) =>
@@ -122,7 +120,7 @@ export async function createEtsyDrafts(
     photosWaiting: [],
     errors: [],
   };
-  const categories = csv(env.ETSY_DRAFT_CATEGORIES);
+  const categories = csvList(env.ETSY_DRAFT_CATEGORIES?.toLowerCase());
   if (!categories.length) return report;
 
   const { products } = await square.buildStorefront(env);
@@ -246,7 +244,7 @@ export async function createEtsyDrafts(
         continue;
       }
       // Two runs can start seconds apart (Square reports a new item and its stock separately): the first one takes the set.
-      if (!(await claim(`etsy:drafting:${sku}`))) {
+      if (!(await claim(env, `etsy:drafting:${sku}`, CLAIM_SECONDS))) {
         report.waiting.push(sku);
         continue;
       }
@@ -351,7 +349,7 @@ export async function createEtsyDrafts(
         report.photosWaiting.push(sku);
         continue;
       }
-      if (!(await claim(`etsy:photos:${sku}`))) {
+      if (!(await claim(env, `etsy:photos:${sku}`, CLAIM_SECONDS))) {
         report.photosWaiting.push(sku);
         continue;
       }
@@ -421,12 +419,5 @@ export async function createEtsyDrafts(
       }
     }
     return n;
-  }
-
-  // True for the first run to ask; another run asking in the next two minutes is told no.
-  async function claim(key: string) {
-    if (await env.GC_KV.get(key)) return false;
-    await env.GC_KV.put(key, "1", { expirationTtl: 120 });
-    return true;
   }
 }

@@ -33,7 +33,17 @@ import * as reviews from "./reviews.ts";
 import { notifySale, mailMissedSales } from "./sales.ts";
 import { dailyReport } from "./report.ts";
 import * as pages from "./pages.ts";
-import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
+import demo from "./demo-products.json" with { type: "json" };
+import { unique } from "radashi";
+import {
+  json,
+  adminPage,
+  isAdmin,
+  isTrue,
+  claim,
+  logEvent,
+  errMsg,
+} from "./util.ts";
 import type {
   Ctx,
   DraftReport,
@@ -56,21 +66,17 @@ const REPORT_CRON = "17 13 * * *"; // and the third
 export default {
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
     const url = new URL(request.url);
-    const cors = corsHeaders(env, request);
-    if (request.method === "OPTIONS")
-      return new Response(null, { status: 204, headers: cors });
-
     try {
       if (url.pathname === "/api/products" && request.method === "GET")
-        return withCors(await products(env, ctx, url), cors);
+        return await products(env, ctx, url);
       if (url.pathname === "/api/checkout" && request.method === "POST")
-        return withCors(await checkout(request, env), cors);
+        return await checkout(request, env);
       if (url.pathname === "/api/commission" && request.method === "POST")
-        return withCors(await commission(request, env), cors);
+        return await commission(request, env);
       if (url.pathname === "/api/reviews" && request.method === "GET")
-        return withCors(await reviews.list(env, ctx), cors);
+        return await reviews.list(env, ctx);
       if (url.pathname === "/api/reviews" && request.method === "POST")
-        return withCors(await reviews.submit(request, env), cors);
+        return await reviews.submit(request, env);
       if (
         url.pathname.startsWith("/api/reviews/photo/") &&
         request.method === "GET"
@@ -96,12 +102,9 @@ export default {
         path: url.pathname,
         error: errMsg(e),
       });
-      return withCors(
-        json(
-          { error: "Something went wrong on our side. Try again in a minute." },
-          500,
-        ),
-        cors,
+      return json(
+        { error: "Something went wrong on our side. Try again in a minute." },
+        500,
       );
     }
   },
@@ -160,12 +163,6 @@ export default {
   },
 };
 
-function withCors(res: Response, cors: Record<string, string>) {
-  const r = new Response(res.body, res);
-  Object.entries(cors).forEach(([k, v]) => r.headers.set(k, v));
-  return r;
-}
-
 // ---------- Storefront ----------
 
 // The catalog as the site sees it, cached for a minute. If Square can't be reached, the last good
@@ -175,15 +172,10 @@ async function catalog(
   ctx: Ctx,
   url: URL,
 ): Promise<StorefrontCatalog> {
-  // `npm run dev` with no Square token: the sample products in site/data/demo-products.json, so the
-  // pages can be worked on without any secrets. DEMO_CATALOG is only ever set by that command.
-  if (env.DEMO_CATALOG === "true" && !env.SQUARE_ACCESS_TOKEN && env.ASSETS) {
-    const res = await env.ASSETS.fetch(
-      new Request(new URL("/data/demo-products.json", url)),
-    );
-    const demo = (await res.json()) as Pick<StorefrontCatalog, "products">;
+  // `npm run dev` with no Square token: the sample products in demo-products.json, so the pages
+  // can be worked on without any secrets. DEMO_CATALOG is only ever set by that command and the tests.
+  if (isTrue(env.DEMO_CATALOG) && !env.SQUARE_ACCESS_TOKEN)
     return { products: demo.products, generatedAt: new Date().toISOString() };
-  }
   // ?fresh=1 (the cart's stock check, and the thank-you page after a sale) skips the minute-old copy and replaces it.
   // Clearing it from the Square webhook isn't enough: that only reaches the data centre the webhook landed in.
   const cache = caches.default;
@@ -316,7 +308,7 @@ async function checkout(request: Request, env: Env) {
     const mods = Array.isArray(l.modifiers)
       ? l.modifiers.filter((m): m is string => typeof m === "string")
       : [];
-    const modifiers = [...new Set(mods)].sort();
+    const modifiers = unique(mods).sort();
     const key = [l.variationId, ...modifiers].join("|");
     const line = merged.get(key) || {
       variationId: l.variationId,
@@ -403,22 +395,18 @@ async function squareWebhook(request: Request, env: Env, ctx: Ctx) {
   if (!(await square.verifySquareSignature(env, request, raw)))
     return json({ error: "Bad signature" }, 401);
   const event: SquareWebhookEvent = JSON.parse(raw);
-  const seenKey = event.event_id ? `square:event:${event.event_id}` : "";
-  if (seenKey) {
-    if (await env.GC_KV.get(seenKey))
-      return json({ ok: true, duplicate: true });
-    await env.GC_KV.put(seenKey, "1", { expirationTtl: 60 * 60 * 72 });
-  }
+  // Square can send the same event more than once: only the first is acted on.
+  const seenKey = `square:event:${event.event_id}`;
+  if (event.event_id && !(await claim(env, seenKey, 60 * 60 * 72)))
+    return json({ ok: true, duplicate: true });
   if (event.type === "payment.created" || event.type === "payment.updated") {
     if (event.data?.object?.payment?.status === "COMPLETED") {
       ctx.waitUntil(
-        reviews
-          .refreshSquareSales(env)
-          .catch((e) =>
-            logEvent(env, "Square sales count didn't refresh", {
-              error: errMsg(e),
-            }),
-          ),
+        reviews.refreshSquareSales(env).catch((e) =>
+          logEvent(env, "Square sales count didn't refresh", {
+            error: errMsg(e),
+          }),
+        ),
       );
     }
     // Answered straight away and finished afterwards: Square gives up on a slow reply, which would stop
@@ -500,9 +488,8 @@ async function etsyWebhook(request: Request, env: Env, ctx: Ctx) {
 // ---------- Admin ----------
 
 async function admin(request: Request, env: Env, url: URL) {
-  const token = url.searchParams.get("token") || "";
   const isCallback = url.pathname === "/admin/etsy/callback"; // Etsy can't pass our token; PKCE state protects it
-  if (!isCallback && !(env.ADMIN_TOKEN && safeEqual(token, env.ADMIN_TOKEN)))
+  if (!isCallback && !isAdmin(env, url))
     return json({ error: "Not found" }, 404);
 
   const redirectUri = `${url.origin}/admin/etsy/callback`;
@@ -538,7 +525,7 @@ async function admin(request: Request, env: Env, url: URL) {
     ]);
     return json({
       etsyConnected: !!tokens,
-      dryRun: env.SYNC_DRY_RUN === "true",
+      dryRun: isTrue(env.SYNC_DRY_RUN),
       lastHourlyCheck: last,
       lastEtsyDraftsCheck: drafts,
       recentActivity: log || [],
@@ -597,10 +584,5 @@ async function admin(request: Request, env: Env, url: URL) {
   return json({ error: "Not found" }, 404);
 }
 
-function html(message: string, status = 200) {
-  return new Response(
-    `<!doctype html><meta name="viewport" content="width=device-width"><title>Golem Craftworks</title>` +
-      `<body style="font:18px system-ui;padding:40px;max-width:40ch">${message}</body>`,
-    { status, headers: { "content-type": "text/html; charset=utf-8" } },
-  );
-}
+const html = (message: string, status = 200) =>
+  adminPage("Golem Craftworks", message, status);

@@ -6,8 +6,8 @@ import { descriptionHtml } from "../shared.ts";
 import {
   DICE_SET_TEMPLATE,
   diceSetDescription,
-  htmlToText,
 } from "../../worker/src/descriptions.ts";
+import { htmlToText } from "../../shared/text.ts";
 
 const APPLEBANE =
   'I swear I made up the name "applebane" because of the red and green in the dice. Still works!';

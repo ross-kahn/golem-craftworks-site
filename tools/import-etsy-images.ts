@@ -11,7 +11,8 @@
 // Options: --max-images=5   --sandbox   --include-items-with-photos
 
 import { readFileSync } from "node:fs";
-import { parseCSV, norm, squareClient, postJSON } from "./shared.ts";
+import { parseCSV, norm, squareClient, searchCatalog } from "./shared.ts";
+import { csvList } from "../shared/text.ts";
 
 // The parts of a Square catalog item this script reads.
 interface SquareItem {
@@ -43,20 +44,6 @@ if (!file || !TOKEN) {
 }
 
 const sq = squareClient({ token: TOKEN, sandbox: SANDBOX });
-
-async function squareItems() {
-  const items: SquareItem[] = [];
-  let cursor: string | undefined;
-  do {
-    const d = await sq<{ objects?: SquareItem[]; cursor?: string }>(
-      "/v2/catalog/search",
-      postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }),
-    );
-    items.push(...(d.objects || []));
-    cursor = d.cursor;
-  } while (cursor);
-  return items.filter((i) => !i.is_deleted && !i.item_data?.is_archived);
-}
 
 async function uploadImage(
   itemId: string,
@@ -92,7 +79,9 @@ async function uploadImage(
 }
 
 const rows = parseCSV(readFileSync(file, "utf8"));
-const items = await squareItems();
+const items = (await searchCatalog<SquareItem>(sq, "ITEM")).filter(
+  (i) => !i.item_data?.is_archived,
+);
 const bySku = new Map<string, SquareItem>();
 const byTitle = new Map<string, SquareItem>();
 for (const it of items) {
@@ -107,10 +96,7 @@ let planned = 0;
 const unmatched: string[] = [];
 const skippedHasPhotos: string[] = [];
 for (const r of rows) {
-  const skus = (r.SKU || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const skus = csvList(r.SKU);
   const item =
     skus.map((s) => bySku.get(s)).find(Boolean) || byTitle.get(norm(r.TITLE));
   if (!item) {

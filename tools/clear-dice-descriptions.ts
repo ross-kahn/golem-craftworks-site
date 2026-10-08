@@ -16,9 +16,15 @@
 // Options: --sandbox
 
 import { randomUUID } from "node:crypto";
-import { squareClient, postJSON, descriptionHtml } from "./shared.ts";
+import { cluster } from "radashi";
+import {
+  squareClient,
+  searchCatalog,
+  postJSON,
+  descriptionHtml,
+} from "./shared.ts";
 import { planNotes } from "./dice-notes.ts";
-import { htmlToText } from "../worker/src/descriptions.ts";
+import { squareDescription } from "../worker/src/descriptions.ts";
 
 // Catalog objects are sent back whole when updated, so fields this script doesn't use are kept as they came.
 interface CatalogObject {
@@ -47,32 +53,15 @@ if (!TOKEN) {
 
 const sq = squareClient({ token: TOKEN, sandbox: args.includes("--sandbox") });
 
-const items: CatalogObject[] = [];
-let cursor: string | undefined;
-do {
-  const d = await sq<{ objects?: CatalogObject[]; cursor?: string }>(
-    "/v2/catalog/search",
-    postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }),
-  );
-  items.push(...(d.objects || []).filter((o) => !o.is_deleted));
-  cursor = d.cursor;
-} while (cursor);
+const items = await searchCatalog<CatalogObject>(sq, "ITEM");
 
 const byId = new Map(items.map((i) => [i.id, i]));
 const plan = planNotes(
-  items.map((i) => {
-    const d = i.item_data || {};
-    // The formatted description first: Square's plain-text copy runs every paragraph together.
-    return {
-      id: i.id,
-      name: d.name || "",
-      description:
-        htmlToText(d.description_html) ||
-        d.description_plaintext ||
-        d.description ||
-        "",
-    };
-  }),
+  items.map((i) => ({
+    id: i.id,
+    name: i.item_data?.name || "",
+    description: squareDescription(i.item_data || {}),
+  })),
 );
 const changes = plan.filter((s) => s.changed);
 
@@ -112,12 +101,12 @@ if (APPLY && changes.length) {
       },
     };
   });
-  for (let i = 0; i < objects.length; i += 20) {
+  for (const batch of cluster(objects, 20)) {
     await sq(
       "/v2/catalog/batch-upsert",
       postJSON({
         idempotency_key: randomUUID(),
-        batches: [{ objects: objects.slice(i, i + 20) }],
+        batches: [{ objects: batch }],
       }),
     );
   }

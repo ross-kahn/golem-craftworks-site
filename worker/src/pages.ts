@@ -10,7 +10,10 @@
 // then take over as before.
 
 import type { Env, PublicProduct, StorefrontCatalog } from "./types.ts";
-import { slugify } from "./util.ts";
+import { group } from "radashi";
+import { isTrue, siteUrl } from "./util.ts";
+import { esc, slugify } from "../../shared/text.ts";
+import { OTHER, byCategory, tilePhotos } from "../../shared/catalog.ts";
 
 // KV: every address a product has been served at -> its Square id (kept up to date in index.ts).
 export const ADDRESSES_KEY = "product:addresses";
@@ -30,14 +33,9 @@ const AI_CRAWLERS = [
   "Applebot-Extended",
 ];
 
-const esc = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const money = (cents: number) =>
   `$${cents % 100 === 0 ? cents / 100 : (cents / 100).toFixed(2)}`;
-const origin = (env: Env, url: URL) =>
-  (env.SITE_URL || url.origin).replace(/\/$/, "");
-const noindex = (env: Env) =>
-  String(env.NOINDEX || "").toLowerCase() === "true";
+const noindex = (env: Env) => isTrue(env.NOINDEX);
 const oneLine = (s: string, max: number) => {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length <= max ? t : t.slice(0, max - 1).replace(/\s+\S*$/, "") + "…";
@@ -55,8 +53,7 @@ const priceLabel = (p: PublicProduct) => {
 };
 
 // Categories as the shop shows them: each has its own page at /shop/<slug>, in A-to-Z order with
-// "Other" (anything without a Square category) last. api.ts and home.ts on the site do the same.
-const OTHER = "Other";
+// "Other" (anything without a Square category) last. The order is in shared/catalog.ts, which the site uses too.
 const categoryOf = (p: PublicProduct) => p.category || OTHER;
 
 interface Category {
@@ -66,33 +63,14 @@ interface Category {
 }
 
 function categories(catalog: StorefrontCatalog): Category[] {
-  const bySlug = new Map<string, Category>();
-  for (const p of catalog.products) {
-    const name = categoryOf(p),
-      slug = slugify(name);
-    const c = bySlug.get(slug) || { name, slug, products: [] };
-    c.products.push(p);
-    bySlug.set(slug, c);
-  }
-  return [...bySlug.values()].sort(
-    (a, b) =>
-      Number(a.name === OTHER) - Number(b.name === OTHER) ||
-      a.name.localeCompare(b.name),
-  );
-}
-
-// Up to four photos for a category's tile: one from each piece, newest first, then their second photos, and so on.
-function tilePhotos(products: PublicProduct[]) {
-  const out: string[] = [];
-  for (
-    let i = 0;
-    out.length < 4 && products.some((p) => p.images.length > i);
-    i++
-  ) {
-    for (const p of products)
-      if (p.images[i] && out.length < 4) out.push(p.images[i]);
-  }
-  return out;
+  const bySlug = group(catalog.products, (p) => slugify(categoryOf(p)));
+  return Object.entries(bySlug)
+    .map(([slug, products = []]) => ({
+      name: categoryOf(products[0]),
+      slug,
+      products,
+    }))
+    .sort((a, b) => byCategory(a.name, b.name));
 }
 
 function page(html: string, env: Env, status = 200) {
@@ -223,7 +201,7 @@ export async function productPage(
   catalog: StorefrontCatalog,
 ) {
   const slug = decodeURIComponent(url.pathname.replace(/^\/product\//, ""));
-  // Styles and scripts are linked relative to /product/<slug>, so a trailing slash would break them.
+  // One address per product: the one without a slash on the end.
   if (slug.endsWith("/"))
     return Response.redirect(
       new URL(`/product/${slug.replace(/\/+$/, "")}`, url).toString(),
@@ -245,10 +223,10 @@ export async function productPage(
   const html = p && (await template(env, url, "/product/"));
   if (!p || !html) return missingPage(env, url);
 
-  const link = `${origin(env, url)}/product/${p.slug}`;
+  const link = `${siteUrl(env, url)}/product/${p.slug}`;
   const title = `${p.name} · ${SHOP}`;
   const description = oneLine(p.description, 160) || TAGLINE;
-  const image = p.images[0] || `${origin(env, url)}/assets/logo.png`;
+  const image = p.images[0] || `${siteUrl(env, url)}/assets/logo.png`;
   const head = [
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(description)}">`,
@@ -288,15 +266,6 @@ async function missingPage(env: Env, url: URL) {
 
 export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
   const all = categories(catalog);
-  // The old filter address (/?category=Dice) now has a page of its own.
-  const old = url.searchParams.get("category");
-  if (old) {
-    const hit = all.find((c) => c.name === old);
-    return Response.redirect(
-      new URL(hit ? `/shop/${hit.slug}` : "/", url).toString(),
-      301,
-    );
-  }
   const html = await template(env, url, "/");
   if (!html) return null;
   // One tile per category with something available, showing its newest few photos.
@@ -304,7 +273,7 @@ export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
     .map((c) => ({ ...c, products: c.products.filter(inStock) }))
     .filter((c) => c.products.length)
     .map((c) => {
-      const photos = tilePhotos(c.products);
+      const photos = tilePhotos(c.products.map((p) => p.images));
       const n = c.products.length;
       return `
           <li class="cat"><a href="/shop/${c.slug}">
@@ -332,7 +301,7 @@ export async function categoryPage(
   catalog: StorefrontCatalog,
 ) {
   const slug = decodeURIComponent(url.pathname.replace(/^\/shop\//, ""));
-  // Styles and scripts are linked relative to /shop/<slug>, so a trailing slash would break them.
+  // One address per category: the one without a slash on the end.
   if (slug.endsWith("/"))
     return Response.redirect(
       new URL(`/shop/${slug.replace(/\/+$/, "")}`, url).toString(),
@@ -343,7 +312,7 @@ export async function categoryPage(
   const html = c && (await template(env, url, "/shop/"));
   if (!c || !html) return missingPage(env, url);
 
-  const link = `${origin(env, url)}/shop/${c.slug}`;
+  const link = `${siteUrl(env, url)}/shop/${c.slug}`;
   const title = `${c.name} · ${SHOP}`;
   const available = c.products.filter(inStock);
   const n = available.length;
@@ -352,7 +321,7 @@ export async function categoryPage(
     : `${c.name}, made by hand at ${SHOP} in Madison, Wisconsin.`;
   const image =
     available.map((p) => p.images[0]).find(Boolean) ||
-    `${origin(env, url)}/assets/logo.png`;
+    `${siteUrl(env, url)}/assets/logo.png`;
   const head = [
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(description)}">`,
@@ -424,7 +393,7 @@ const STATIC_PAGES = [
 ];
 
 export function sitemap(env: Env, url: URL, catalog: StorefrontCatalog) {
-  const base = origin(env, url);
+  const base = siteUrl(env, url);
   const entry = (path: string, lastmod?: string) =>
     `  <url><loc>${esc(base + path)}</loc>${lastmod ? `<lastmod>${esc(lastmod.slice(0, 10))}</lastmod>` : ""}</url>`;
   return file(
@@ -451,14 +420,14 @@ export function robots(env: Env, url: URL) {
   return file(
     `User-agent: *\n${rules}\n` +
       AI_CRAWLERS.map((bot) => `User-agent: ${bot}\n${rules}`).join("\n") +
-      `\nSitemap: ${origin(env, url)}/sitemap.xml\n`,
+      `\nSitemap: ${siteUrl(env, url)}/sitemap.xml\n`,
     "text/plain",
   );
 }
 
 // A plain-text guide to the shop for AI assistants (the llms.txt convention).
 export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
-  const base = origin(env, url);
+  const base = siteUrl(env, url);
   const line = (p: PublicProduct) =>
     `- [${p.name}](${base}/product/${p.slug}): ${priceLabel(p)}, ${madeToOrder(p) ? "made to order" : inStock(p) ? "in stock" : "sold"}. ${oneLine(p.description, 140)}`;
   const all = categories(catalog);
@@ -485,7 +454,7 @@ export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
 
 // Product feed for Google Merchant Center (free Shopping listings). One entry per thing a buyer can choose.
 export function googleFeed(env: Env, url: URL, catalog: StorefrontCatalog) {
-  const base = origin(env, url);
+  const base = siteUrl(env, url);
   const tag = (name: string, value: string) =>
     `<${name}>${esc(value)}</${name}>`;
   const items = catalog.products

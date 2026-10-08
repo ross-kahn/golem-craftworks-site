@@ -1,4 +1,8 @@
 // Shared by the Etsy import tools: reading Etsy's CSV export and calling Square.
+import { paged } from "../shared/paged.ts";
+
+// Lower-case letters and digits only, for comparing titles.
+export { words as norm } from "../shared/text.ts";
 
 // Minimal RFC 4180 CSV parser (handles quotes, commas and newlines inside fields).
 // Rows come back keyed by the upper-cased column heading.
@@ -38,13 +42,6 @@ export function parseCSV(text: string): Record<string, string>[] {
   );
 }
 
-// Lower-case letters and digits only, for comparing titles.
-export const norm = (s: string | undefined) =>
-  String(s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-
 export function squareClient({
   token,
   sandbox = false,
@@ -81,6 +78,21 @@ export function squareClient({
 }
 
 export type SquareCall = ReturnType<typeof squareClient>;
+
+// Everything of one type in the Square catalog ("ITEM", "CATEGORY", ...), less what's been deleted.
+export async function searchCatalog<T extends { is_deleted?: boolean }>(
+  sq: SquareCall,
+  type: string,
+) {
+  const out: T[] = [];
+  const search = (cursor?: string) =>
+    sq<{ objects?: T[]; cursor?: string }>(
+      "/v2/catalog/search",
+      postJSON({ object_types: [type], cursor, limit: 1000 }),
+    );
+  for await (const page of paged(search)) out.push(...(page.objects || []));
+  return out.filter((o) => !o.is_deleted);
+}
 
 export const postJSON = (body: unknown): RequestInit => ({
   method: "POST",

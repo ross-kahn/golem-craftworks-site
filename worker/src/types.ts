@@ -6,7 +6,6 @@ export interface Env {
 
   // wrangler.toml [vars]
   SITE_URL?: string;
-  ALLOWED_ORIGINS?: string;
   SQUARE_ENV?: string;
   SQUARE_VERSION?: string;
   SQUARE_LOCATION_ID: string;

@@ -24,10 +24,12 @@
 
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { cluster, unique } from "radashi";
 import {
   parseCSV,
   norm,
   squareClient,
+  searchCatalog,
   postJSON,
   descriptionHtml,
 } from "./shared.ts";
@@ -88,19 +90,7 @@ function locationId() {
 
 const sq = squareClient({ token: TOKEN, sandbox: args.includes("--sandbox") });
 
-async function catalog(type: string) {
-  const out: CatalogObject[] = [];
-  let cursor: string | undefined;
-  do {
-    const d = await sq<{ objects?: CatalogObject[]; cursor?: string }>(
-      "/v2/catalog/search",
-      postJSON({ object_types: [type], cursor, limit: 1000 }),
-    );
-    out.push(...(d.objects || []));
-    cursor = d.cursor;
-  } while (cursor);
-  return out.filter((o) => !o.is_deleted);
-}
+const catalog = (type: string) => searchCatalog<CatalogObject>(sq, type);
 
 const attributeValues = (d: ListingDetails) =>
   Object.fromEntries(
@@ -186,11 +176,9 @@ const renames = existing.flatMap((item) => {
   return name && !updating.has(item.id) ? [{ item, name }] : [];
 });
 
-const columns = [
-  ...new Set(
-    [...plan.create, ...plan.update].flatMap((d) => Object.keys(d.metadata)),
-  ),
-];
+const columns = unique(
+  [...plan.create, ...plan.update].flatMap((d) => Object.keys(d.metadata)),
+);
 const extras = (d: ListingDetails) =>
   Object.keys(d.metadata).length
     ? `  + ${Object.keys(d.metadata)
@@ -307,14 +295,14 @@ if (APPLY && total) {
     })),
   ];
   const newVariationIds: string[] = [];
-  for (let i = 0; i < objects.length; i += 20) {
+  for (const batch of cluster(objects, 20)) {
     const res = await sq<{
       id_mappings?: { client_object_id: string; object_id: string }[];
     }>(
       "/v2/catalog/batch-upsert",
       postJSON({
         idempotency_key: randomUUID(),
-        batches: [{ objects: objects.slice(i, i + 20) }],
+        batches: [{ objects: batch }],
       }),
     );
     for (const m of res.id_mappings || [])
@@ -323,12 +311,12 @@ if (APPLY && total) {
   }
 
   const now = new Date().toISOString();
-  for (let i = 0; i < newVariationIds.length; i += 100) {
+  for (const ids of cluster(newVariationIds, 100)) {
     await sq(
       "/v2/inventory/changes/batch-create",
       postJSON({
         idempotency_key: randomUUID(),
-        changes: newVariationIds.slice(i, i + 100).map((id) => ({
+        changes: ids.map((id) => ({
           type: "PHYSICAL_COUNT",
           physical_count: {
             catalog_object_id: id,

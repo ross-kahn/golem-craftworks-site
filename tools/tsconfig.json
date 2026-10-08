@@ -11,7 +11,8 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["."]
+  "include": [".", "../shared"]
 }

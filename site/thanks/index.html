@@ -15,42 +15,32 @@
       content="https://golemcraftworks.com/assets/logo.png"
     />
     <meta name="theme-color" content="#000000" />
-    <script src="../js/theme.js"></script>
-    <link rel="icon" type="image/png" href="../assets/favicon.png" />
-    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+    <script src="/js/theme.js"></script>
+    <link rel="icon" type="image/png" href="/assets/favicon.png" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="../styles/main.css" />
+    <link rel="stylesheet" href="/styles/main.css" />
   </head>
   <body data-page="thanks">
     <header data-site-header></header>
     <main id="main" class="wrap">
       <div class="thanks">
-        <img src="../assets/logo.png" alt="" />
+        <img src="/assets/logo.png" alt="" />
         <h1>Thanks, your order is in.</h1>
         <p>
           A receipt from Square is on its way to your email. If you chose
           pickup, I'll email you to set a time.
         </p>
-        <p><a class="btn btn--ghost" href="../">Back to the shop</a></p>
+        <p><a class="btn btn--ghost" href="/">Back to the shop</a></p>
       </div>
     </main>
     <footer data-site-footer></footer>
-    <script src="../js/config.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/site.js"></script>
-    <script>
-      window.GC && window.GC.cart.clear();
-      try {
-        sessionStorage.setItem("gc-bought", String(Date.now()));
-      } catch (_) {}
-      // What they just bought may now be sold out: drop the saved product list so the shop shows it right away.
-      window.GC_API &&
-        window.GC_API.getProducts({ fresh: true }).catch(function () {});
-    </script>
+    <script src="/js/config.js"></script>
+    <script src="/js/thanks.js"></script>
   </body>
 </html>

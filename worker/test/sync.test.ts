@@ -430,7 +430,6 @@ function makeEnv(extra: Partial<Env> = {}): Env {
     ETSY_WEBHOOK_SECRET:
       "whsec_" + Buffer.from("etsy-secret-bytes").toString("base64"),
     SITE_URL: "https://golemcraftworks.com",
-    ALLOWED_ORIGINS: "https://golemcraftworks.com",
     SHIPPING_FLAT_CENTS: "800",
     HIDDEN_CATEGORIES: "Market only",
     ADMIN_TOKEN: "admintoken",
@@ -1150,10 +1149,7 @@ test("checkout: blocks sold items and builds a Square link with shipping and no 
       new Request("https://w.example/api/checkout", {
         method: "POST",
         body: JSON.stringify(b),
-        headers: {
-          "content-type": "application/json",
-          origin: "https://golemcraftworks.com",
-        },
+        headers: { "content-type": "application/json" },
       }),
       env,
       ctx(),
@@ -1174,10 +1170,6 @@ test("checkout: blocks sold items and builds a Square link with shipping and no 
     fulfillment: "ship",
   });
   assert.equal(okRes.status, 200);
-  assert.equal(
-    okRes.headers.get("access-control-allow-origin"),
-    "https://golemcraftworks.com",
-  );
   assert.equal(((await okRes.json()) as any).url, "https://square.link/u/abc");
   const link = state.paymentLinks[0];
   assert.deepEqual(link.order.line_items, [
@@ -1348,7 +1340,7 @@ test("product pages are complete before any script runs", async () => {
   );
   assert.equal((html.match(/<title>/g) || []).length, 1);
   assert.ok(
-    html.includes('<script src="../js/product.js"></script>'),
+    html.includes('<script src="/js/product.js"></script>'),
     "the page script still loads",
   );
 
@@ -1393,11 +1385,9 @@ test("product pages are complete before any script runs", async () => {
     [slash.status, slash.headers.get("location")],
     [301, "https://w.example/product/java-ttrpg-dice-set"],
   );
-  // The bare page (demo mode's ?id= address) is still the static file.
+  // The bare address is the template these pages are built from.
   assert.ok(
-    (await (await get(env, "/product/?id=I_YZ")).text()).includes(
-      "<!--ssr:product-->",
-    ),
+    (await (await get(env, "/product/")).text()).includes("<!--ssr:product-->"),
   );
 });
 
@@ -1442,17 +1432,6 @@ test("home page shows a tile per category with something available", async () =>
       'data-n="3"><img src="https://img/yz.jpg" alt="" loading="lazy" decoding="async"><img src="https://img/yz2.jpg"',
     ),
   );
-
-  // The old filter addresses lead to the category pages.
-  const old = await get(env, "/?category=Game%20sets");
-  assert.deepEqual(
-    [old.status, old.headers.get("location")],
-    [301, "https://w.example/shop/game-sets"],
-  );
-  assert.equal(
-    (await get(env, "/?category=Gone")).headers.get("location"),
-    "https://w.example/",
-  );
 });
 
 test("category pages list what's available; same-named items get distinct addresses", async () => {
@@ -1471,7 +1450,7 @@ test("category pages list what's available; same-named items get distinct addres
   );
   assert.ok(html.includes("Game sets: 1 handmade piece available now"));
   assert.ok(
-    /<h1[^>]*>Game sets<\/h1>/.test(html) &&
+    /<h1[^>]*>\s*Game sets\s*<\/h1>/.test(html) &&
       html.includes(
         '<a class="chip" href="/shop/game-sets" aria-current="page">Game sets</a>',
       ),
@@ -1486,7 +1465,7 @@ test("category pages list what's available; same-named items get distinct addres
   );
   assert.ok(
     !html.includes("ssr:") &&
-      html.includes('<script src="../js/shop.js"></script>'),
+      html.includes('<script src="/js/shop.js"></script>'),
   );
   assert.equal((html.match(/<title>/g) || []).length, 1);
   assert.equal(
@@ -1525,11 +1504,9 @@ test("category pages list what's available; same-named items get distinct addres
     [slash.status, slash.headers.get("location")],
     [301, "https://w.example/shop/game-sets"],
   );
-  // The bare page (demo mode's ?category= address) is still the static file.
+  // The bare address is the template these pages are built from.
   assert.ok(
-    (await (await get(env, "/shop/?category=Dice")).text()).includes(
-      "<!--ssr:grid-->",
-    ),
+    (await (await get(env, "/shop/")).text()).includes("<!--ssr:grid-->"),
   );
 });
 
@@ -1562,14 +1539,13 @@ test("the shipping price comes from one setting, everywhere it's shown", async (
   assert.ok((config.headers.get("content-type") || "").includes("javascript"));
   const js = await config.text();
   assert.ok(
-    js.includes('shopName: "Golem Craftworks"') &&
+    /shopName:\s*"Golem Craftworks"/.test(js) &&
       js.trimEnd().endsWith("window.GC_CONFIG.shippingCents = 950;"),
   );
 
   const shipping = await (await get(env, "/shipping/")).text();
   assert.ok(
-    shipping.includes("for a flat $9.50, however many") &&
-      !shipping.includes("ssr:"),
+    /for a flat\s+\$9\.50\./.test(shipping) && !shipping.includes("ssr:"),
   );
   assert.ok(
     (await (await get(env, "/llms.txt")).text()).includes("for a flat $9.50"),

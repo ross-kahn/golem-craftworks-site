@@ -2,9 +2,11 @@
 // Square emails the buyer their receipt; this is the shop's copy, with what to pack, where to send it and the money.
 
 import * as square from "./square.ts";
-import { mailReady, send } from "./commission.ts";
-import type { MailEnv } from "./commission.ts";
-import { logEvent, errMsg } from "./util.ts";
+import { sift, sleep, sum } from "radashi";
+import { mailReady, send } from "./email.ts";
+import type { MailEnv } from "./email.ts";
+import { logEvent, errMsg, claim } from "./util.ts";
+import { paged } from "../../shared/paged.ts";
 import type {
   Env,
   SquareAddress,
@@ -61,20 +63,16 @@ const row = (label: string, n: number) =>
 
 function addressLines(a?: SquareAddress) {
   if (!a) return [];
-  return [
+  return sift([
     a.address_line_1,
     a.address_line_2,
     a.address_line_3,
-    [
-      [a.locality, a.administrative_district_level_1]
-        .filter(Boolean)
-        .join(", "),
+    sift([
+      sift([a.locality, a.administrative_district_level_1]).join(", "),
       a.postal_code,
-    ]
-      .filter(Boolean)
-      .join(" "),
+    ]).join(" "),
     a.country && a.country !== "US" ? a.country : "",
-  ].filter(Boolean) as string[];
+  ]);
 }
 
 // Called for Square's payment events, and by the hourly check for any it missed. Throws if the email can't be sent.
@@ -104,8 +102,7 @@ export async function notifySale(
   }
   // Square's reports of one payment arrive seconds apart, and this can take that long: the first one takes it.
   const claimKey = `sale:mailing:${p.order_id}`;
-  if (await env.GC_KV.get(claimKey)) return;
-  await env.GC_KV.put(claimKey, "1", { expirationTtl: 60 });
+  if (!(await claim(env, claimKey, 60))) return;
   try {
     await mailSale(env, p, doneKey, wait);
   } catch (e) {
@@ -118,18 +115,19 @@ export async function notifySale(
 export async function mailMissedSales(env: Env) {
   if (!mailReady(env)) return;
   const begin = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  let cursor: string | undefined;
-  do {
+  const list = (cursor?: string) => {
     const query = new URLSearchParams({
       begin_time: begin,
       location_id: env.SQUARE_LOCATION_ID,
       limit: "100",
       ...(cursor ? { cursor } : {}),
     });
-    const data = await square.sq<{
+    return square.sq<{
       payments?: SquarePayment[];
       cursor?: string;
     }>(env, `/v2/payments?${query}`);
+  };
+  for await (const data of paged(list)) {
     for (const payment of data.payments || []) {
       try {
         await notifySale(env, { data: { object: { payment } } });
@@ -141,8 +139,7 @@ export async function mailMissedSales(env: Env) {
         );
       }
     }
-    cursor = data.cursor;
-  } while (cursor);
+  }
 }
 
 async function mailSale(
@@ -162,7 +159,7 @@ async function mailSale(
   let addressFrom = "";
   for (let i = 0; i < ADDRESS_TRIES; i++) {
     if (i > 0) {
-      await new Promise((r) => setTimeout(r, wait));
+      await sleep(wait);
       if (p.id)
         pay = (
           await square
@@ -206,8 +203,8 @@ async function mailSale(
   }
   const name =
     to?.display_name ||
-    [addr?.first_name, addr?.last_name].filter(Boolean).join(" ") ||
-    [customer?.given_name, customer?.family_name].filter(Boolean).join(" ");
+    sift([addr?.first_name, addr?.last_name]).join(" ") ||
+    sift([customer?.given_name, customer?.family_name]).join(" ");
   const email =
     pay.buyer_email_address ||
     to?.email_address ||
@@ -232,7 +229,7 @@ async function mailSale(
   // Square's fee is sometimes added to the payment a moment after it completes.
   const total = cents(pay.total_money || order.total_money);
   const fees = pay.processing_fee;
-  const fee = (fees || []).reduce((n, f) => n + cents(f.amount_money), 0);
+  const fee = sum(fees || [], (f) => cents(f.amount_money));
   const moneyRows = [
     ...(order.discounts || []).map((d) =>
       row(d.name || "Discount", -cents(d.applied_money)),
@@ -291,7 +288,7 @@ async function mailSale(
                 "SHIP TO: Square didn't pass the address along. Get it from the order in Square Dashboard before packing.",
               ]),
         "",
-        `Buyer: ${[name, email, phone].filter(Boolean).join(" · ") || "see the order in Square"}`,
+        `Buyer: ${sift([name, email, phone]).join(" · ") || "see the order in Square"}`,
         ...(pay.created_at
           ? [
               `Ordered: ${new Date(pay.created_at).toLocaleString("en-US", { timeZone: "America/Chicago", dateStyle: "medium", timeStyle: "short" })} Central`,

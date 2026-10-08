@@ -7,21 +7,22 @@ The whole thing runs on Cloudflare's free plan as one Worker: Cloudflare serves 
 **Before launch the shop lives at `https://preview.golemcraftworks.com`**, hidden from search engines, while `golemcraftworks.com` still shows the old link page. Every address in the setup steps below uses the preview address. [Going public](#going-public) lists what to change when the shop is ready for the main address.
 
 ```
-site/      The website. Static files, served by Cloudflare as they are.
+site/      The website: pages and styles as they are, scripts bundled from ts/.
   index.html            Shop (home): one tile per category
   shop/                 Category page (/shop/<category>)
   product/              Product page  (/product/<name>)
-  about/  commissions/  thanks/   Content pages
+  about/  commissions/  reviews/  shipping/  thanks/   Content pages
   styles/main.css       All styling
-  ts/config.ts          The only file you need to edit for a basic launch
-  ts/                   Shop, product, cart and form scripts (TypeScript source)
-  js/                   Built from ts/ by `npm run build`. Don't edit by hand.
+  ts/pages/             One script per page, plus config.ts (the shop's settings) and theme.ts
+  ts/                   What the pages share: api.ts (talking to the Worker), chrome.ts (header, footer, cart)
+  js/                   Built from ts/ by `npm run build`. Not in git; don't edit by hand.
   assets/               Logo, favicon, hero golem
-  data/demo-products.json   Sample products for `npm run dev` and demo mode
   .assetsignore         Files in site/ that are not published (the TypeScript source)
 worker/    Cloudflare Worker in TypeScript (Square + Etsy logic, keeps your API keys secret)
   wrangler.toml         Cloudflare settings: domain, site folder, shop options
-tools/     One-time helper to copy Etsy photos into Square
+  src/demo-products.json   Sample products for `npm run dev` and the tests
+shared/    Code the site, the Worker and the tools all use (form rules, text helpers, category order)
+tools/     One-time helpers that brought the Etsy listings and photos into Square
 ```
 
 ## Build and deploy
@@ -30,9 +31,8 @@ Needs Node 22.18 or newer. Run these from the project folder.
 
 ```bash
 npm install          # once per computer
-npm run prepare      # once per copy of the repo: turns on the pre-commit hook
 npx wrangler login   # once per computer: opens Cloudflare in your browser
-npm run deploy       # builds site/ts -> site/js, then publishes the site and the Worker together
+npm run deploy       # bundles site/ts -> site/js, then publishes the site and the Worker together
 ```
 
 `npm run deploy` is the only way anything goes live. It publishes whatever is in the folder on your computer, committed or not. Pushing to GitHub does not deploy.
@@ -40,20 +40,44 @@ npm run deploy       # builds site/ts -> site/js, then publishes the site and th
 A normal change looks like this:
 
 ```bash
-npm run watch        # rebuilds site/js as you edit site/ts (leave it running)
-npm run dev          # the site and the Worker at http://localhost:8787
-npm run typecheck    # type-check the site, the Worker and tools/
-npm test             # Worker tests against fake Square/Etsy APIs
-git commit           # the hook rebuilds site/js and adds it to the commit
+npm run dev          # the site and the Worker at http://localhost:8787, rebuilt as you edit
+npm run typecheck    # type-check the site, the Worker, shared/ and tools/
+npm test             # builds the site, then runs every test
+git commit
 git push
 npm run deploy
 ```
 
 - **What needs a deploy:** any change to `site/`, `worker/src/` or `worker/wrangler.toml`. Secrets set with `wrangler secret put` take effect at once and need no deploy.
-- **Local preview without Cloudflare:** `cd site && python3 -m http.server 8000`, then open http://localhost:8000. This serves the pages only, so it only works in demo mode (`apiBase: ""`).
-- **`npm run dev` with sample products:** with no Square token set, `npm run dev` shows the sample products in `site/data/demo-products.json` (dice sets and woodworks, with coloured squares for photos). Checkout doesn't work there.
+- **`npm run dev` with sample products:** with no Square token set, `npm run dev` shows the sample products in `worker/src/demo-products.json` (dice sets and woodworks, with coloured squares for photos). Checkout doesn't work there.
 - **`npm run dev` with real data:** put the secrets in `worker/.dev.vars`, one `NAME=value` per line. Git ignores that file. Use sandbox Square credentials there.
 - **Undo a bad deploy:** `npx wrangler rollback` from `worker/` goes back to the previous version.
+
+### Tests
+
+`npm test` covers three things, none of which touch a real account:
+
+- **The Worker** against fake Square, Etsy and Resend (`worker/test/sync.test.ts`, `reviews.test.ts`, `commission.test.ts`, `util.test.ts`).
+- **The whole shop in a pretend browser** (`worker/test/site.test.ts`): the Worker serves the real pages and scripts with the sample products, and the test clicks through them: browsing, the cart, checkout, both forms, the theme switch. It only knows what a visitor sees, so it keeps passing however the scripts are rearranged, and fails if a page stops working.
+- **The shared helpers and the import tools** (`shared/test/`, `tools/test/`).
+
+### Libraries and shared helpers
+
+The site's scripts are bundled with [esbuild](https://esbuild.github.io), so the site, the Worker and the tools can all import the same code. Two small libraries do the everyday work: [Radashi](https://radashi.js.org) for lists and objects (`sum`, `unique`, `group`, `cluster`, ...) and [Valibot](https://valibot.dev) for checking what visitors type into the forms. Before writing a helper, look for it there, then in these files:
+
+| File | What's in it |
+|---|---|
+| `shared/forms.ts` | The commission and review forms as Valibot schemas. The page checks against them before sending and the Worker checks again, so both give the same message |
+| `shared/validate.ts` | The building blocks for those (`line`, `paragraph`, `emailAddress`) and `check`, which says what's missing |
+| `shared/text.ts` | Text: `slugify`, `esc`, `csvList`, `htmlToText`, `decodeEntities` |
+| `shared/catalog.ts` | The order categories are shown in, and which photos go on a category's tile |
+| `shared/paged.ts` | Reading every page of a long Square list |
+| `worker/src/util.ts` | Replies, the activity log, signatures, the admin check and admin page, `claim` and `overLimit` (one-at-a-time and rate limits) |
+| `worker/src/email.ts` | Sending through Resend |
+| `site/ts/api.ts`, `site/ts/chrome.ts` | What the pages share: fetching and prices; the cart, form status lines, and what a product grid shows while loading or when it can't |
+| `tools/shared.ts` | Reading Etsy's CSV export and calling Square from the tools |
+
+Styling goes in `site/styles/main.css` as classes, not in `style="..."` on the page or `.style` in a script.
 
 ## How inventory stays in sync
 
@@ -128,9 +152,9 @@ npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
 npx wrangler secret put ADMIN_TOKEN           # any long random string, keep it private (weaker than most)
 ```
 
-The site is now at https://preview.golemcraftworks.com in demo mode: sample products, checkout turned off.
+The site is now at https://preview.golemcraftworks.com, showing your Square inventory.
 
-To show your real inventory, set `apiBase: "/"` in `site/ts/config.ts`, set your email, Instagram and Etsy links there too, and run `npm run deploy` from the project folder.
+Set your email, Instagram and Etsy links in `site/ts/pages/config.ts`, and run `npm run deploy` from the project folder.
 
 `SQUARE_WEBHOOK_URL` in wrangler.toml must exactly match the URL you gave Square, or webhook signatures won't verify.
 
@@ -163,12 +187,11 @@ This moves the shop from `preview.golemcraftworks.com` to `golemcraftworks.com` 
 
 Pick a quiet hour. Between steps 3 and 5 below, sale notifications from Square and Etsy have nowhere to land; the hourly check picks up anything missed. After step 3 the preview address stops working, and every address in this file that says `preview.golemcraftworks.com` becomes `golemcraftworks.com`.
 
-1. **Finish the policy page.** Fill in the two placeholders in `site/shipping/index.html` (how soon orders ship, and the return policy).
+1. **Read the policy page once more.** `site/shipping/index.html` says how soon orders ship and what the return policy is; Google requires both.
 2. **Free up the main address.** In Cloudflare DNS, delete the `A` records for `golemcraftworks.com` and `www` that point at the old link page. Keep the email records (`MX`, `TXT`). The deploy creates its own records and fails if the old ones are in the way. You can also turn off forwarding at GoDaddy; nothing uses it after this.
 3. **Switch the settings** in `worker/wrangler.toml`, then run `npm run deploy`:
    - Routes: remove the `preview.golemcraftworks.com` route and uncomment the two for `golemcraftworks.com` and `www.golemcraftworks.com`.
    - `SITE_URL = "https://golemcraftworks.com"`
-   - `ALLOWED_ORIGINS = "https://golemcraftworks.com,https://www.golemcraftworks.com"`
    - `SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"`
    - `NOINDEX = "false"`
 4. **Square.** In the Developer Console under Webhooks, edit the subscription's URL to `https://golemcraftworks.com/webhooks/square`, exactly as in `SQUARE_WEBHOOK_URL`. If you make a new subscription instead of editing, it has a new signature key: from `worker/` run `npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY`.
@@ -278,7 +301,7 @@ Things to know:
 - **Etsy cancellations** aren't added back to Square automatically. Adjust the count in Square and the sync will update Etsy.
 - **Turning an Etsy listing back on** may count as a renewal with Etsy's listing fee.
 - **Sales tax** is not added to shipped website orders, because Square can't work out tax by destination for this kind of checkout. Most ship out of state, where none is due. On orders shipped within Wisconsin you pay it out of the price; the order email marks those "WISCONSIN ORDER" so you can total them when you file. Pickup orders and in-person sales are charged the taxes set on your items in Square. The switch is `auto_apply_taxes` in `worker/src/square.ts`; turning it on for shipped orders charges every buyer your rate wherever they are.
-- **Commission form** only sends email once Resend is set up (below). In demo mode it opens the visitor's email app with the request filled in.
+- **Commission form** only sends email once Resend is set up (below). Until then it tells the visitor to email you directly.
 
 ## Commission emails
 
@@ -344,7 +367,7 @@ The reviews page shows Etsy reviews plus ones left on the site. A review left on
 Cloudflare Turnstile is a free check that the visitor is a person, usually without asking them to do anything. It's off until both keys below are set. Without it the form still has a hidden trap field, a too-fast-to-be-human timer, and a limit of three reviews a day per visitor.
 
 1. In the Cloudflare dashboard, open **Turnstile** and add a widget. Name it anything, add the hostname `golemcraftworks.com` (this covers `preview.golemcraftworks.com` too), and leave the mode on **Managed**.
-2. Copy the **site key** into `turnstileSiteKey` in `site/ts/config.ts`. This one is public, so it's fine in the repo.
+2. Copy the **site key** into `turnstileSiteKey` in `site/ts/pages/config.ts`. This one is public, so it's fine in the repo.
 3. Copy the **secret key**, then from `worker/` run `npx wrangler secret put TURNSTILE_SECRET` and paste it.
 4. Run `npm run deploy` straight after. Between steps 3 and 4 the Worker expects the check but the page doesn't show it yet, so reviews sent in that gap are refused.
 5. Open the reviews page: a small Cloudflare box appears above the Send button. Send a test review to make sure it goes through.
@@ -355,6 +378,4 @@ To turn it off again, empty `turnstileSiteKey`, run `npx wrangler secret delete 
 
 The repo is private and is only a backup and history of the source. It holds no secrets: API keys live in Cloudflare (`wrangler secret put`) and in `worker/.dev.vars`, which git ignores. Never paste a key into `wrangler.toml` or any other tracked file.
 
-`site/js/` is committed so a fresh copy of the repo can be previewed without building. The pre-commit hook in `.githooks/` rebuilds it whenever a commit touches `site/ts/`, and stops the commit if the build fails. On a new copy of the repo, run `npm install` and `npm run prepare` once.
-
-**Network share:** if the project sits on `\\openmediavault`, which doesn't allow running programs stored on it, building, type-checking and tests still work there. `npm run deploy` and `npm run dev` do not, because Wrangler's bundler is a program inside `node_modules`. Run those from a copy on a local disk, or allow execution on the share.
+`site/js/` is built, not committed. `npm run deploy`, `npm run dev` and `npm test` each build it first, so a fresh copy of the repo only needs `npm install`.

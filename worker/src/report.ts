@@ -1,8 +1,9 @@
 // Daily report: emails the shop when the sync has something that needs a look, from the same
 // information as /admin/status. A day with nothing wrong sends nothing.
 
-import { mailReady, send } from "./commission.ts";
-import { logEvent, isTrue, errMsg } from "./util.ts";
+import { group } from "radashi";
+import { mailReady, send } from "./email.ts";
+import { logEvent, isTrue, errMsg, siteUrl } from "./util.ts";
 import type {
   DraftReport,
   Env,
@@ -80,17 +81,17 @@ export async function dailyReport(env: Env) {
   );
 
   // The same failure every hour is one line, not twenty-four.
-  const failures = new Map<string, { n: number; latest: LogLine }>();
-  for (const l of (log || []).filter(
-    (l) => FAILURE.test(l.message) && Date.now() - Date.parse(l.at) < DAY_MS,
-  )) {
-    const hit = failures.get(l.message);
-    if (hit) hit.n++;
-    else failures.set(l.message, { n: 1, latest: l }); // the log is newest first
-  }
+  const failures = group(
+    (log || []).filter(
+      (l) => FAILURE.test(l.message) && Date.now() - Date.parse(l.at) < DAY_MS,
+    ),
+    (l) => l.message,
+  );
   section(
     "Failures in the last day",
-    [...failures].map(([message, { n, latest }]) => {
+    Object.entries(failures).map(([message, lines = []]) => {
+      const [latest] = lines; // the log is newest first
+      const n = lines.length;
       const error = (latest.data as { error?: string } | undefined)?.error;
       return `${message}${n > 1 ? ` (${n} times)` : ""}${error ? `: ${error}` : ""} [${latest.at}]`;
     }),
@@ -112,7 +113,7 @@ export async function dailyReport(env: Env) {
       to: [shop],
       reply_to: shop,
       subject: `Golem Craftworks sync: ${sections.length} ${sections.length === 1 ? "thing needs" : "things need"} a look`,
-      text: `${sections.join("\n\n")}\n\n--\nThe full picture is at ${(env.SITE_URL || "").replace(/\/$/, "")}/admin/status?token=YOUR_ADMIN_TOKEN\nThis is sent once a day, and only when there's something to report.`,
+      text: `${sections.join("\n\n")}\n\n--\nThe full picture is at ${siteUrl(env)}/admin/status?token=YOUR_ADMIN_TOKEN\nThis is sent once a day, and only when there's something to report.`,
     });
   } catch (e) {
     await logEvent(env, "Daily report email failed", { error: errMsg(e) });

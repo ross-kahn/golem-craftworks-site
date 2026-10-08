@@ -1,8 +1,6 @@
-// Site settings. Edit these, nothing else needs to change for a basic launch.
-// After editing, run `npm run build` to update js/config.js.
+// Site settings. After editing, `npm run deploy` puts them live.
+// This is its own script so the Worker can serve it with the shipping price filled in.
 window.GC_CONFIG = {
-  apiBase: "/",
-
   shopName: "Golem Craftworks",
   contactEmail: "ross@golemcraftworks.com",
   instagramUrl: "https://www.instagram.com/golem_craftworks/",
@@ -14,8 +12,7 @@ window.GC_CONFIG = {
 
   shippingLabel: "Flat-rate shipping, US only",
   // Don't change the price here. The Worker replaces this with SHIPPING_FLAT_CENTS from
-  // worker/wrangler.toml, the one place the shipping price is set. This number is only used
-  // in demo mode, where there is no Worker.
+  // worker/wrangler.toml, the one place the shipping price is set.
   shippingCents: 800,
   pickupLabel: "Local pickup or drop-off in Madison, WI",
   pickupNote: "I'll email you to set a time.",

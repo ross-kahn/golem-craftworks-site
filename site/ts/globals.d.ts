@@ -1,7 +1,6 @@
-// Types shared by the site scripts. Each script is a plain <script> file, so these are global.
+// Types the site scripts share. Nothing here is imported: they're global to everything in ts/.
 
 interface SiteConfig {
-  apiBase: string;
   shopName: string;
   contactEmail: string;
   instagramUrl: string;
@@ -14,7 +13,7 @@ interface SiteConfig {
   currency: string;
 }
 
-// A product as the Worker (or demo-products.json) sends it.
+// A product as the Worker sends it.
 interface RawVariation {
   id: string;
   name: string;
@@ -41,7 +40,7 @@ interface ModifierList {
 
 interface RawProduct {
   id: string;
-  slug?: string;
+  slug: string;
   name: string;
   category?: string;
   optionLabel?: string;
@@ -101,40 +100,9 @@ interface CartLine {
   max: number; // stock for the variation, shared by every line that uses it
 }
 
-interface CommissionData {
-  name: string;
-  email: string;
-  type: string;
-  idea: string;
-  when: string;
-  budget: string;
-  website: string;
-}
-
 interface ApiError extends Error {
   status?: number;
   body?: { error?: string; soldOut?: string[]; changed?: string[] } | null;
-  demo?: boolean;
-}
-
-interface GCApi {
-  getProducts(opts?: { fresh?: boolean }): Promise<Product[]>;
-  getProduct(id: string): Promise<Product | null>;
-  createCheckout(order: {
-    lines: CartLine[];
-    fulfillment: Fulfillment;
-  }): Promise<{ url?: string }>;
-  sendCommission(
-    data: CommissionData,
-  ): Promise<{ ok: boolean; confirmationSent: boolean }>;
-  getReviews(): Promise<ReviewData>;
-  sendReview(data: FormData): Promise<{ ok: boolean; review?: Review }>;
-  money(cents: number | null | undefined): string;
-  priceLabel(p: Product): string;
-  isDemo(): boolean;
-  siteRoot(): string;
-  slugify(s: string): string;
-  categoryLink(name: string): string;
 }
 
 type CartAddResult = { ok: true } | { ok: false; reason: string };
@@ -142,6 +110,7 @@ type CartAddResult = { ok: true } | { ok: false; reason: string };
 interface GCCart {
   lines(): CartLine[];
   count(): number;
+  inCart(variationId: string): number; // how many of a variation, across all of its lines
   add(
     product: Product,
     variation: Variation,
@@ -152,16 +121,6 @@ interface GCCart {
   clear(): void;
 }
 
-interface GCSite {
-  cart: GCCart;
-  openCart(): void;
-  toast(msg: string): void;
-  esc(s: unknown): string;
-  root: string;
-}
-
 interface Window {
   GC_CONFIG: SiteConfig;
-  GC_API: GCApi;
-  GC: GCSite;
 }

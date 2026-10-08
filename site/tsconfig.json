@@ -1,15 +1,15 @@
 {
-  // Compiles ts/*.ts to js/*.js, one file each. The pages load the js/ files with plain <script> tags.
+  // Type-checking only. esbuild bundles each file in ts/pages/ into js/ (see "build" in package.json).
   "compilerOptions": {
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ES2020",
-    "rootDir": "ts",
-    "outDir": "js",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "types": [],
     "strict": true,
-    "noEmitOnError": true,
-    "newLine": "lf",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
   "include": ["ts"]

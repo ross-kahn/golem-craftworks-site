@@ -1,0 +1,161 @@
+// Reviews page: the list (Etsy reviews plus ones left here) and the form to leave one.
+import * as api from "../api.ts";
+import { formStatus } from "../chrome.ts";
+import { esc } from "../../../shared/text.ts";
+import { check } from "../../../shared/validate.ts";
+import {
+  Review as ReviewForm,
+  REVIEW_MAX_PHOTOS,
+} from "../../../shared/forms.ts";
+
+const cfg = window.GC_CONFIG;
+const listEl = document.querySelector<HTMLElement>("[data-reviews]")!;
+const summaryEl = document.querySelector<HTMLElement>("[data-review-summary]")!;
+const moreBtn = document.querySelector<HTMLButtonElement>(
+  "[data-more-reviews]",
+)!;
+const etsyNote = document.querySelector<HTMLElement>("[data-etsy-note]")!;
+const form = document.querySelector<HTMLFormElement>("[data-review-form]")!;
+const status = document.querySelector<HTMLElement>("[data-form-status]")!;
+const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+const PAGE = 12;
+const opened = Date.now();
+
+// ---------- List ----------
+
+const stars = (n: number) =>
+  `<span class="stars" role="img" aria-label="${n} out of 5 stars">${"★".repeat(n)}<span class="stars__off">${"★".repeat(5 - n)}</span></span>`;
+
+function card(r: Review) {
+  const when = new Date(r.at).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+  });
+  const from = r.source === "etsy" ? "Etsy buyer" : r.name;
+  return `
+    <li class="review">
+      <p class="review__head">${stars(r.rating)}</p>
+      ${r.text ? `<p class="review__text">${esc(r.text)}</p>` : ""}
+      ${
+        r.photos.length
+          ? `<div class="review__photos">${r.photos
+              .map(
+                (src) =>
+                  `<a href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="Photo from this review" loading="lazy"></a>`,
+              )
+              .join("")}</div>`
+          : ""
+      }
+      <p class="review__by">${esc(from)}${r.product ? ` · ${esc(r.product)}` : ""} · ${esc(when)}${r.source === "etsy" ? " · on Etsy" : ""}</p>
+    </li>`;
+}
+
+let reviews: Review[] = [];
+let shown = PAGE;
+function render() {
+  listEl.innerHTML = reviews.length
+    ? reviews.slice(0, shown).map(card).join("")
+    : `<li class="empty">No reviews here yet. Yours could be the first.</li>`;
+  moreBtn.hidden = shown >= reviews.length;
+}
+moreBtn.addEventListener("click", () => {
+  shown += PAGE;
+  render();
+});
+
+api
+  .getReviews()
+  .then((data) => {
+    reviews = data.reviews;
+    const s = data.stats;
+    const parts = [
+      s.average !== null
+        ? `${stars(Math.round(s.average))} ${s.average.toFixed(1)} from ${s.count.toLocaleString("en-US")} ${s.count === 1 ? "review" : "reviews"}`
+        : "",
+      s.sales != null ? `${s.sales.toLocaleString("en-US")} sales` : "",
+    ].filter(Boolean);
+    summaryEl.innerHTML = parts.join(" · ");
+    summaryEl.hidden = !parts.length;
+    etsyNote.hidden = !reviews.some((r) => r.source === "etsy");
+    render();
+  })
+  .catch(() => {
+    listEl.innerHTML = `<li class="empty">Reviews couldn't load right now. Refresh to try again.</li>`;
+  });
+
+// ---------- Form ----------
+
+const say = formStatus(status);
+
+// Shrinks a photo in the browser before it's sent. This also drops the location data cameras embed.
+async function shrink(file: File): Promise<Blob> {
+  try {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((done) =>
+      canvas.toBlob(done, "image/jpeg", 0.85),
+    );
+    return blob || file;
+  } catch (_) {
+    return file; // the Worker checks whatever arrives
+  }
+}
+
+// Cloudflare's spam check, only when a site key is set in config.ts.
+if (cfg.turnstileSiteKey) {
+  document.querySelector<HTMLElement>("[data-turnstile]")!.innerHTML =
+    `<div class="cf-turnstile" data-sitekey="${esc(cfg.turnstileSiteKey)}"></div>`;
+  const s = document.createElement("script");
+  s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+  s.async = true;
+  document.head.appendChild(s);
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const data = new FormData(form);
+  const files = data
+    .getAll("photos")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+
+  // The same check the Worker makes when the review arrives.
+  const { missing } = check(ReviewForm, Object.fromEntries(data));
+  if (missing.length)
+    return say(`Add ${missing.join(", ")} to send your review.`, true);
+  if (files.length > REVIEW_MAX_PHOTOS)
+    return say(`Add up to ${REVIEW_MAX_PHOTOS} photos.`, true);
+
+  button.disabled = true;
+  say(files.length ? "Preparing photos…" : "Sending…");
+  try {
+    data.delete("photos");
+    for (const f of files) data.append("photos", await shrink(f), "photo.jpg");
+    data.set("elapsed", String(Date.now() - opened));
+    say("Sending…");
+    const sent = await api.sendReview(data);
+    form.reset();
+    if (sent.review) {
+      reviews.unshift(sent.review);
+      render();
+    }
+    say(
+      sent.review
+        ? "Thank you! Your review is posted."
+        : "Thank you! Your review is in.",
+    );
+  } catch (e) {
+    const err = e as ApiError;
+    say(
+      err.status && err.body && err.body.error
+        ? err.message
+        : "Your review didn't send. Try again in a moment.",
+      true,
+    );
+  } finally {
+    button.disabled = false;
+  }
+});

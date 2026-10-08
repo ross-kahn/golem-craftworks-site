@@ -2,6 +2,7 @@
 // update to the item that already carries its SKU.
 // No network here, so it can be tested; import-etsy-listings.ts does the reading and writing.
 import { norm } from "./shared.ts";
+import { csvList as list } from "../shared/text.ts";
 
 export interface PlannedVariation {
   name: string;
@@ -57,12 +58,6 @@ export function diceSetTitle(title: string): string | null {
 // Columns the import uses directly. Anything else is carried along as metadata.
 const CORE =
   /^(DESCRIPTION|PRICE|CURRENCY_CODE|QUANTITY|SKU|IMAGE\d+|VARIATION \d+ (TYPE|NAME|VALUES))$/;
-
-const list = (s: string | undefined) =>
-  (s || "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
 
 export function planListings(
   rows: Record<string, string>[],
