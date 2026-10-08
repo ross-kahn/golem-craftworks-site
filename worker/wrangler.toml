@@ -62,7 +62,7 @@ ETSY_KEYSTRING = "6ae72rteu6oiyw8qal74efaq"
 ETSY_SHOP_ID = "52196219"
 # The flat shipping price, in cents. This is the only place it's set: checkout, the cart,
 # the shipping page and the product data for search engines all read it from here.
-SHIPPING_FLAT_CENTS = "1"   # TEMPORARY for testing: put back to "800"
+SHIPPING_FLAT_CENTS = "800"  
 # The sales count on the site is Etsy's figure plus items sold in Square from this date on.
 # It's the day Etsy's own Square integration was disconnected: before then, Etsy's figure
 # already included Square sales. Empty = show Etsy's figure alone.

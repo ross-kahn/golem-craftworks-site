@@ -4,7 +4,7 @@ window.GC_CONFIG = {
   apiBase: "/",
 
   shopName: "Golem Craftworks",
-  contactEmail: "golemcraftworks@gmail.com",
+  contactEmail: "ross@golemcraftworks.com",
   instagramUrl: "https://www.instagram.com/golem_craftworks/",
   etsyUrl: "https://golemcraftworks.etsy.com",
 

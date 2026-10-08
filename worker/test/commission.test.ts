@@ -6,7 +6,7 @@ import type { Env } from "../src/types.ts";
 const env = (extra: object = {}) => ({
   RESEND_API_KEY: "re_test",
   EMAIL_FROM: "Golem Craftworks <commissions@golemcraftworks.com>",
-  COMMISSION_TO: "golemcraftworks@gmail.com",
+  COMMISSION_TO: "ross@golemcraftworks.com",
   SITE_URL: "https://golemcraftworks.com",
   ...extra
 }) as Env;
@@ -46,12 +46,12 @@ test("sends one email to the shop and one to the client", async () => {
   const res = await commission(post(valid), env());
   assert.deepEqual(await res.json(), { ok: true, confirmationSent: true });
   assert.equal(sent.length, 2);
-  assert.deepEqual(sent[0].to, ["golemcraftworks@gmail.com"]);
+  assert.deepEqual(sent[0].to, ["ross@golemcraftworks.com"]);
   assert.equal(sent[0].subject, "New commission request: Dice vault (Jane Doe)");
   assert.equal(sent[0].reply_to, "jane@example.com");
   assert.deepEqual(sent[1].to, ["jane@example.com"]);
   assert.equal(sent[1].subject, "Golem Craftworks received your commission request");
-  assert.equal(sent[1].reply_to, "golemcraftworks@gmail.com");
+  assert.equal(sent[1].reply_to, "ross@golemcraftworks.com");
   assert.match(sent[1].text, /Walnut vault with initials\./);
 });
 
@@ -70,7 +70,7 @@ test("a failed client confirmation still counts as sent", async () => {
 });
 
 test("a failed shop email is an error and the client isn't told it worked", async () => {
-  const sent = fakeResend("golemcraftworks@gmail.com");
+  const sent = fakeResend("ross@golemcraftworks.com");
   const res = await commission(post(valid), env());
   assert.equal(res.status, 502);
   assert.equal(sent.length, 0);
