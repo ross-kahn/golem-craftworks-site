@@ -53,6 +53,9 @@ function listHint(l: ModifierList) {
     : `Choose ${l.min} to ${l.max}`;
 }
 
+const chevron = (d: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+
 function render(p: Product) {
   document.title = `${p.name} · Golem Craftworks`;
   const firstAvail =
@@ -68,6 +71,12 @@ function render(p: Product) {
       <div class="gallery">
         <div class="gallery__main">
           ${images.length ? `<img src="${esc(images[0])}" alt="${esc(p.name)}" data-main>` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}
+          ${
+            images.length > 1
+              ? `<button class="gallery__nav gallery__nav--prev" type="button" data-step="-1" aria-label="Previous photo">${chevron("M15 5l-7 7 7 7")}</button>
+          <button class="gallery__nav gallery__nav--next" type="button" data-step="1" aria-label="Next photo">${chevron("M9 5l7 7-7 7")}</button>`
+              : ""
+          }
         </div>
         ${
           images.length > 1
@@ -181,6 +190,18 @@ function render(p: Product) {
     }
   }
 
+  let shown = 0;
+  function show(i: number) {
+    shown = i;
+    mount.querySelector<HTMLImageElement>("[data-main]")!.src = images[i];
+    mount.querySelectorAll<HTMLElement>("[data-thumb]").forEach((b) => {
+      const on = Number(b.dataset.thumb) === i;
+      b.setAttribute("aria-current", String(on));
+      // Keeps the strip following along when the arrows move past its edge.
+      if (on) b.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+
   mount.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.name === "variation") {
@@ -209,13 +230,11 @@ function render(p: Product) {
   mount.addEventListener("click", (e) => {
     const target = e.target as Element;
     const thumb = target.closest<HTMLElement>("[data-thumb]");
-    if (thumb) {
-      const i = Number(thumb.dataset.thumb);
-      mount.querySelector<HTMLImageElement>("[data-main]")!.src = images[i];
-      mount
-        .querySelectorAll("[data-thumb]")
-        .forEach((b) => b.setAttribute("aria-current", String(b === thumb)));
-    }
+    if (thumb) show(Number(thumb.dataset.thumb));
+    const step = target.closest<HTMLElement>("[data-step]");
+    // Stepping past either end wraps around to the other.
+    if (step)
+      show((shown + Number(step.dataset.step) + images.length) % images.length);
     if (target.closest("[data-add]")) {
       if (addBtn.dataset.view) {
         openCart();
