@@ -14,11 +14,25 @@ import type { Env, LogLine } from "../src/types.ts";
 // ---------- fakes ----------
 class KV {
   m = new Map<string, string>();
-  async get(k: string, type?: string) { const v = this.m.get(k); if (v === undefined) return null; return type === "json" ? JSON.parse(v) : v; }
-  async put(k: string, v: string) { this.m.set(k, v); }
-  async delete(k: string) { this.m.delete(k); }
+  async get(k: string, type?: string) {
+    const v = this.m.get(k);
+    if (v === undefined) return null;
+    return type === "json" ? JSON.parse(v) : v;
+  }
+  async put(k: string, v: string) {
+    this.m.set(k, v);
+  }
+  async delete(k: string) {
+    this.m.delete(k);
+  }
 }
-(globalThis as any).caches = { default: { match: async () => null, put: async () => {}, delete: async () => true } };
+(globalThis as any).caches = {
+  default: {
+    match: async () => null,
+    put: async () => {},
+    delete: async () => true,
+  },
+};
 
 // The fakes mirror raw API payloads, so they're left loosely typed.
 let state: any, calls: { method: string; url: string; body: any }[];
@@ -27,107 +41,275 @@ const LOC = "LOC1";
 function freshState() {
   return {
     catalog: [
-      item("I_DICE", "Ember dice set", [variation("V_DICE", "Default", 4500, "DICE-1", true)], { cat: "C_DICE" }),
-      item("I_YZ", "Yahtzee set", [
-        variation("V_WAL", "Walnut", 6500, "YZ-WAL", true),
-        variation("V_CHE", "Cherry", 6000, "YZ-CHE", true)
-      ], { cat: "C_GAME", image: "IMG1", lists: [
-        { modifier_list_id: "ML_DICE", min_selected_modifiers: -1, max_selected_modifiers: -1 },
-        { modifier_list_id: "ML_FINISH", ordinal: 2, modifier_overrides: [{ modifier_id: "M_GLOSS", on_by_default_override: "YES" }] },
-        { modifier_list_id: "ML_OFF", enabled: false },
-        { modifier_list_id: "ML_TEXT" }
-      ] }),
-      item("I_STICKER", "Sticker", [variation("V_STK", "Default", 300, "STK", false)], { cat: "C_MISC" }),
-      item("I_OLD", "Archived thing", [variation("V_OLD", "Default", 100, "OLD", true)], { archived: true })
+      item(
+        "I_DICE",
+        "Ember dice set",
+        [variation("V_DICE", "Default", 4500, "DICE-1", true)],
+        { cat: "C_DICE" },
+      ),
+      item(
+        "I_YZ",
+        "Yahtzee set",
+        [
+          variation("V_WAL", "Walnut", 6500, "YZ-WAL", true),
+          variation("V_CHE", "Cherry", 6000, "YZ-CHE", true),
+        ],
+        {
+          cat: "C_GAME",
+          image: "IMG1",
+          lists: [
+            {
+              modifier_list_id: "ML_DICE",
+              min_selected_modifiers: -1,
+              max_selected_modifiers: -1,
+            },
+            {
+              modifier_list_id: "ML_FINISH",
+              ordinal: 2,
+              modifier_overrides: [
+                { modifier_id: "M_GLOSS", on_by_default_override: "YES" },
+              ],
+            },
+            { modifier_list_id: "ML_OFF", enabled: false },
+            { modifier_list_id: "ML_TEXT" },
+          ],
+        },
+      ),
+      item(
+        "I_STICKER",
+        "Sticker",
+        [variation("V_STK", "Default", 300, "STK", false)],
+        { cat: "C_MISC" },
+      ),
+      item(
+        "I_OLD",
+        "Archived thing",
+        [variation("V_OLD", "Default", 100, "OLD", true)],
+        { archived: true },
+      ),
     ],
     related: [
       { id: "C_DICE", type: "CATEGORY", category_data: { name: "Dice" } },
       { id: "C_GAME", type: "CATEGORY", category_data: { name: "Game sets" } },
-      { id: "C_MISC", type: "CATEGORY", category_data: { name: "Market only" } },
+      {
+        id: "C_MISC",
+        type: "CATEGORY",
+        category_data: { name: "Market only" },
+      },
       { id: "IMG1", type: "IMAGE", image_data: { url: "https://img/yz.jpg" } },
       modifierList("ML_DICE", "Dice", { selection_type: "MULTIPLE" }, [
         modifier("M_HAND", "Handmade dice", 1500, { on_by_default: true }),
-        modifier("M_SECRET", "Staff only", 0, { hidden_online: true })
+        modifier("M_SECRET", "Staff only", 0, { hidden_online: true }),
       ]),
       modifierList("ML_FINISH", "Finish", { selection_type: "SINGLE" }, [
         modifier("M_SATIN", "Satin", 0, { on_by_default: true }),
-        modifier("M_GLOSS", "Gloss", 500)
+        modifier("M_GLOSS", "Gloss", 500),
       ]),
       modifierList("ML_OFF", "Turned off", {}, [modifier("M_OFF", "Off", 100)]),
-      modifierList("ML_TEXT", "Engraving text", { modifier_type: "TEXT" }, [])
+      modifierList("ML_TEXT", "Engraving text", { modifier_type: "TEXT" }, []),
     ],
     counts: { V_DICE: 1, V_WAL: 3, V_CHE: 0, V_OLD: 5 },
     listings: {
-      101: { listing_id: 101, state: "active", quantity: 1, skus: ["DICE-1"], title: "Ember" },
-      202: { listing_id: 202, state: "active", quantity: 5, skus: ["YZ-WAL", "YZ-CHE"], title: "Yahtzee" },
-      303: { listing_id: 303, state: "active", quantity: 9, skus: ["STK"], title: "Sticker" }
+      101: {
+        listing_id: 101,
+        state: "active",
+        quantity: 1,
+        skus: ["DICE-1"],
+        title: "Ember",
+      },
+      202: {
+        listing_id: 202,
+        state: "active",
+        quantity: 5,
+        skus: ["YZ-WAL", "YZ-CHE"],
+        title: "Yahtzee",
+      },
+      303: {
+        listing_id: 303,
+        state: "active",
+        quantity: 9,
+        skus: ["STK"],
+        title: "Sticker",
+      },
     },
     inventories: {
       101: inv([["DICE-1", 1, true]]),
-      202: inv([["YZ-WAL", 3, true, 513], ["YZ-CHE", 2, true, 514]]),
-      303: inv([["STK", 9, true]])
+      202: inv([
+        ["YZ-WAL", 3, true, 513],
+        ["YZ-CHE", 2, true, 514],
+      ]),
+      303: inv([["STK", 9, true]]),
     },
     receipts: [],
     drafts: [],
-    images: {} as Record<string, { listing_image_id: number; rank: number; text: string }[]>, // Etsy's photos, by listing
+    images: {} as Record<
+      string,
+      { listing_image_id: number; rank: number; text: string }[]
+    >, // Etsy's photos, by listing
     imageIds: 0,
     squareAdjustments: [],
-    paymentLinks: []
+    paymentLinks: [],
   };
 }
 
-function item(id: string, name: string, variations: object[],
-  { cat, image, archived, lists }: { cat?: string; image?: string; archived?: boolean; lists?: object[] } = {}) {
-  return { id, type: "ITEM", updated_at: "2026-09-01T00:00:00Z", present_at_all_locations: true,
-    item_data: { name, description_plaintext: `${name} description`, is_archived: !!archived,
-      categories: cat ? [{ id: cat }] : [], image_ids: image ? [image] : [], variations, modifier_list_info: lists || [] } };
+function item(
+  id: string,
+  name: string,
+  variations: object[],
+  {
+    cat,
+    image,
+    archived,
+    lists,
+  }: {
+    cat?: string;
+    image?: string;
+    archived?: boolean;
+    lists?: object[];
+  } = {},
+) {
+  return {
+    id,
+    type: "ITEM",
+    updated_at: "2026-09-01T00:00:00Z",
+    present_at_all_locations: true,
+    item_data: {
+      name,
+      description_plaintext: `${name} description`,
+      is_archived: !!archived,
+      categories: cat ? [{ id: cat }] : [],
+      image_ids: image ? [image] : [],
+      variations,
+      modifier_list_info: lists || [],
+    },
+  };
 }
-function modifierList(id: string, name: string, data: object, modifiers: object[]) {
-  return { id, type: "MODIFIER_LIST", present_at_all_locations: true, modifier_list_data: { name, ...data, modifiers } };
+function modifierList(
+  id: string,
+  name: string,
+  data: object,
+  modifiers: object[],
+) {
+  return {
+    id,
+    type: "MODIFIER_LIST",
+    present_at_all_locations: true,
+    modifier_list_data: { name, ...data, modifiers },
+  };
 }
 function modifier(id: string, name: string, price: number, data: object = {}) {
-  return { id, type: "MODIFIER", present_at_all_locations: true,
-    modifier_data: { name, price_money: { amount: price, currency: "USD" }, ...data } };
+  return {
+    id,
+    type: "MODIFIER",
+    present_at_all_locations: true,
+    modifier_data: {
+      name,
+      price_money: { amount: price, currency: "USD" },
+      ...data,
+    },
+  };
 }
-function variation(id: string, name: string, price: number, sku: string, track: boolean) {
-  return { id, type: "ITEM_VARIATION", present_at_all_locations: true,
-    item_variation_data: { name, sku, price_money: { amount: price, currency: "USD" }, pricing_type: "FIXED_PRICING", track_inventory: track } };
+function variation(
+  id: string,
+  name: string,
+  price: number,
+  sku: string,
+  track: boolean,
+) {
+  return {
+    id,
+    type: "ITEM_VARIATION",
+    present_at_all_locations: true,
+    item_variation_data: {
+      name,
+      sku,
+      price_money: { amount: price, currency: "USD" },
+      pricing_type: "FIXED_PRICING",
+      track_inventory: track,
+    },
+  };
 }
-function inv(rows: [sku: string, qty: number, enabled: boolean, valueId?: number][]) {
+function inv(
+  rows: [sku: string, qty: number, enabled: boolean, valueId?: number][],
+) {
   return {
     products: rows.map(([sku, qty, enabled, valueId], i) => ({
-      product_id: 9000 + i, sku, is_deleted: false,
-      property_values: valueId ? [{ property_id: 200, property_name: "Wood", scale_id: null, scale_name: null, value_ids: [valueId], values: [sku] }] : [],
-      offerings: [{ offering_id: 7000 + i, quantity: qty, is_enabled: enabled, is_deleted: false, price: { amount: 6500, divisor: 100, currency_code: "USD" } }]
+      product_id: 9000 + i,
+      sku,
+      is_deleted: false,
+      property_values: valueId
+        ? [
+            {
+              property_id: 200,
+              property_name: "Wood",
+              scale_id: null,
+              scale_name: null,
+              value_ids: [valueId],
+              values: [sku],
+            },
+          ]
+        : [],
+      offerings: [
+        {
+          offering_id: 7000 + i,
+          quantity: qty,
+          is_enabled: enabled,
+          is_deleted: false,
+          price: { amount: 6500, divisor: 100, currency_code: "USD" },
+        },
+      ],
     })),
-    price_on_property: [], quantity_on_property: rows.length > 1 ? [200] : [], sku_on_property: rows.length > 1 ? [200] : []
+    price_on_property: [],
+    quantity_on_property: rows.length > 1 ? [200] : [],
+    sku_on_property: rows.length > 1 ? [200] : [],
   };
 }
 
-const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+const ok = (body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 
 globalThis.fetch = (async (input: unknown, init: any = {}) => {
   const url = String(input);
   const method = init.method || "GET";
-  const body = init.body && init.headers && String(init.headers["content-type"]).includes("json") ? JSON.parse(init.body) : init.body;
+  const body =
+    init.body &&
+    init.headers &&
+    String(init.headers["content-type"]).includes("json")
+      ? JSON.parse(init.body)
+      : init.body;
   calls.push({ method, url, body });
 
   // ---- Square ----
   if (url.endsWith("/v2/catalog/search")) {
     if (body.object_types[0] === "ITEM_VARIATION") {
       const sku = body.query.exact_query.attribute_value;
-      const v = state.catalog.flatMap((i: any) => i.item_data.variations).find((x: any) => x.item_variation_data.sku === sku);
+      const v = state.catalog
+        .flatMap((i: any) => i.item_data.variations)
+        .find((x: any) => x.item_variation_data.sku === sku);
       return ok({ objects: v ? [v] : [] });
     }
     return ok({ objects: state.catalog, related_objects: state.related });
   }
   if (url.endsWith("/v2/catalog/batch-retrieve")) {
     const all = state.catalog.flatMap((i: any) => i.item_data.variations);
-    return ok({ objects: all.filter((v: any) => body.object_ids.includes(v.id)) });
+    return ok({
+      objects: all.filter((v: any) => body.object_ids.includes(v.id)),
+    });
   }
   if (url.endsWith("/v2/inventory/counts/batch-retrieve")) {
-    return ok({ counts: body.catalog_object_ids.filter((id: string) => id in state.counts)
-      .map((id: string) => ({ catalog_object_id: id, location_id: LOC, state: "IN_STOCK", quantity: String(state.counts[id]) })) });
+    return ok({
+      counts: body.catalog_object_ids
+        .filter((id: string) => id in state.counts)
+        .map((id: string) => ({
+          catalog_object_id: id,
+          location_id: LOC,
+          state: "IN_STOCK",
+          quantity: String(state.counts[id]),
+        })),
+    });
   }
   if (url.endsWith("/v2/inventory/changes/batch-create")) {
     state.squareAdjustments.push(body);
@@ -137,7 +319,9 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
   }
   if (url.endsWith("/v2/online-checkout/payment-links")) {
     state.paymentLinks.push(body);
-    return ok({ payment_link: { id: "PL1", url: "https://square.link/u/abc" } });
+    return ok({
+      payment_link: { id: "PL1", url: "https://square.link/u/abc" },
+    });
   }
 
   // ---- Etsy ----
@@ -145,36 +329,71 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
     assert.equal(init.headers["x-api-key"], "KEY:SECRET");
     let m: RegExpMatchArray | null;
     if ((m = url.match(/\/shops\/\d+\/listings\?state=(\w+)/))) {
-      return ok({ count: 0, results: Object.values(state.listings).filter((l: any) => l.state === m![1]) });
+      return ok({
+        count: 0,
+        results: Object.values(state.listings).filter(
+          (l: any) => l.state === m![1],
+        ),
+      });
     }
     if ((m = url.match(/\/listings\/(\d+)\/inventory$/))) {
-      if (method === "PUT") { state.inventories[m[1]] = { ...state.inventories[m[1]], put: body }; return ok({}); }
+      if (method === "PUT") {
+        state.inventories[m[1]] = { ...state.inventories[m[1]], put: body };
+        return ok({});
+      }
       return ok(structuredClone(state.inventories[m[1]]));
     }
     if (/\/shops\/\d+\/listings$/.test(url) && method === "POST") {
       const id = 900 + state.drafts.length;
       const form = Object.fromEntries(new URLSearchParams(init.body));
       state.drafts.push({ id, form, photos: [] });
-      state.listings[id] = { listing_id: id, state: "draft", title: form.title, skus: [] };
+      state.listings[id] = {
+        listing_id: id,
+        state: "draft",
+        title: form.title,
+        skus: [],
+      };
       return ok(state.listings[id]);
     }
-    if ((m = url.match(/\/shops\/\d+\/listings\/(\d+)\/images$/)) && method === "POST") {
-      const rank = Number(init.body.get("rank")), text = await init.body.get("image").text();
-      state.drafts.find((d: any) => d.id === Number(m![1]))?.photos.push(`${rank}:${text}`);
+    if (
+      (m = url.match(/\/shops\/\d+\/listings\/(\d+)\/images$/)) &&
+      method === "POST"
+    ) {
+      const rank = Number(init.body.get("rank")),
+        text = await init.body.get("image").text();
+      state.drafts
+        .find((d: any) => d.id === Number(m![1]))
+        ?.photos.push(`${rank}:${text}`);
       const held = (state.images[m[1]] ||= []);
-      if (init.body.get("overwrite") === "true") state.images[m[1]] = held.filter((i: any) => i.rank !== rank);
-      state.images[m[1]].push({ listing_image_id: ++state.imageIds, rank, text });
+      if (init.body.get("overwrite") === "true")
+        state.images[m[1]] = held.filter((i: any) => i.rank !== rank);
+      state.images[m[1]].push({
+        listing_image_id: ++state.imageIds,
+        rank,
+        text,
+      });
       return ok({});
     }
-    if ((m = url.match(/\/shops\/\d+\/listings\/(\d+)\/images\/(\d+)$/)) && method === "DELETE") {
-      state.images[m[1]] = state.images[m[1]].filter((i: any) => i.listing_image_id !== Number(m![2]));
+    if (
+      (m = url.match(/\/shops\/\d+\/listings\/(\d+)\/images\/(\d+)$/)) &&
+      method === "DELETE"
+    ) {
+      state.images[m[1]] = state.images[m[1]].filter(
+        (i: any) => i.listing_image_id !== Number(m![2]),
+      );
       return new Response(null, { status: 204 });
     }
     if ((m = url.match(/\/listings\/(\d+)\/images$/))) {
-      if (!state.listings[m[1]]) return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
+      if (!state.listings[m[1]])
+        return new Response(JSON.stringify({ error: "Not found" }), {
+          status: 404,
+        });
       return ok({ results: structuredClone(state.images[m[1]] || []) });
     }
-    if ((m = url.match(/\/shops\/\d+\/listings\/(\d+)$/)) && method === "PATCH") {
+    if (
+      (m = url.match(/\/shops\/\d+\/listings\/(\d+)$/)) &&
+      method === "PATCH"
+    ) {
       const st = new URLSearchParams(init.body).get("state");
       state.listings[m[1]].state = st;
       return ok(state.listings[m[1]]);
@@ -190,30 +409,68 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
 
 function makeEnv(extra: Partial<Env> = {}): Env {
   const kv = new KV();
-  kv.m.set("etsy:tokens", JSON.stringify({ access_token: "AT", refresh_token: "RT", expires_at: Date.now() + 3600e3 }));
+  kv.m.set(
+    "etsy:tokens",
+    JSON.stringify({
+      access_token: "AT",
+      refresh_token: "RT",
+      expires_at: Date.now() + 3600e3,
+    }),
+  );
   return {
-    GC_KV: kv as unknown as KVNamespace, SQUARE_ACCESS_TOKEN: "sq", SQUARE_LOCATION_ID: LOC, SQUARE_ENV: "sandbox",
-    SQUARE_WEBHOOK_SIGNATURE_KEY: "sigkey", SQUARE_WEBHOOK_URL: "https://w.example/webhooks/square",
-    ETSY_KEYSTRING: "KEY", ETSY_SHARED_SECRET: "SECRET", ETSY_SHOP_ID: "55",
-    ETSY_WEBHOOK_SECRET: "whsec_" + Buffer.from("etsy-secret-bytes").toString("base64"),
-    SITE_URL: "https://golemcraftworks.com", ALLOWED_ORIGINS: "https://golemcraftworks.com",
-    SHIPPING_FLAT_CENTS: "800", HIDDEN_CATEGORIES: "Market only", ADMIN_TOKEN: "admintoken",
-    SYNC_DRY_RUN: "false", ...extra
+    GC_KV: kv as unknown as KVNamespace,
+    SQUARE_ACCESS_TOKEN: "sq",
+    SQUARE_LOCATION_ID: LOC,
+    SQUARE_ENV: "sandbox",
+    SQUARE_WEBHOOK_SIGNATURE_KEY: "sigkey",
+    SQUARE_WEBHOOK_URL: "https://w.example/webhooks/square",
+    ETSY_KEYSTRING: "KEY",
+    ETSY_SHARED_SECRET: "SECRET",
+    ETSY_SHOP_ID: "55",
+    ETSY_WEBHOOK_SECRET:
+      "whsec_" + Buffer.from("etsy-secret-bytes").toString("base64"),
+    SITE_URL: "https://golemcraftworks.com",
+    ALLOWED_ORIGINS: "https://golemcraftworks.com",
+    SHIPPING_FLAT_CENTS: "800",
+    HIDDEN_CATEGORIES: "Market only",
+    ADMIN_TOKEN: "admintoken",
+    SYNC_DRY_RUN: "false",
+    ...extra,
   };
 }
-const ctx = () => { const p: Promise<unknown>[] = []; return { waitUntil: (x: Promise<unknown>) => { p.push(x); }, done: () => Promise.all(p) }; };
+const ctx = () => {
+  const p: Promise<unknown>[] = [];
+  return {
+    waitUntil: (x: Promise<unknown>) => {
+      p.push(x);
+    },
+    done: () => Promise.all(p),
+  };
+};
 
-beforeEach(() => { state = freshState(); calls = []; });
+beforeEach(() => {
+  state = freshState();
+  calls = [];
+});
 
 // ---------- tests ----------
 
 test("storefront: hides archived and hidden-category items, keeps stock and untracked items", async () => {
   const { products, skuMap, tracked } = await square.buildStorefront(makeEnv());
-  assert.deepEqual(products.map((p) => p.name).sort(), ["Ember dice set", "Yahtzee set"]);
+  assert.deepEqual(products.map((p) => p.name).sort(), [
+    "Ember dice set",
+    "Yahtzee set",
+  ]);
   const yz = products.find((p) => p.id === "I_YZ")!;
   assert.equal(yz.category, "Game sets");
   assert.deepEqual(yz.images, ["https://img/yz.jpg"]);
-  assert.deepEqual(yz.variations.map((v) => [v.name, v.qty, v.priceCents]), [["Walnut", 3, 6500], ["Cherry", 0, 6000]]);
+  assert.deepEqual(
+    yz.variations.map((v) => [v.name, v.qty, v.priceCents]),
+    [
+      ["Walnut", 3, 6500],
+      ["Cherry", 0, 6000],
+    ],
+  );
   assert.equal(skuMap["STK"], "V_STK", "hidden items still map for Etsy sales");
   assert.equal(tracked.has("V_STK"), false);
 });
@@ -221,17 +478,25 @@ test("storefront: hides archived and hidden-category items, keeps stock and untr
 test("storefront: an item marked sold out in Square shows as sold, even when stock isn't counted", async () => {
   const sticker = state.catalog[2];
   sticker.item_data.categories = [{ id: "C_DICE" }]; // otherwise hidden; its stock isn't tracked
-  const qty = async () => (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_STICKER")!.variations[0].qty;
+  const qty = async () =>
+    (await square.buildStorefront(makeEnv())).products.find(
+      (p) => p.id === "I_STICKER",
+    )!.variations[0].qty;
   assert.equal(await qty(), null);
-  sticker.item_data.variations[0].item_variation_data.location_overrides = [{ location_id: LOC, sold_out: true }];
+  sticker.item_data.variations[0].item_variation_data.location_overrides = [
+    { location_id: LOC, sold_out: true },
+  ];
   assert.equal(await qty(), 0);
 });
 
 test("storefront: newest pieces come first, and editing one doesn't move it", async () => {
   const [dice, yahtzee] = state.catalog;
-  dice.created_at = "2026-03-01T00:00:00Z"; dice.updated_at = "2026-10-06T00:00:00Z"; // old, just edited
-  yahtzee.created_at = "2026-09-15T00:00:00Z"; yahtzee.updated_at = "2026-09-15T00:00:00Z";
-  const order = async () => (await square.buildStorefront(makeEnv())).products.map((p) => p.id);
+  dice.created_at = "2026-03-01T00:00:00Z";
+  dice.updated_at = "2026-10-06T00:00:00Z"; // old, just edited
+  yahtzee.created_at = "2026-09-15T00:00:00Z";
+  yahtzee.updated_at = "2026-09-15T00:00:00Z";
+  const order = async () =>
+    (await square.buildStorefront(makeEnv())).products.map((p) => p.id);
   assert.deepEqual(await order(), ["I_YZ", "I_DICE"]);
   // Added in the same batch: alphabetical, so the order is steady.
   dice.created_at = yahtzee.created_at;
@@ -241,28 +506,52 @@ test("storefront: newest pieces come first, and editing one doesn't move it", as
 test("storefront: descriptions keep their paragraphs", async () => {
   const d = state.catalog[1].item_data;
   d.description_plaintext = "One.\nTwo:\nA, B\nThree & <four>";
-  d.description_html = "<p>One.</p><p>Two:<br>A, B</p>\n<ul><li>Walnut</li><li>Maple</li></ul><p>Three &amp; &lt;four&gt; &#39;five&#39;&nbsp;six</p>";
-  const text = async () => (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_YZ")!.description;
-  assert.equal(await text(), "One.\n\nTwo:\nA, B\n\n- Walnut\n- Maple\n\nThree & <four> 'five' six");
+  d.description_html =
+    "<p>One.</p><p>Two:<br>A, B</p>\n<ul><li>Walnut</li><li>Maple</li></ul><p>Three &amp; &lt;four&gt; &#39;five&#39;&nbsp;six</p>";
+  const text = async () =>
+    (await square.buildStorefront(makeEnv())).products.find(
+      (p) => p.id === "I_YZ",
+    )!.description;
+  assert.equal(
+    await text(),
+    "One.\n\nTwo:\nA, B\n\n- Walnut\n- Maple\n\nThree & <four> 'five' six",
+  );
   delete d.description_html;
-  assert.equal(await text(), "One.\nTwo:\nA, B\nThree & <four>", "plain text is the fallback");
+  assert.equal(
+    await text(),
+    "One.\nTwo:\nA, B\nThree & <four>",
+    "plain text is the fallback",
+  );
 });
 
 test("storefront: dice sets share one description, with Square's text as the set-specific part", async () => {
   const d = state.catalog[0].item_data;
   d.name = '"EMBER" TTRPG Dice Set';
   d.description_html = "<p>Glows like a $5 campfire.</p>";
-  const text = async () => (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_DICE")!.description;
+  const text = async () =>
+    (await square.buildStorefront(makeEnv())).products.find(
+      (p) => p.id === "I_DICE",
+    )!.description;
   const paragraphs = (await text()).split("\n\n");
-  assert.deepEqual(paragraphs.slice(0, 3), ["EMBER 8-Piece Dice Set", "Tabletop Gaming Dice for Dungeons & Dragons (D&D), Pathfinder, Call of Cthulhu, Shadowrun, and more", "Glows like a $5 campfire."]);
+  assert.deepEqual(paragraphs.slice(0, 3), [
+    "EMBER 8-Piece Dice Set",
+    "Tabletop Gaming Dice for Dungeons & Dragons (D&D), Pathfinder, Call of Cthulhu, Shadowrun, and more",
+    "Glows like a $5 campfire.",
+  ]);
   assert.equal(paragraphs.at(-1), "Thanks for checking out my work!");
 
   // A description not yet trimmed in Square doesn't say everything twice.
-  d.description_html = "<p>EMBER 8-Piece Dice Set</p><p>Glows like a $5 campfire.</p><p>Thanks for checking out my work, cheers!</p>";
+  d.description_html =
+    "<p>EMBER 8-Piece Dice Set</p><p>Glows like a $5 campfire.</p><p>Thanks for checking out my work, cheers!</p>";
   assert.deepEqual((await text()).split("\n\n"), paragraphs);
 
-  delete d.description_html; d.description_plaintext = "";
-  assert.deepEqual((await text()).split("\n\n"), paragraphs.filter((p) => !p.startsWith("Glows")), "nothing set-specific: the template alone");
+  delete d.description_html;
+  d.description_plaintext = "";
+  assert.deepEqual(
+    (await text()).split("\n\n"),
+    paragraphs.filter((p) => !p.startsWith("Glows")),
+    "nothing set-specific: the template alone",
+  );
 });
 
 test("storefront: modifier lists carry Square's defaults and limits", async () => {
@@ -270,18 +559,41 @@ test("storefront: modifier lists carry Square's defaults and limits", async () =
   assert.deepEqual(products.find((p) => p.id === "I_DICE")!.modifierLists, []);
   assert.deepEqual(products.find((p) => p.id === "I_YZ")!.modifierLists, [
     // Hidden-online modifiers are dropped; the list's own default applies.
-    { id: "ML_DICE", name: "Dice", min: 0, max: 1, modifiers: [{ id: "M_HAND", name: "Handmade dice", priceCents: 1500, default: true }] },
+    {
+      id: "ML_DICE",
+      name: "Dice",
+      min: 0,
+      max: 1,
+      modifiers: [
+        {
+          id: "M_HAND",
+          name: "Handmade dice",
+          priceCents: 1500,
+          default: true,
+        },
+      ],
+    },
     // Pick-one list: the item's override turns Gloss on, and only one default survives.
-    { id: "ML_FINISH", name: "Finish", min: 0, max: 1, modifiers: [
-      { id: "M_SATIN", name: "Satin", priceCents: 0, default: true },
-      { id: "M_GLOSS", name: "Gloss", priceCents: 500, default: false }
-    ] }
+    {
+      id: "ML_FINISH",
+      name: "Finish",
+      min: 0,
+      max: 1,
+      modifiers: [
+        { id: "M_SATIN", name: "Satin", priceCents: 0, default: true },
+        { id: "M_GLOSS", name: "Gloss", priceCents: 500, default: false },
+      ],
+    },
   ]);
 
   // The item's own min/max win over the list's.
   state.catalog[1].item_data.modifier_list_info[1].min_selected_modifiers = 1;
-  state.related.find((r: any) => r.id === "ML_DICE").modifier_list_data.modifiers[0].modifier_data.on_by_default = false;
-  const again = (await square.buildStorefront(makeEnv())).products.find((p) => p.id === "I_YZ")!.modifierLists;
+  state.related.find(
+    (r: any) => r.id === "ML_DICE",
+  ).modifier_list_data.modifiers[0].modifier_data.on_by_default = false;
+  const again = (await square.buildStorefront(makeEnv())).products.find(
+    (p) => p.id === "I_YZ",
+  )!.modifierLists;
   assert.deepEqual([again[1].min, again[1].max], [1, 1]);
   assert.equal(again[0].modifiers[0].default, false);
 });
@@ -300,12 +612,18 @@ test("Square -> Etsy: variation sells out, offering disabled and read-only field
   assert.deepEqual(r.plan, ["set-quantity"]);
   const put = state.inventories[202].put;
   const che = put.products.find((p: any) => p.sku === "YZ-CHE");
-  assert.deepEqual(che.offerings, [{ price: 65, quantity: 0, is_enabled: false }]);
+  assert.deepEqual(che.offerings, [
+    { price: 65, quantity: 0, is_enabled: false },
+  ]);
   assert.equal("product_id" in che, false);
   assert.equal("offering_id" in che.offerings[0], false);
   assert.deepEqual(che.property_values[0].value_ids, [514]);
   const wal = put.products.find((p: any) => p.sku === "YZ-WAL");
-  assert.deepEqual(wal.offerings, [{ price: 65, quantity: 3, is_enabled: true }], "other variations untouched");
+  assert.deepEqual(
+    wal.offerings,
+    [{ price: 65, quantity: 3, is_enabled: true }],
+    "other variations untouched",
+  );
   assert.deepEqual(put.quantity_on_property, [200]);
 });
 
@@ -321,12 +639,19 @@ test("Square -> Etsy: a restock updates the count but never puts the listing bac
   const r = await pushToEtsy(env, "DICE-1", 2);
   assert.deepEqual(r.plan, ["set-quantity"]);
   assert.equal(state.inventories[101].put.products[0].offerings[0].quantity, 2);
-  assert.equal(state.listings[101].state, "inactive", "left for publishing by hand");
+  assert.equal(
+    state.listings[101].state,
+    "inactive",
+    "left for publishing by hand",
+  );
 
   // One that Etsy marked sold out isn't written to at all.
   state.listings[101].state = "sold_out";
   const writes = calls.filter((c) => c.method !== "GET").length;
-  assert.equal((await pushToEtsy(env, "DICE-1", 3)).skipped, "sold-out-on-etsy");
+  assert.equal(
+    (await pushToEtsy(env, "DICE-1", 3)).skipped,
+    "sold-out-on-etsy",
+  );
   assert.equal(calls.filter((c) => c.method !== "GET").length, writes);
 });
 
@@ -341,7 +666,11 @@ test("dry run changes nothing", async () => {
 
 test("Etsy -> Square: sale recorded once even if delivered twice", async () => {
   const env = makeEnv();
-  const receipt = { receipt_id: 777, is_paid: true, transactions: [{ transaction_id: 1, sku: "YZ-WAL", quantity: 1 }] };
+  const receipt = {
+    receipt_id: 777,
+    is_paid: true,
+    transactions: [{ transaction_id: 1, sku: "YZ-WAL", quantity: 1 }],
+  };
   await recordEtsyReceipt(env, receipt);
   const again = await recordEtsyReceipt(env, receipt);
   assert.equal(again.skipped, "already-recorded");
@@ -355,38 +684,108 @@ test("Etsy -> Square: sale recorded once even if delivered twice", async () => {
 test("Square webhook: valid signature accepted, Etsy updated from live count", async () => {
   const env = makeEnv();
   state.counts.V_DICE = 0; // sold at a market
-  const event = { event_id: "e1", type: "inventory.count.updated", data: { object: { inventory_counts: [
-    { catalog_object_id: "V_DICE", catalog_object_type: "ITEM_VARIATION", location_id: LOC, state: "IN_STOCK", quantity: "1" } // stale payload
-  ] } } };
+  const event = {
+    event_id: "e1",
+    type: "inventory.count.updated",
+    data: {
+      object: {
+        inventory_counts: [
+          {
+            catalog_object_id: "V_DICE",
+            catalog_object_type: "ITEM_VARIATION",
+            location_id: LOC,
+            state: "IN_STOCK",
+            quantity: "1",
+          }, // stale payload
+        ],
+      },
+    },
+  };
   const raw = JSON.stringify(event);
-  const sig = createHmac("sha256", "sigkey").update(env.SQUARE_WEBHOOK_URL + raw).digest("base64");
+  const sig = createHmac("sha256", "sigkey")
+    .update(env.SQUARE_WEBHOOK_URL + raw)
+    .digest("base64");
   const c = ctx();
-  const res = await worker.fetch(new Request("https://w.example/webhooks/square", {
-    method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": sig } }), env, c);
+  const res = await worker.fetch(
+    new Request("https://w.example/webhooks/square", {
+      method: "POST",
+      body: raw,
+      headers: { "x-square-hmacsha256-signature": sig },
+    }),
+    env,
+    c,
+  );
   assert.equal(res.status, 200);
   await c.done();
-  assert.equal(state.listings[101].state, "inactive", "used live count 0, not stale payload 1");
+  assert.equal(
+    state.listings[101].state,
+    "inactive",
+    "used live count 0, not stale payload 1",
+  );
 
-  const bad = await worker.fetch(new Request("https://w.example/webhooks/square", {
-    method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": "nope" } }), env, ctx());
+  const bad = await worker.fetch(
+    new Request("https://w.example/webhooks/square", {
+      method: "POST",
+      body: raw,
+      headers: { "x-square-hmacsha256-signature": "nope" },
+    }),
+    env,
+    ctx(),
+  );
   assert.equal(bad.status, 401);
 });
 
 test("Etsy webhook: signature verified per Etsy's scheme and sale recorded", async () => {
   const env = makeEnv();
-  state.receipts = [{ receipt_id: 888, is_paid: true, transactions: [{ transaction_id: 5, sku: "DICE-1", quantity: 1 }] }];
-  const raw = JSON.stringify({ event_type: "order.paid", resource_url: "https://openapi.etsy.com/v3/application/shops/55/receipts/888", shop_id: 55 });
-  const id = "msg_1", ts = String(Math.floor(Date.now() / 1000));
-  const sig = createHmac("sha256", Buffer.from("etsy-secret-bytes")).update(`${id}.${ts}.${raw}`).digest("base64");
+  state.receipts = [
+    {
+      receipt_id: 888,
+      is_paid: true,
+      transactions: [{ transaction_id: 5, sku: "DICE-1", quantity: 1 }],
+    },
+  ];
+  const raw = JSON.stringify({
+    event_type: "order.paid",
+    resource_url:
+      "https://openapi.etsy.com/v3/application/shops/55/receipts/888",
+    shop_id: 55,
+  });
+  const id = "msg_1",
+    ts = String(Math.floor(Date.now() / 1000));
+  const sig = createHmac("sha256", Buffer.from("etsy-secret-bytes"))
+    .update(`${id}.${ts}.${raw}`)
+    .digest("base64");
   const c = ctx();
-  const res = await worker.fetch(new Request("https://w.example/webhooks/etsy", {
-    method: "POST", body: raw, headers: { "webhook-id": id, "webhook-timestamp": ts, "webhook-signature": `v1,${sig}` } }), env, c);
+  const res = await worker.fetch(
+    new Request("https://w.example/webhooks/etsy", {
+      method: "POST",
+      body: raw,
+      headers: {
+        "webhook-id": id,
+        "webhook-timestamp": ts,
+        "webhook-signature": `v1,${sig}`,
+      },
+    }),
+    env,
+    c,
+  );
   assert.equal(res.status, 200);
   await c.done();
   assert.equal(state.counts.V_DICE, 0);
 
-  const stale = await worker.fetch(new Request("https://w.example/webhooks/etsy", {
-    method: "POST", body: raw, headers: { "webhook-id": id, "webhook-timestamp": "1000", "webhook-signature": `v1,${sig}` } }), env, ctx());
+  const stale = await worker.fetch(
+    new Request("https://w.example/webhooks/etsy", {
+      method: "POST",
+      body: raw,
+      headers: {
+        "webhook-id": id,
+        "webhook-timestamp": "1000",
+        "webhook-signature": `v1,${sig}`,
+      },
+    }),
+    env,
+    ctx(),
+  );
   assert.equal(stale.status, 401, "old timestamps rejected");
 });
 
@@ -395,66 +794,166 @@ test("hourly check: catches a missed Etsy sale, matches Etsy to Square, never re
   // Etsy shows 5 Yahtzee sets but Square has 3 (+0 cherry): should lower cherry to 0 disabled.
   // Sticker is untracked in Square: must be left alone even though Square has no count.
   // A missed Etsy sale of the dice: should be recorded in Square first.
-  state.receipts = [{ receipt_id: 999, is_paid: true, transactions: [{ transaction_id: 9, sku: "DICE-1", quantity: 1 }] }];
+  state.receipts = [
+    {
+      receipt_id: 999,
+      is_paid: true,
+      transactions: [{ transaction_id: 9, sku: "DICE-1", quantity: 1 }],
+    },
+  ];
   state.listings[101].state = "sold_out"; // Etsy marked it sold
   const report = await reconcile(env);
   assert.equal(state.counts.V_DICE, 0, "missed Etsy sale recorded");
-  assert.deepEqual(report.changed.map((l) => [l.sku, l.from, l.to]), [["YZ-CHE", 2, 0]]);
-  assert.equal(state.listings[303].state, "active", "untracked sticker untouched");
-  assert.equal(state.listings[101].state, "sold_out", "sold piece not relisted");
+  assert.deepEqual(
+    report.changed.map((l) => [l.sku, l.from, l.to]),
+    [["YZ-CHE", 2, 0]],
+  );
+  assert.equal(
+    state.listings[303].state,
+    "active",
+    "untracked sticker untouched",
+  );
+  assert.equal(
+    state.listings[101].state,
+    "sold_out",
+    "sold piece not relisted",
+  );
   assert.deepEqual(report.etsyOnly, []);
   assert.deepEqual(report.notPublished, []);
 
   // A restock in Square raises Etsy, variation by variation, even when the listing's total already matches.
-  state.counts.V_CHE = 1; state.counts.V_WAL = 2;
+  state.counts.V_CHE = 1;
+  state.counts.V_WAL = 2;
   const again = await reconcile(env);
-  assert.deepEqual(again.changed.map((l) => [l.sku, l.to]).sort(), [["YZ-CHE", 1], ["YZ-WAL", 2]]);
+  assert.deepEqual(again.changed.map((l) => [l.sku, l.to]).sort(), [
+    ["YZ-CHE", 1],
+    ["YZ-WAL", 2],
+  ]);
 
   // The dice come back into stock: reported as waiting, the sold-out listing untouched.
   state.counts.V_DICE = 1;
   const third = await reconcile(env);
-  assert.deepEqual(third.notPublished.map((n) => [n.listing, n.state, n.square]), [[101, "sold_out", 1]]);
+  assert.deepEqual(
+    third.notPublished.map((n) => [n.listing, n.state, n.square]),
+    [[101, "sold_out", 1]],
+  );
   assert.equal(state.listings[101].state, "sold_out");
   assert.ok(!third.changed.some((c) => c.listing === 101));
 });
 
 // A new dice set in Square, and the Etsy draft that listings are modelled on.
 function newDiceSet() {
-  state.catalog.push(item("I_JAVA", '"JAVA" TTRPG Dice Set', [variation("V_JAVA", "Default", 5500, "DICE-JAVA", true)], { cat: "C_DICE", image: "IMG1" }));
+  state.catalog.push(
+    item(
+      "I_JAVA",
+      '"JAVA" TTRPG Dice Set',
+      [variation("V_JAVA", "Default", 5500, "DICE-JAVA", true)],
+      { cat: "C_DICE", image: "IMG1" },
+    ),
+  );
   state.counts.V_JAVA = 1;
   state.listings[500] = {
-    listing_id: 500, state: "draft", title: "TEMPLATE 8-Piece Dice Set | Handmade D&amp;D Dice", skus: [],
-    who_made: "i_did", when_made: "made_to_order", taxonomy_id: 2078, shipping_profile_id: 11, return_policy_id: 12, shop_section_id: null,
-    tags: ["dnd dice", "ttrpg"], materials: ["resin"], is_supply: false, should_auto_renew: true, item_weight: 4, item_weight_unit: "oz"
+    listing_id: 500,
+    state: "draft",
+    title: "TEMPLATE 8-Piece Dice Set | Handmade D&amp;D Dice",
+    skus: [],
+    who_made: "i_did",
+    when_made: "made_to_order",
+    taxonomy_id: 2078,
+    shipping_profile_id: 11,
+    return_policy_id: 12,
+    shop_section_id: null,
+    tags: ["dnd dice", "ttrpg"],
+    materials: ["resin"],
+    is_supply: false,
+    should_auto_renew: true,
+    item_weight: 4,
+    item_weight_unit: "oz",
   };
-  state.inventories[500] = { products: [{ sku: "", offerings: [{ price: { amount: 100, divisor: 100 }, quantity: 1, is_enabled: true, readiness_state_id: 77 }] }] };
+  state.inventories[500] = {
+    products: [
+      {
+        sku: "",
+        offerings: [
+          {
+            price: { amount: 100, divisor: 100 },
+            quantity: 1,
+            is_enabled: true,
+            readiness_state_id: 77,
+          },
+        ],
+      },
+    ],
+  };
 }
 
 test("new dice sets get an Etsy draft copied from the template, once", async () => {
   newDiceSet();
   const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
   const report = await createEtsyDrafts(env);
-  assert.deepEqual(report.created, [{ sku: "DICE-JAVA", listingId: 900, title: "JAVA 8-Piece Dice Set | Handmade D&D Dice", photos: 1, published: false }]);
+  assert.deepEqual(report.created, [
+    {
+      sku: "DICE-JAVA",
+      listingId: 900,
+      title: "JAVA 8-Piece Dice Set | Handmade D&D Dice",
+      photos: 1,
+      published: false,
+    },
+  ]);
   assert.deepEqual(report.errors, []);
 
   const draft = state.drafts[0];
   assert.deepEqual(draft.form, {
-    title: "JAVA 8-Piece Dice Set | Handmade D&D Dice", description: draft.form.description, price: "55.00", quantity: "1", type: "physical",
-    who_made: "i_did", when_made: "made_to_order", taxonomy_id: "2078", shipping_profile_id: "11", return_policy_id: "12",
-    tags: "dnd dice,ttrpg", materials: "resin", is_supply: "false", should_auto_renew: "true", item_weight: "4", item_weight_unit: "oz",
-    readiness_state_id: "77"
+    title: "JAVA 8-Piece Dice Set | Handmade D&D Dice",
+    description: draft.form.description,
+    price: "55.00",
+    quantity: "1",
+    type: "physical",
+    who_made: "i_did",
+    when_made: "made_to_order",
+    taxonomy_id: "2078",
+    shipping_profile_id: "11",
+    return_policy_id: "12",
+    tags: "dnd dice,ttrpg",
+    materials: "resin",
+    is_supply: "false",
+    should_auto_renew: "true",
+    item_weight: "4",
+    item_weight_unit: "oz",
+    readiness_state_id: "77",
   });
-  assert.ok(draft.form.description.startsWith("JAVA 8-Piece Dice Set"), "the shared dice description");
-  assert.deepEqual(state.inventories[900].put.products, [{ sku: "DICE-JAVA", property_values: [], offerings: [{ price: 55, quantity: 1, is_enabled: true, readiness_state_id: 77 }] }]);
+  assert.ok(
+    draft.form.description.startsWith("JAVA 8-Piece Dice Set"),
+    "the shared dice description",
+  );
+  assert.deepEqual(state.inventories[900].put.products, [
+    {
+      sku: "DICE-JAVA",
+      property_values: [],
+      offerings: [
+        { price: 55, quantity: 1, is_enabled: true, readiness_state_id: 77 },
+      ],
+    },
+  ]);
   assert.deepEqual(draft.photos, ["1:photo https://img/yz.jpg"]);
   assert.equal(state.listings[900].state, "draft", "left for review");
 
   // A duplicated item that hasn't been renamed yet waits, and says why.
-  state.catalog.push(item("I_COPY", '"JAVA" TTRPG Dice Set Copy', [variation("V_COPY", "Default", 5500, "DICE-COPY", true)], { cat: "C_DICE" }));
+  state.catalog.push(
+    item(
+      "I_COPY",
+      '"JAVA" TTRPG Dice Set Copy',
+      [variation("V_COPY", "Default", 5500, "DICE-COPY", true)],
+      { cat: "C_DICE" },
+    ),
+  );
   state.counts.V_COPY = 1;
   const copy = await createEtsyDrafts(env);
   assert.deepEqual(copy.created, []);
-  assert.match(copy.errors[0], /^DICE-COPY: no draft, because '"JAVA" TTRPG Dice Set Copy' isn't named like/);
+  assert.match(
+    copy.errors[0],
+    /^DICE-COPY: no draft, because '"JAVA" TTRPG Dice Set Copy' isn't named like/,
+  );
   state.catalog.pop();
 
   // Already on Etsy (Ember), not a dice category (Yahtzee), and already drafted (JAVA): nothing more is made.
@@ -462,16 +961,28 @@ test("new dice sets get an Etsy draft copied from the template, once", async () 
   assert.deepEqual((await createEtsyDrafts(env)).created, []);
   assert.equal(state.drafts.length, 1);
   // The stock sync leaves drafts alone.
-  assert.deepEqual(await pushToEtsy(env, "DICE-JAVA", 1), { skipped: "no-etsy-listing" });
+  assert.deepEqual(await pushToEtsy(env, "DICE-JAVA", 1), {
+    skipped: "no-etsy-listing",
+  });
 });
 
 test("saving a new dice set in Square makes its Etsy draft straight away", async () => {
   const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
   const send = async (event: object) => {
     const raw = JSON.stringify(event);
-    const sig = createHmac("sha256", "sigkey").update(env.SQUARE_WEBHOOK_URL + raw).digest("base64");
+    const sig = createHmac("sha256", "sigkey")
+      .update(env.SQUARE_WEBHOOK_URL + raw)
+      .digest("base64");
     const c = ctx();
-    await worker.fetch(new Request("https://w.example/webhooks/square", { method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": sig } }), env, c);
+    await worker.fetch(
+      new Request("https://w.example/webhooks/square", {
+        method: "POST",
+        body: raw,
+        headers: { "x-square-hmacsha256-signature": sig },
+      }),
+      env,
+      c,
+    );
     await c.done();
   };
   // An ordinary change: nothing new, so Etsy's listings aren't even looked up again.
@@ -484,98 +995,217 @@ test("saving a new dice set in Square makes its Etsy draft straight away", async
   newDiceSet();
   await Promise.all([
     send({ event_id: "c2", type: "catalog.version.updated" }),
-    send({ event_id: "c3", type: "inventory.count.updated", data: { object: { inventory_counts: [
-      { catalog_object_id: "V_JAVA", catalog_object_type: "ITEM_VARIATION", location_id: LOC, state: "IN_STOCK", quantity: "1" }] } } })
+    send({
+      event_id: "c3",
+      type: "inventory.count.updated",
+      data: {
+        object: {
+          inventory_counts: [
+            {
+              catalog_object_id: "V_JAVA",
+              catalog_object_type: "ITEM_VARIATION",
+              location_id: LOC,
+              state: "IN_STOCK",
+              quantity: "1",
+            },
+          ],
+        },
+      },
+    }),
   ]);
-  assert.deepEqual(state.drafts.map((d: any) => d.form.title), ["JAVA 8-Piece Dice Set | Handmade D&D Dice"]);
+  assert.deepEqual(
+    state.drafts.map((d: any) => d.form.title),
+    ["JAVA 8-Piece Dice Set | Handmade D&D Dice"],
+  );
 });
 
 test("new photos in Square replace the ones on Etsy, for drafts and listings already there", async () => {
   newDiceSet();
   const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
-  const etsyPhotos = (id: number) => state.images[id].sort((a: any, b: any) => a.rank - b.rank).map((i: any) => i.text);
-  const photo = (id: string, url: string) => state.related.push({ id, type: "IMAGE", image_data: { url } });
+  const etsyPhotos = (id: number) =>
+    state.images[id]
+      .sort((a: any, b: any) => a.rank - b.rank)
+      .map((i: any) => i.text);
+  const photo = (id: string, url: string) =>
+    state.related.push({ id, type: "IMAGE", image_data: { url } });
   // Ember has been on Etsy all along, with two photos put there by hand.
-  state.images[101] = [{ listing_image_id: 1, rank: 1, text: "etsy one" }, { listing_image_id: 2, rank: 2, text: "etsy two" }];
+  state.images[101] = [
+    { listing_image_id: 1, rank: 1, text: "etsy one" },
+    { listing_image_id: 2, rank: 2, text: "etsy two" },
+  ];
   state.imageIds = 2;
 
   await createEtsyDrafts(env); // JAVA gets its draft with the placeholder photo
   assert.deepEqual(etsyPhotos(900), ["photo https://img/yz.jpg"]);
-  assert.deepEqual(etsyPhotos(101), ["etsy one", "etsy two"], "a listing's own photos stay until Square's change");
+  assert.deepEqual(
+    etsyPhotos(101),
+    ["etsy one", "etsy two"],
+    "a listing's own photos stay until Square's change",
+  );
 
   // Better photos for JAVA, and a first photo for Ember.
-  photo("IMG_A", "https://img/java-a.jpg"); photo("IMG_B", "https://img/java-b.jpg"); photo("IMG_E", "https://img/ember.jpg");
-  state.catalog.find((i: any) => i.id === "I_JAVA").item_data.image_ids = ["IMG_A", "IMG_B"];
+  photo("IMG_A", "https://img/java-a.jpg");
+  photo("IMG_B", "https://img/java-b.jpg");
+  photo("IMG_E", "https://img/ember.jpg");
+  state.catalog.find((i: any) => i.id === "I_JAVA").item_data.image_ids = [
+    "IMG_A",
+    "IMG_B",
+  ];
   state.catalog[0].item_data.image_ids = ["IMG_E"];
   const dry = await createEtsyDrafts({ ...env, SYNC_DRY_RUN: "true" });
-  assert.deepEqual([dry.photosUpdated, dry.photosWaiting.sort()], [[], ["DICE-1", "DICE-JAVA"]]);
+  assert.deepEqual(
+    [dry.photosUpdated, dry.photosWaiting.sort()],
+    [[], ["DICE-1", "DICE-JAVA"]],
+  );
 
   const report = await createEtsyDrafts(env, { quick: true });
-  assert.deepEqual(report.photosUpdated.map((u) => [u.sku, u.listingId, u.photos]).sort(), [["DICE-1", 101, 1], ["DICE-JAVA", 900, 2]]);
-  assert.deepEqual(etsyPhotos(900), ["photo https://img/java-a.jpg", "photo https://img/java-b.jpg"]);
-  assert.deepEqual(etsyPhotos(101), ["photo https://img/ember.jpg"], "the extra one from before is gone");
+  assert.deepEqual(
+    report.photosUpdated.map((u) => [u.sku, u.listingId, u.photos]).sort(),
+    [
+      ["DICE-1", 101, 1],
+      ["DICE-JAVA", 900, 2],
+    ],
+  );
+  assert.deepEqual(etsyPhotos(900), [
+    "photo https://img/java-a.jpg",
+    "photo https://img/java-b.jpg",
+  ]);
+  assert.deepEqual(
+    etsyPhotos(101),
+    ["photo https://img/ember.jpg"],
+    "the extra one from before is gone",
+  );
   assert.deepEqual(report.errors, []);
 
   // Nothing changed since: Etsy isn't touched. Taking every photo off in Square doesn't empty the listing.
   calls = [];
   state.catalog[0].item_data.image_ids = [];
-  assert.deepEqual((await createEtsyDrafts(env, { quick: true })).photosUpdated, []);
+  assert.deepEqual(
+    (await createEtsyDrafts(env, { quick: true })).photosUpdated,
+    [],
+  );
   assert.equal(calls.filter((c) => c.url.includes("etsy")).length, 0);
 
   // A draft deleted on Etsy is reported once, then left alone.
   delete state.listings[900];
-  state.catalog.find((i: any) => i.id === "I_JAVA").item_data.image_ids = ["IMG_B"];
-  assert.match((await createEtsyDrafts(env, { quick: true })).errors[0], /DICE-JAVA \(listing 900\): photos not updated/);
+  state.catalog.find((i: any) => i.id === "I_JAVA").item_data.image_ids = [
+    "IMG_B",
+  ];
+  assert.match(
+    (await createEtsyDrafts(env, { quick: true })).errors[0],
+    /DICE-JAVA \(listing 900\): photos not updated/,
+  );
   assert.deepEqual((await createEtsyDrafts(env, { quick: true })).errors, []);
 });
 
 test("Etsy drafts: dry run, publishing straight away, and a missing template", async () => {
   newDiceSet();
-  const dry = await createEtsyDrafts(makeEnv({ ETSY_DRAFT_CATEGORIES: "dice", SYNC_DRY_RUN: "true" }));
-  assert.deepEqual([dry.dryRun, dry.created, dry.waiting], [true, [], ["DICE-JAVA"]]);
-  assert.equal(calls.filter((c) => c.method !== "GET" && c.url.includes("etsy")).length, 0, "nothing changed on Etsy");
+  const dry = await createEtsyDrafts(
+    makeEnv({ ETSY_DRAFT_CATEGORIES: "dice", SYNC_DRY_RUN: "true" }),
+  );
+  assert.deepEqual(
+    [dry.dryRun, dry.created, dry.waiting],
+    [true, [], ["DICE-JAVA"]],
+  );
+  assert.equal(
+    calls.filter((c) => c.method !== "GET" && c.url.includes("etsy")).length,
+    0,
+    "nothing changed on Etsy",
+  );
 
-  assert.deepEqual((await createEtsyDrafts(makeEnv())).waiting, [], "off unless categories are named");
+  assert.deepEqual(
+    (await createEtsyDrafts(makeEnv())).waiting,
+    [],
+    "off unless categories are named",
+  );
 
-  const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice", ETSY_DRAFTS_AUTO_PUBLISH: "true" });
+  const env = makeEnv({
+    ETSY_DRAFT_CATEGORIES: "Dice",
+    ETSY_DRAFTS_AUTO_PUBLISH: "true",
+  });
   const report = await createEtsyDrafts(env);
   assert.equal(report.created[0].published, true);
   assert.equal(state.listings[900].state, "active");
 
   // A set with more photos than this run can send waits for the next one.
   state.drafts = [];
-  const tight = await createEtsyDrafts(makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" }), { budget: 3 });
+  const tight = await createEtsyDrafts(
+    makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" }),
+    { budget: 3 },
+  );
   assert.deepEqual([tight.created, tight.waiting], [[], ["DICE-JAVA"]]);
 
   delete state.listings[500];
-  const none = await createEtsyDrafts(makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" }));
+  const none = await createEtsyDrafts(
+    makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" }),
+  );
   assert.equal(none.created.length, 0);
   assert.match(none.errors[0], /TEMPLATE/);
 });
 
 test("checkout: blocks sold items and builds a Square link with shipping and no added tax", async () => {
   const env = makeEnv();
-  const post = (b: unknown) => worker.fetch(new Request("https://w.example/api/checkout", {
-    method: "POST", body: JSON.stringify(b), headers: { "content-type": "application/json", origin: "https://golemcraftworks.com" } }), env, ctx());
+  const post = (b: unknown) =>
+    worker.fetch(
+      new Request("https://w.example/api/checkout", {
+        method: "POST",
+        body: JSON.stringify(b),
+        headers: {
+          "content-type": "application/json",
+          origin: "https://golemcraftworks.com",
+        },
+      }),
+      env,
+      ctx(),
+    );
 
-  const sold = await post({ lines: [{ variationId: "V_CHE", qty: 1 }], fulfillment: "ship" });
+  const sold = await post({
+    lines: [{ variationId: "V_CHE", qty: 1 }],
+    fulfillment: "ship",
+  });
   assert.equal(sold.status, 409);
   assert.deepEqual(((await sold.json()) as any).soldOut, ["V_CHE"]);
 
-  const okRes = await post({ lines: [{ variationId: "V_WAL", qty: 2 }, { variationId: "V_DICE", qty: 1 }], fulfillment: "ship" });
+  const okRes = await post({
+    lines: [
+      { variationId: "V_WAL", qty: 2 },
+      { variationId: "V_DICE", qty: 1 },
+    ],
+    fulfillment: "ship",
+  });
   assert.equal(okRes.status, 200);
-  assert.equal(okRes.headers.get("access-control-allow-origin"), "https://golemcraftworks.com");
+  assert.equal(
+    okRes.headers.get("access-control-allow-origin"),
+    "https://golemcraftworks.com",
+  );
   assert.equal(((await okRes.json()) as any).url, "https://square.link/u/abc");
   const link = state.paymentLinks[0];
-  assert.deepEqual(link.order.line_items, [{ catalog_object_id: "V_WAL", quantity: "2" }, { catalog_object_id: "V_DICE", quantity: "1" }]);
-  assert.equal(link.order.pricing_options.auto_apply_taxes, false, "shipped orders add no tax");
+  assert.deepEqual(link.order.line_items, [
+    { catalog_object_id: "V_WAL", quantity: "2" },
+    { catalog_object_id: "V_DICE", quantity: "1" },
+  ]);
+  assert.equal(
+    link.order.pricing_options.auto_apply_taxes,
+    false,
+    "shipped orders add no tax",
+  );
   assert.equal(link.checkout_options.shipping_fee.charge.amount, 800);
-  assert.equal(link.checkout_options.redirect_url, "https://golemcraftworks.com/thanks/");
+  assert.equal(
+    link.checkout_options.redirect_url,
+    "https://golemcraftworks.com/thanks/",
+  );
 
-  await post({ lines: [{ variationId: "V_WAL", qty: 1 }], fulfillment: "pickup" });
+  await post({
+    lines: [{ variationId: "V_WAL", qty: 1 }],
+    fulfillment: "pickup",
+  });
   const pickup = state.paymentLinks[1];
   assert.equal(pickup.checkout_options.ask_for_shipping_address, false);
-  assert.equal(pickup.order.pricing_options.auto_apply_taxes, true, "pickup is local, so it's taxed");
+  assert.equal(
+    pickup.order.pricing_options.auto_apply_taxes,
+    true,
+    "pickup is local, so it's taxed",
+  );
   assert.equal(pickup.checkout_options.shipping_fee, undefined);
 
   const tooMany = await post({ lines: [{ variationId: "V_DICE", qty: 2 }] });
@@ -587,107 +1217,242 @@ test("checkout: blocks sold items and builds a Square link with shipping and no 
 
 test("checkout: add-ons are sent to Square, checked against the item's rules, and share stock", async () => {
   const env = makeEnv();
-  const post = (b: unknown) => worker.fetch(new Request("https://w.example/api/checkout", {
-    method: "POST", body: JSON.stringify(b), headers: { "content-type": "application/json" } }), env, ctx());
+  const post = (b: unknown) =>
+    worker.fetch(
+      new Request("https://w.example/api/checkout", {
+        method: "POST",
+        body: JSON.stringify(b),
+        headers: { "content-type": "application/json" },
+      }),
+      env,
+      ctx(),
+    );
 
-  const okRes = await post({ lines: [
-    { variationId: "V_WAL", qty: 1, modifiers: ["M_HAND", "M_GLOSS"] },
-    { variationId: "V_WAL", qty: 2 }
-  ] });
+  const okRes = await post({
+    lines: [
+      { variationId: "V_WAL", qty: 1, modifiers: ["M_HAND", "M_GLOSS"] },
+      { variationId: "V_WAL", qty: 2 },
+    ],
+  });
   assert.equal(okRes.status, 200);
   assert.deepEqual(state.paymentLinks[0].order.line_items, [
-    { catalog_object_id: "V_WAL", quantity: "1", modifiers: [{ catalog_object_id: "M_GLOSS" }, { catalog_object_id: "M_HAND" }] },
-    { catalog_object_id: "V_WAL", quantity: "2" }
+    {
+      catalog_object_id: "V_WAL",
+      quantity: "1",
+      modifiers: [
+        { catalog_object_id: "M_GLOSS" },
+        { catalog_object_id: "M_HAND" },
+      ],
+    },
+    { catalog_object_id: "V_WAL", quantity: "2" },
   ]);
 
-  const overStock = await post({ lines: [{ variationId: "V_WAL", qty: 2, modifiers: ["M_HAND"] }, { variationId: "V_WAL", qty: 2 }] });
-  assert.equal(overStock.status, 409, "three in stock, four asked for across two lines");
+  const overStock = await post({
+    lines: [
+      { variationId: "V_WAL", qty: 2, modifiers: ["M_HAND"] },
+      { variationId: "V_WAL", qty: 2 },
+    ],
+  });
+  assert.equal(
+    overStock.status,
+    409,
+    "three in stock, four asked for across two lines",
+  );
   assert.deepEqual(((await overStock.json()) as any).soldOut, ["V_WAL"]);
 
-  for (const modifiers of [["M_NOPE"], ["M_SECRET"], ["M_OFF"], ["M_SATIN", "M_GLOSS"]]) {
-    const bad = await post({ lines: [{ variationId: "V_WAL", qty: 1, modifiers }] });
+  for (const modifiers of [
+    ["M_NOPE"],
+    ["M_SECRET"],
+    ["M_OFF"],
+    ["M_SATIN", "M_GLOSS"],
+  ]) {
+    const bad = await post({
+      lines: [{ variationId: "V_WAL", qty: 1, modifiers }],
+    });
     assert.equal(bad.status, 409, modifiers.join("+"));
     assert.deepEqual(((await bad.json()) as any).changed, ["V_WAL"]);
   }
 
   state.catalog[1].item_data.modifier_list_info[1].min_selected_modifiers = 1;
-  assert.equal((await post({ lines: [{ variationId: "V_WAL", qty: 1 }] })).status, 409, "a required choice is missing");
-  assert.equal((await post({ lines: [{ variationId: "V_WAL", qty: 1, modifiers: ["M_SATIN"] }] })).status, 200);
+  assert.equal(
+    (await post({ lines: [{ variationId: "V_WAL", qty: 1 }] })).status,
+    409,
+    "a required choice is missing",
+  );
+  assert.equal(
+    (
+      await post({
+        lines: [{ variationId: "V_WAL", qty: 1, modifiers: ["M_SATIN"] }],
+      })
+    ).status,
+    200,
+  );
   assert.equal(state.paymentLinks.length, 2);
 });
 
 // The real page files from site/, served the way Cloudflare's static assets would.
-const ASSETS = { fetch: async (req: Request) => {
-  const path = new URL(req.url).pathname;
-  const name = path.endsWith("/") ? path + "index.html" : path;
-  try { return new Response(readFileSync(new URL("../../site" + name, import.meta.url), "utf8"), { headers: { "content-type": "text/html" } }); }
-  catch { return new Response("static 404", { status: 404 }); }
-} } as unknown as Fetcher;
-const get = (env: Env, path: string) => worker.fetch(new Request("https://w.example" + path), env, ctx());
+const ASSETS = {
+  fetch: async (req: Request) => {
+    const path = new URL(req.url).pathname;
+    const name = path.endsWith("/") ? path + "index.html" : path;
+    try {
+      return new Response(
+        readFileSync(new URL("../../site" + name, import.meta.url), "utf8"),
+        { headers: { "content-type": "text/html" } },
+      );
+    } catch {
+      return new Response("static 404", { status: 404 });
+    }
+  },
+} as unknown as Fetcher;
+const get = (env: Env, path: string) =>
+  worker.fetch(new Request("https://w.example" + path), env, ctx());
 
 test("product pages are complete before any script runs", async () => {
   state.catalog[1].item_data.name = '"JAVA" TTRPG Dice Set';
-  state.catalog[1].item_data.description_plaintext = "Coffee swirl dice.\n\nPrice is $55 & worth it <really>.";
+  state.catalog[1].item_data.description_plaintext =
+    "Coffee swirl dice.\n\nPrice is $55 & worth it <really>.";
   const env = makeEnv({ ASSETS, NOINDEX: undefined });
 
   const feed = (await (await get(env, "/api/products")).json()) as any;
-  assert.deepEqual(feed.products.map((p: any) => p.slug).sort(), ["ember-dice-set", "java-ttrpg-dice-set"]);
+  assert.deepEqual(feed.products.map((p: any) => p.slug).sort(), [
+    "ember-dice-set",
+    "java-ttrpg-dice-set",
+  ]);
 
   const res = await get(env, "/product/java-ttrpg-dice-set");
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("x-robots-tag"), null);
   const html = await res.text();
-  assert.ok(html.includes("<title>&#34;JAVA&#34; TTRPG Dice Set · Golem Craftworks</title>"));
-  assert.ok(html.includes('<link rel="canonical" href="https://golemcraftworks.com/product/java-ttrpg-dice-set">'));
-  assert.ok(html.includes('<meta property="og:image" content="https://img/yz.jpg">'));
+  assert.ok(
+    html.includes(
+      "<title>&#34;JAVA&#34; TTRPG Dice Set · Golem Craftworks</title>",
+    ),
+  );
+  assert.ok(
+    html.includes(
+      '<link rel="canonical" href="https://golemcraftworks.com/product/java-ttrpg-dice-set">',
+    ),
+  );
+  assert.ok(
+    html.includes('<meta property="og:image" content="https://img/yz.jpg">'),
+  );
   assert.ok(html.includes("<h1>&#34;JAVA&#34; TTRPG Dice Set</h1>"));
-  assert.ok(html.includes("<p>Price is $55 &#38; worth it &#60;really&#62;.</p>"), "description is in the page, escaped");
-  assert.ok(!html.includes("ssr:") && !html.includes("skeleton"), "the placeholders are gone");
+  assert.ok(
+    html.includes("<p>Price is $55 &#38; worth it &#60;really&#62;.</p>"),
+    "description is in the page, escaped",
+  );
+  assert.ok(
+    !html.includes("ssr:") && !html.includes("skeleton"),
+    "the placeholders are gone",
+  );
   assert.equal((html.match(/<title>/g) || []).length, 1);
-  assert.ok(html.includes('<script src="../js/product.js"></script>'), "the page script still loads");
+  assert.ok(
+    html.includes('<script src="../js/product.js"></script>'),
+    "the page script still loads",
+  );
 
-  const data = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1]);
+  const data = JSON.parse(
+    html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1],
+  );
   assert.equal(data["@type"], "Product");
   assert.equal(data.name, '"JAVA" TTRPG Dice Set');
-  assert.deepEqual([data.offers["@type"], data.offers.lowPrice, data.offers.highPrice, data.offers.availability],
-    ["AggregateOffer", "60.00", "65.00", "https://schema.org/InStock"]);
+  assert.deepEqual(
+    [
+      data.offers["@type"],
+      data.offers.lowPrice,
+      data.offers.highPrice,
+      data.offers.availability,
+    ],
+    ["AggregateOffer", "60.00", "65.00", "https://schema.org/InStock"],
+  );
   assert.equal(data.offers.shippingDetails.shippingRate.value, "8.00");
 
   // One-of-a-kind and sold: the page stays up and says so.
   state.counts.V_DICE = 0;
-  const sold = JSON.parse((await (await get(env, "/product/ember-dice-set")).text()).match(/ld\+json">(.*?)<\/script>/)![1]);
-  assert.deepEqual([sold.offers["@type"], sold.offers.price, sold.offers.availability], ["Offer", "45.00", "https://schema.org/OutOfStock"]);
+  const sold = JSON.parse(
+    (await (await get(env, "/product/ember-dice-set")).text()).match(
+      /ld\+json">(.*?)<\/script>/,
+    )![1],
+  );
+  assert.deepEqual(
+    [sold.offers["@type"], sold.offers.price, sold.offers.availability],
+    ["Offer", "45.00", "https://schema.org/OutOfStock"],
+  );
 
   const missing = await get(env, "/product/no-such-thing");
   assert.equal(missing.status, 404);
   assert.ok((await missing.text()).includes("This page wandered off."));
-  assert.equal((await get(env, "/product/sticker")).status, 404, "hidden items have no page");
+  assert.equal(
+    (await get(env, "/product/sticker")).status,
+    404,
+    "hidden items have no page",
+  );
   const slash = await get(env, "/product/java-ttrpg-dice-set/");
-  assert.deepEqual([slash.status, slash.headers.get("location")], [301, "https://w.example/product/java-ttrpg-dice-set"]);
+  assert.deepEqual(
+    [slash.status, slash.headers.get("location")],
+    [301, "https://w.example/product/java-ttrpg-dice-set"],
+  );
   // The bare page (demo mode's ?id= address) is still the static file.
-  assert.ok((await (await get(env, "/product/?id=I_YZ")).text()).includes("<!--ssr:product-->"));
+  assert.ok(
+    (await (await get(env, "/product/?id=I_YZ")).text()).includes(
+      "<!--ssr:product-->",
+    ),
+  );
 });
 
 test("home page shows a tile per category with something available", async () => {
   const env = makeEnv({ ASSETS });
   const html = await (await get(env, "/")).text();
-  assert.ok(html.includes('<a href="/shop/dice">') && html.includes('<a href="/shop/game-sets">'));
-  assert.ok(html.indexOf("/shop/dice") < html.indexOf("/shop/game-sets"), "A to Z");
-  assert.ok(html.includes('<div class="cat__media" data-n="1"><img src="https://img/yz.jpg"') && html.includes("<p class=\"cat__count\">1 piece</p>"));
-  assert.ok(!html.includes("/product/") && !html.includes("ssr:"), "products are on the category pages");
-  assert.ok(html.includes("Hardwood boxes and dice, made one at a time."), "the rest of the page is intact");
+  assert.ok(
+    html.includes('<a href="/shop/dice">') &&
+      html.includes('<a href="/shop/game-sets">'),
+  );
+  assert.ok(
+    html.indexOf("/shop/dice") < html.indexOf("/shop/game-sets"),
+    "A to Z",
+  );
+  assert.ok(
+    html.includes(
+      '<div class="cat__media" data-n="1"><img src="https://img/yz.jpg"',
+    ) && html.includes('<p class="cat__count">1 piece</p>'),
+  );
+  assert.ok(
+    !html.includes("/product/") && !html.includes("ssr:"),
+    "products are on the category pages",
+  );
+  assert.ok(
+    html.includes("Hardwood boxes and dice, made one at a time."),
+    "the rest of the page is intact",
+  );
 
   state.counts.V_DICE = 0;
-  assert.ok(!(await (await get(env, "/")).text()).includes("/shop/dice"), "nothing available, no tile");
+  assert.ok(
+    !(await (await get(env, "/")).text()).includes("/shop/dice"),
+    "nothing available, no tile",
+  );
   // A category with few pieces fills its tile from their other photos.
   state.catalog[1].item_data.image_ids = ["IMG1", "IMG2", "IMG3"];
-  state.related.push({ id: "IMG2", type: "IMAGE", image_data: { url: "https://img/yz2.jpg" } }, { id: "IMG3", type: "IMAGE", image_data: { url: "https://img/yz3.jpg" } });
-  assert.ok((await (await get(env, "/")).text()).includes('data-n="3"><img src="https://img/yz.jpg" alt="" loading="lazy" decoding="async"><img src="https://img/yz2.jpg"'));
+  state.related.push(
+    { id: "IMG2", type: "IMAGE", image_data: { url: "https://img/yz2.jpg" } },
+    { id: "IMG3", type: "IMAGE", image_data: { url: "https://img/yz3.jpg" } },
+  );
+  assert.ok(
+    (await (await get(env, "/")).text()).includes(
+      'data-n="3"><img src="https://img/yz.jpg" alt="" loading="lazy" decoding="async"><img src="https://img/yz2.jpg"',
+    ),
+  );
 
   // The old filter addresses lead to the category pages.
   const old = await get(env, "/?category=Game%20sets");
-  assert.deepEqual([old.status, old.headers.get("location")], [301, "https://w.example/shop/game-sets"]);
-  assert.equal((await get(env, "/?category=Gone")).headers.get("location"), "https://w.example/");
+  assert.deepEqual(
+    [old.status, old.headers.get("location")],
+    [301, "https://w.example/shop/game-sets"],
+  );
+  assert.equal(
+    (await get(env, "/?category=Gone")).headers.get("location"),
+    "https://w.example/",
+  );
 });
 
 test("category pages list what's available; same-named items get distinct addresses", async () => {
@@ -699,41 +1464,96 @@ test("category pages list what's available; same-named items get distinct addres
   assert.equal(res.status, 200);
   const html = await res.text();
   assert.ok(html.includes("<title>Game sets · Golem Craftworks</title>"));
-  assert.ok(html.includes('<link rel="canonical" href="https://golemcraftworks.com/shop/game-sets">'));
+  assert.ok(
+    html.includes(
+      '<link rel="canonical" href="https://golemcraftworks.com/shop/game-sets">',
+    ),
+  );
   assert.ok(html.includes("Game sets: 1 handmade piece available now"));
-  assert.ok(/<h1[^>]*>Game sets<\/h1>/.test(html) && html.includes('<a class="chip" href="/shop/game-sets" aria-current="page">Game sets</a>'));
-  assert.ok(html.includes('<a href="/product/yahtzee-set-i_yz">') && html.includes(">From $60<"));
-  assert.ok(!html.includes("/product/yahtzee-set-i_dice"), "the sold one isn't in the grid");
-  assert.ok(!html.includes("ssr:") && html.includes('<script src="../js/shop.js"></script>'));
+  assert.ok(
+    /<h1[^>]*>Game sets<\/h1>/.test(html) &&
+      html.includes(
+        '<a class="chip" href="/shop/game-sets" aria-current="page">Game sets</a>',
+      ),
+  );
+  assert.ok(
+    html.includes('<a href="/product/yahtzee-set-i_yz">') &&
+      html.includes(">From $60<"),
+  );
+  assert.ok(
+    !html.includes("/product/yahtzee-set-i_dice"),
+    "the sold one isn't in the grid",
+  );
+  assert.ok(
+    !html.includes("ssr:") &&
+      html.includes('<script src="../js/shop.js"></script>'),
+  );
   assert.equal((html.match(/<title>/g) || []).length, 1);
-  assert.equal((await get(env, "/product/yahtzee-set-i_dice")).status, 200, "but its page is still there");
-  assert.ok((await (await get(env, "/product/yahtzee-set-i_yz")).text()).includes('<a href="/shop/game-sets">Game sets</a>'));
+  assert.equal(
+    (await get(env, "/product/yahtzee-set-i_dice")).status,
+    200,
+    "but its page is still there",
+  );
+  assert.ok(
+    (await (await get(env, "/product/yahtzee-set-i_yz")).text()).includes(
+      '<a href="/shop/game-sets">Game sets</a>',
+    ),
+  );
 
   // Nothing in Square's categories: it goes under Other.
   state.catalog[0].item_data.categories = [];
   state.counts.V_DICE = 1;
   const other = await (await get(env, "/shop/other")).text();
-  assert.ok(other.includes("<title>Other · Golem Craftworks</title>") && other.includes("/product/yahtzee-set-i_dice"));
+  assert.ok(
+    other.includes("<title>Other · Golem Craftworks</title>") &&
+      other.includes("/product/yahtzee-set-i_dice"),
+  );
   const home = await (await get(env, "/")).text();
-  assert.ok(home.indexOf("/shop/game-sets") < home.indexOf("/shop/other"), "Other comes last");
+  assert.ok(
+    home.indexOf("/shop/game-sets") < home.indexOf("/shop/other"),
+    "Other comes last",
+  );
 
   assert.equal((await get(env, "/shop/no-such-category")).status, 404);
-  assert.equal((await get(env, "/shop/market-only")).status, 404, "hidden categories have no page");
+  assert.equal(
+    (await get(env, "/shop/market-only")).status,
+    404,
+    "hidden categories have no page",
+  );
   const slash = await get(env, "/shop/game-sets/");
-  assert.deepEqual([slash.status, slash.headers.get("location")], [301, "https://w.example/shop/game-sets"]);
+  assert.deepEqual(
+    [slash.status, slash.headers.get("location")],
+    [301, "https://w.example/shop/game-sets"],
+  );
   // The bare page (demo mode's ?category= address) is still the static file.
-  assert.ok((await (await get(env, "/shop/?category=Dice")).text()).includes("<!--ssr:grid-->"));
+  assert.ok(
+    (await (await get(env, "/shop/?category=Dice")).text()).includes(
+      "<!--ssr:grid-->",
+    ),
+  );
 });
 
 test("npm run dev without a Square token shows the sample products", async () => {
-  const env = makeEnv({ ASSETS, DEMO_CATALOG: "true", SQUARE_ACCESS_TOKEN: "" });
+  const env = makeEnv({
+    ASSETS,
+    DEMO_CATALOG: "true",
+    SQUARE_ACCESS_TOKEN: "",
+  });
   const home = await (await get(env, "/")).text();
-  assert.ok(home.includes('<a href="/shop/8-piece-rpg-dice">') && home.includes('<a href="/shop/woodworks">') && home.includes('data-n="4"'));
+  assert.ok(
+    home.includes('<a href="/shop/8-piece-rpg-dice">') &&
+      home.includes('<a href="/shop/woodworks">') &&
+      home.includes('data-n="4"'),
+  );
   const wood = await (await get(env, "/shop/woodworks")).text();
   assert.ok(wood.includes('<a href="/product/yahtzee-set">'));
   assert.equal((await get(env, "/product/ember-ttrpg-dice-set")).status, 200);
   // With a token, the setting does nothing.
-  assert.ok(!(await (await get(makeEnv({ ASSETS, DEMO_CATALOG: "true" }), "/")).text()).includes("/shop/woodworks"));
+  assert.ok(
+    !(
+      await (await get(makeEnv({ ASSETS, DEMO_CATALOG: "true" }), "/")).text()
+    ).includes("/shop/woodworks"),
+  );
 });
 
 test("the shipping price comes from one setting, everywhere it's shown", async () => {
@@ -741,33 +1561,72 @@ test("the shipping price comes from one setting, everywhere it's shown", async (
   const config = await get(env, "/js/config.js");
   assert.ok((config.headers.get("content-type") || "").includes("javascript"));
   const js = await config.text();
-  assert.ok(js.includes('shopName: "Golem Craftworks"') && js.trimEnd().endsWith("window.GC_CONFIG.shippingCents = 950;"));
+  assert.ok(
+    js.includes('shopName: "Golem Craftworks"') &&
+      js.trimEnd().endsWith("window.GC_CONFIG.shippingCents = 950;"),
+  );
 
   const shipping = await (await get(env, "/shipping/")).text();
-  assert.ok(shipping.includes("for a flat $9.50, however many") && !shipping.includes("ssr:"));
-  assert.ok((await (await get(env, "/llms.txt")).text()).includes("for a flat $9.50"));
+  assert.ok(
+    shipping.includes("for a flat $9.50, however many") &&
+      !shipping.includes("ssr:"),
+  );
+  assert.ok(
+    (await (await get(env, "/llms.txt")).text()).includes("for a flat $9.50"),
+  );
   const product = await (await get(env, "/product/yahtzee-set")).text();
-  assert.ok(product.includes('"shippingRate":{"@type":"MonetaryAmount","value":"9.50"'));
+  assert.ok(
+    product.includes('"shippingRate":{"@type":"MonetaryAmount","value":"9.50"'),
+  );
 
-  await worker.fetch(new Request("https://w.example/api/checkout", { method: "POST", body: JSON.stringify({ lines: [{ variationId: "V_WAL", qty: 1 }] }) }), env, ctx());
-  assert.equal(state.paymentLinks[0].checkout_options.shipping_fee.charge.amount, 950);
+  await worker.fetch(
+    new Request("https://w.example/api/checkout", {
+      method: "POST",
+      body: JSON.stringify({ lines: [{ variationId: "V_WAL", qty: 1 }] }),
+    }),
+    env,
+    ctx(),
+  );
+  assert.equal(
+    state.paymentLinks[0].checkout_options.shipping_fee.charge.amount,
+    950,
+  );
 });
 
 test("renaming an item in Square redirects its old address to the new one", async () => {
   const env = makeEnv({ ASSETS });
-  const visit = async (path: string) => { const c = ctx(); const res = await worker.fetch(new Request("https://w.example" + path), env, c); await c.done(); return res; };
+  const visit = async (path: string) => {
+    const c = ctx();
+    const res = await worker.fetch(
+      new Request("https://w.example" + path),
+      env,
+      c,
+    );
+    await c.done();
+    return res;
+  };
   assert.equal((await visit("/product/ember-dice-set")).status, 200);
 
   state.catalog[0].item_data.name = '"EMBER" TTRPG Dice Set';
   assert.equal((await visit("/product/ember-ttrpg-dice-set")).status, 200);
   const old = await visit("/product/ember-dice-set");
-  assert.deepEqual([old.status, old.headers.get("location")], [301, "https://w.example/product/ember-ttrpg-dice-set"]);
+  assert.deepEqual(
+    [old.status, old.headers.get("location")],
+    [301, "https://w.example/product/ember-ttrpg-dice-set"],
+  );
 
   // Renamed again: both earlier addresses lead to the current one.
   state.catalog[0].item_data.name = "Ember";
   await visit("/");
-  for (const path of ["/product/ember-dice-set", "/product/ember-ttrpg-dice-set"]) {
-    assert.equal((await visit(path)).headers.get("location"), "https://w.example/product/ember", path);
+  for (const path of [
+    "/product/ember-dice-set",
+    "/product/ember-ttrpg-dice-set",
+  ]) {
+    assert.equal(
+      (await visit(path)).headers.get("location"),
+      "https://w.example/product/ember",
+      path,
+    );
   }
   assert.equal((await visit("/product/never-existed")).status, 404);
 });
@@ -775,34 +1634,77 @@ test("renaming an item in Square redirects its old address to the new one", asyn
 test("crawler files: sitemap, robots, llms.txt and the Google feed", async () => {
   const live = makeEnv({ ASSETS, NOINDEX: "false" });
   const map = await (await get(live, "/sitemap.xml")).text();
-  for (const path of ["/", "/reviews/", "/shipping/", "/shop/dice", "/shop/game-sets", "/product/yahtzee-set", "/product/ember-dice-set"]) {
-    assert.ok(map.includes(`<loc>https://golemcraftworks.com${path}</loc>`), path);
+  for (const path of [
+    "/",
+    "/reviews/",
+    "/shipping/",
+    "/shop/dice",
+    "/shop/game-sets",
+    "/product/yahtzee-set",
+    "/product/ember-dice-set",
+  ]) {
+    assert.ok(
+      map.includes(`<loc>https://golemcraftworks.com${path}</loc>`),
+      path,
+    );
   }
-  assert.ok(map.includes("<lastmod>2026-09-01</lastmod>") && !map.includes("sticker"));
+  assert.ok(
+    map.includes("<lastmod>2026-09-01</lastmod>") && !map.includes("sticker"),
+  );
 
   const robots = await (await get(live, "/robots.txt")).text();
-  assert.ok(robots.includes("User-agent: GPTBot\nAllow: /") && robots.includes("Disallow: /admin/"));
-  assert.ok(robots.includes("Sitemap: https://golemcraftworks.com/sitemap.xml"));
+  assert.ok(
+    robots.includes("User-agent: GPTBot\nAllow: /") &&
+      robots.includes("Disallow: /admin/"),
+  );
+  assert.ok(
+    robots.includes("Sitemap: https://golemcraftworks.com/sitemap.xml"),
+  );
 
   const llms = await (await get(live, "/llms.txt")).text();
-  assert.ok(llms.startsWith("# Golem Craftworks") && llms.includes("## Game sets"));
-  assert.ok(llms.includes("- [Game sets](https://golemcraftworks.com/shop/game-sets)"));
-  assert.ok(llms.includes("- [Yahtzee set](https://golemcraftworks.com/product/yahtzee-set): From $60, in stock."));
+  assert.ok(
+    llms.startsWith("# Golem Craftworks") && llms.includes("## Game sets"),
+  );
+  assert.ok(
+    llms.includes("- [Game sets](https://golemcraftworks.com/shop/game-sets)"),
+  );
+  assert.ok(
+    llms.includes(
+      "- [Yahtzee set](https://golemcraftworks.com/product/yahtzee-set): From $60, in stock.",
+    ),
+  );
 
   const feed = await (await get(live, "/feeds/google.xml")).text();
   // Only items with a photo can be listed; one entry per wood, grouped.
   assert.equal((feed.match(/<item>/g) || []).length, 2);
-  for (const part of ["<g:id>V_WAL</g:id>", "<g:title>Yahtzee set, Walnut</g:title>", "<g:price>65.00 USD</g:price>", "<g:availability>in_stock</g:availability>",
-    "<g:id>V_CHE</g:id>", "<g:availability>out_of_stock</g:availability>", "<g:item_group_id>I_YZ</g:item_group_id>",
-    "<g:link>https://golemcraftworks.com/product/yahtzee-set</g:link>", "<g:identifier_exists>no</g:identifier_exists>"]) {
+  for (const part of [
+    "<g:id>V_WAL</g:id>",
+    "<g:title>Yahtzee set, Walnut</g:title>",
+    "<g:price>65.00 USD</g:price>",
+    "<g:availability>in_stock</g:availability>",
+    "<g:id>V_CHE</g:id>",
+    "<g:availability>out_of_stock</g:availability>",
+    "<g:item_group_id>I_YZ</g:item_group_id>",
+    "<g:link>https://golemcraftworks.com/product/yahtzee-set</g:link>",
+    "<g:identifier_exists>no</g:identifier_exists>",
+  ]) {
     assert.ok(feed.includes(part), part);
   }
 
   // Before launch: everything is closed to search engines.
   const preview = makeEnv({ ASSETS, NOINDEX: "true" });
-  assert.equal(await (await get(preview, "/robots.txt")).text(), "User-agent: *\nDisallow: /\n");
-  assert.equal((await get(preview, "/product/yahtzee-set")).headers.get("x-robots-tag"), "noindex");
-  assert.equal((await get(preview, "/")).headers.get("x-robots-tag"), "noindex");
+  assert.equal(
+    await (await get(preview, "/robots.txt")).text(),
+    "User-agent: *\nDisallow: /\n",
+  );
+  assert.equal(
+    (await get(preview, "/product/yahtzee-set")).headers.get("x-robots-tag"),
+    "noindex",
+  );
+  assert.equal(
+    (await get(preview, "/")).headers.get("x-robots-tag"),
+    "noindex",
+  );
 });
 
 test("if Square is unreachable, pages are built from the last saved catalog", async () => {
@@ -811,53 +1713,116 @@ test("if Square is unreachable, pages are built from the last saved catalog", as
   await worker.fetch(new Request("https://w.example/api/products"), env, c);
   await c.done(); // the catalog is saved in the background
   const realFetch = globalThis.fetch;
-  globalThis.fetch = (async () => { throw new Error("Square is down"); }) as typeof fetch;
+  globalThis.fetch = (async () => {
+    throw new Error("Square is down");
+  }) as typeof fetch;
   try {
     const res = await get(env, "/product/yahtzee-set");
     assert.equal(res.status, 200);
     assert.ok((await res.text()).includes("<h1>Yahtzee set</h1>"));
-  } finally { globalThis.fetch = realFetch; }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test("catalog report: says why each Square item is or isn't on the site", async () => {
   state.catalog[0].is_deleted = true;
   const env = makeEnv();
-  assert.equal((await worker.fetch(new Request("https://w.example/admin/catalog"), env, ctx())).status, 404);
-  const r = (await (await worker.fetch(new Request("https://w.example/admin/catalog?token=admintoken"), env, ctx())).json()) as any;
-  assert.deepEqual(Object.fromEntries(r.items.map((i: any) => [i.name, i.status])), {
-    "Ember dice set": "deleted in Square", "Yahtzee set": "on the site",
-    "Sticker": "in a hidden category", "Archived thing": "archived in Square"
+  assert.equal(
+    (
+      await worker.fetch(
+        new Request("https://w.example/admin/catalog"),
+        env,
+        ctx(),
+      )
+    ).status,
+    404,
+  );
+  const r = (await (
+    await worker.fetch(
+      new Request("https://w.example/admin/catalog?token=admintoken"),
+      env,
+      ctx(),
+    )
+  ).json()) as any;
+  assert.deepEqual(
+    Object.fromEntries(r.items.map((i: any) => [i.name, i.status])),
+    {
+      "Ember dice set": "deleted in Square",
+      "Yahtzee set": "on the site",
+      Sticker: "in a hidden category",
+      "Archived thing": "archived in Square",
+    },
+  );
+  assert.deepEqual(r.totals, {
+    "deleted in Square": 1,
+    "on the site": 1,
+    "in a hidden category": 1,
+    "archived in Square": 1,
   });
-  assert.deepEqual(r.totals, { "deleted in Square": 1, "on the site": 1, "in a hidden category": 1, "archived in Square": 1 });
-  assert.deepEqual(r.items.find((i: any) => i.name === "Yahtzee set").skus, ["YZ-WAL", "YZ-CHE"]);
-  assert.equal(calls.find((c) => c.url.endsWith("/v2/catalog/search"))!.body.include_deleted_objects, true);
+  assert.deepEqual(r.items.find((i: any) => i.name === "Yahtzee set").skus, [
+    "YZ-WAL",
+    "YZ-CHE",
+  ]);
+  assert.equal(
+    calls.find((c) => c.url.endsWith("/v2/catalog/search"))!.body
+      .include_deleted_objects,
+    true,
+  );
 });
 
 test("admin endpoints require the token", async () => {
   const env = makeEnv();
-  const no = await worker.fetch(new Request("https://w.example/admin/status"), env, ctx());
+  const no = await worker.fetch(
+    new Request("https://w.example/admin/status"),
+    env,
+    ctx(),
+  );
   assert.equal(no.status, 404);
-  const yes = await worker.fetch(new Request("https://w.example/admin/status?token=admintoken"), env, ctx());
+  const yes = await worker.fetch(
+    new Request("https://w.example/admin/status?token=admintoken"),
+    env,
+    ctx(),
+  );
   assert.equal(yes.status, 200);
   assert.equal(((await yes.json()) as any).etsyConnected, true);
 });
 
 test("Etsy stock updates keep each offering's readiness state, which Etsy requires", async () => {
   const { inventoryForPut } = await import("../src/etsy.ts");
-  const offering = (extra: object) => ({ price: { amount: 4000, divisor: 100 }, quantity: 3, is_enabled: true, ...extra });
-  const put = inventoryForPut({ products: [
-    { sku: "A", offerings: [offering({ readiness_state_id: 77 })] },
-    { sku: "B", offerings: [offering({})] } // none of its own: borrows the listing's
-  ] }, new Map([["A", 1]]));
-  assert.deepEqual(put.products.map((p) => p.offerings), [
-    [{ price: 40, quantity: 1, is_enabled: true, readiness_state_id: 77 }],
-    [{ price: 40, quantity: 3, is_enabled: true, readiness_state_id: 77 }]
-  ]);
+  const offering = (extra: object) => ({
+    price: { amount: 4000, divisor: 100 },
+    quantity: 3,
+    is_enabled: true,
+    ...extra,
+  });
+  const put = inventoryForPut(
+    {
+      products: [
+        { sku: "A", offerings: [offering({ readiness_state_id: 77 })] },
+        { sku: "B", offerings: [offering({})] }, // none of its own: borrows the listing's
+      ],
+    },
+    new Map([["A", 1]]),
+  );
+  assert.deepEqual(
+    put.products.map((p) => p.offerings),
+    [
+      [{ price: 40, quantity: 1, is_enabled: true, readiness_state_id: 77 }],
+      [{ price: 40, quantity: 3, is_enabled: true, readiness_state_id: 77 }],
+    ],
+  );
 });
 
 test("hourly check: an Etsy SKU with no Square item is only reported while its listing is on sale", async () => {
   const env = makeEnv();
-  state.listings[404] = { listing_id: 404, state: "active", quantity: 1, skus: ["RPG-GONE"], title: "Gone" };
+  state.listings[404] = {
+    listing_id: 404,
+    state: "active",
+    quantity: 1,
+    skus: ["RPG-GONE"],
+    title: "Gone",
+  };
   assert.deepEqual((await reconcile(env)).etsyOnly, ["RPG-GONE"]);
   state.listings[404].state = "sold_out";
   assert.deepEqual((await reconcile(env)).etsyOnly, []);

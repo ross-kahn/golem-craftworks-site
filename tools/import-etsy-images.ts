@@ -30,72 +30,125 @@ const file = args.find((a) => !a.startsWith("--"));
 const APPLY = args.includes("--apply");
 const SANDBOX = args.includes("--sandbox");
 const INCLUDE_WITH_PHOTOS = args.includes("--include-items-with-photos");
-const MAX = Number((args.find((a) => a.startsWith("--max-images=")) || "=5").split("=")[1]);
+const MAX = Number(
+  (args.find((a) => a.startsWith("--max-images=")) || "=5").split("=")[1],
+);
 const TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 if (!file || !TOKEN) {
-  console.error("Usage: SQUARE_ACCESS_TOKEN=... node tools/import-etsy-images.ts <etsy-export.csv> [--apply]");
+  console.error(
+    "Usage: SQUARE_ACCESS_TOKEN=... node tools/import-etsy-images.ts <etsy-export.csv> [--apply]",
+  );
   process.exit(1);
 }
 
 const sq = squareClient({ token: TOKEN, sandbox: SANDBOX });
 
 async function squareItems() {
-  const items: SquareItem[] = []; let cursor: string | undefined;
+  const items: SquareItem[] = [];
+  let cursor: string | undefined;
   do {
-    const d = await sq<{ objects?: SquareItem[]; cursor?: string }>("/v2/catalog/search", postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }));
-    items.push(...(d.objects || [])); cursor = d.cursor;
+    const d = await sq<{ objects?: SquareItem[]; cursor?: string }>(
+      "/v2/catalog/search",
+      postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }),
+    );
+    items.push(...(d.objects || []));
+    cursor = d.cursor;
   } while (cursor);
   return items.filter((i) => !i.is_deleted && !i.item_data?.is_archived);
 }
 
-async function uploadImage(itemId: string, url: string, name: string, isPrimary: boolean) {
+async function uploadImage(
+  itemId: string,
+  url: string,
+  name: string,
+  isPrimary: boolean,
+) {
   const img = await fetch(url);
   if (!img.ok) throw new Error(`download failed ${img.status}`);
   const type = img.headers.get("content-type") || "image/jpeg";
   const blob = new Blob([await img.arrayBuffer()], { type });
   const form = new FormData();
-  form.append("request", new Blob([JSON.stringify({
-    idempotency_key: `etsy-img-${itemId}-${Buffer.from(url).toString("base64url").slice(-40)}`,
-    object_id: itemId,
-    is_primary: isPrimary,
-    image: { type: "IMAGE", id: "#etsy_image", image_data: { name } }
-  })], { type: "application/json" }));
-  form.append("image_file", blob, url.split("/").pop()!.split("?")[0] || "photo.jpg");
+  form.append(
+    "request",
+    new Blob(
+      [
+        JSON.stringify({
+          idempotency_key: `etsy-img-${itemId}-${Buffer.from(url).toString("base64url").slice(-40)}`,
+          object_id: itemId,
+          is_primary: isPrimary,
+          image: { type: "IMAGE", id: "#etsy_image", image_data: { name } },
+        }),
+      ],
+      { type: "application/json" },
+    ),
+  );
+  form.append(
+    "image_file",
+    blob,
+    url.split("/").pop()!.split("?")[0] || "photo.jpg",
+  );
   return sq("/v2/catalog/images", { method: "POST", body: form });
 }
 
 const rows = parseCSV(readFileSync(file, "utf8"));
 const items = await squareItems();
-const bySku = new Map<string, SquareItem>(); const byTitle = new Map<string, SquareItem>();
+const bySku = new Map<string, SquareItem>();
+const byTitle = new Map<string, SquareItem>();
 for (const it of items) {
   byTitle.set(norm(it.item_data.name), it);
   for (const v of it.item_data.variations || []) {
-    const sku = v.item_variation_data?.sku; if (sku) bySku.set(sku.trim(), it);
+    const sku = v.item_variation_data?.sku;
+    if (sku) bySku.set(sku.trim(), it);
   }
 }
 
-let planned = 0; const unmatched: string[] = []; const skippedHasPhotos: string[] = [];
+let planned = 0;
+const unmatched: string[] = [];
+const skippedHasPhotos: string[] = [];
 for (const r of rows) {
-  const skus = (r.SKU || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const item = skus.map((s) => bySku.get(s)).find(Boolean) || byTitle.get(norm(r.TITLE));
-  if (!item) { unmatched.push(r.TITLE); continue; }
-  if ((item.item_data.image_ids || []).length && !INCLUDE_WITH_PHOTOS) { skippedHasPhotos.push(item.item_data.name); continue; }
-  const urls = Array.from({ length: 10 }, (_, i) => r[`IMAGE${i + 1}`]).filter(Boolean).slice(0, MAX);
+  const skus = (r.SKU || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const item =
+    skus.map((s) => bySku.get(s)).find(Boolean) || byTitle.get(norm(r.TITLE));
+  if (!item) {
+    unmatched.push(r.TITLE);
+    continue;
+  }
+  if ((item.item_data.image_ids || []).length && !INCLUDE_WITH_PHOTOS) {
+    skippedHasPhotos.push(item.item_data.name);
+    continue;
+  }
+  const urls = Array.from({ length: 10 }, (_, i) => r[`IMAGE${i + 1}`])
+    .filter(Boolean)
+    .slice(0, MAX);
   if (!urls.length) continue;
-  console.log(`${APPLY ? "Uploading" : "Would upload"} ${urls.length} photo(s): "${r.TITLE}" -> Square "${item.item_data.name}"`);
+  console.log(
+    `${APPLY ? "Uploading" : "Would upload"} ${urls.length} photo(s): "${r.TITLE}" -> Square "${item.item_data.name}"`,
+  );
   for (const [i, u] of urls.entries()) {
     planned++;
     if (!APPLY) continue;
-    try { await uploadImage(item.id, u, `${item.item_data.name} ${i + 1}`, i === 0); }
-    catch (e) { console.log(`   ! ${u}: ${e instanceof Error ? e.message : e}`); }
+    try {
+      await uploadImage(item.id, u, `${item.item_data.name} ${i + 1}`, i === 0);
+    } catch (e) {
+      console.log(`   ! ${u}: ${e instanceof Error ? e.message : e}`);
+    }
   }
 }
 
 console.log(`\n${APPLY ? "Uploaded" : "Would upload"} ${planned} photo(s).`);
-if (skippedHasPhotos.length) console.log(`Skipped ${skippedHasPhotos.length} Square item(s) that already have photos.`);
+if (skippedHasPhotos.length)
+  console.log(
+    `Skipped ${skippedHasPhotos.length} Square item(s) that already have photos.`,
+  );
 if (unmatched.length) {
-  console.log(`\nNo Square match for ${unmatched.length} Etsy listing(s). Give them matching SKUs or titles:`);
+  console.log(
+    `\nNo Square match for ${unmatched.length} Etsy listing(s). Give them matching SKUs or titles:`,
+  );
   unmatched.forEach((t) => console.log("  - " + t));
 }
-if (!APPLY) console.log("\nThis was a preview. Run again with --apply to upload.");
+if (!APPLY)
+  console.log("\nThis was a preview. Run again with --apply to upload.");

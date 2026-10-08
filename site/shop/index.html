@@ -1,46 +1,72 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <!--ssr:head-->
-  <title>Shop · Golem Craftworks</title>
-  <meta name="description" content="Handmade by Golem Craftworks in Madison, Wisconsin.">
-  <meta property="og:title" content="Shop · Golem Craftworks">
-  <meta property="og:description" content="Handmade by Golem Craftworks in Madison, Wisconsin.">
-  <meta property="og:image" content="https://golemcraftworks.com/assets/logo.png">
-  <!--/ssr:head-->
-  <meta name="theme-color" content="#000000">
-  <script src="../js/theme.js"></script>
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../styles/main.css">
-</head>
-<body data-page="shop">
-  <header data-site-header></header>
-  <main id="main">
-    <section class="shop shop--category" aria-labelledby="shop-title">
-      <div class="wrap">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Shop</a> / <span data-category-name><!--ssr:crumb--><!--/ssr:crumb--></span></nav>
-        <div class="shop__head">
-          <h1 id="shop-title" data-category-name><!--ssr:title-->The shop<!--/ssr:title--></h1>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <!--ssr:head-->
+    <title>Shop · Golem Craftworks</title>
+    <meta
+      name="description"
+      content="Handmade by Golem Craftworks in Madison, Wisconsin."
+    />
+    <meta property="og:title" content="Shop · Golem Craftworks" />
+    <meta
+      property="og:description"
+      content="Handmade by Golem Craftworks in Madison, Wisconsin."
+    />
+    <meta
+      property="og:image"
+      content="https://golemcraftworks.com/assets/logo.png"
+    />
+    <!--/ssr:head-->
+    <meta name="theme-color" content="#000000" />
+    <script src="../js/theme.js"></script>
+    <link rel="icon" type="image/png" href="../assets/favicon.png" />
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles/main.css" />
+  </head>
+  <body data-page="shop">
+    <header data-site-header></header>
+    <main id="main">
+      <section class="shop shop--category" aria-labelledby="shop-title">
+        <div class="wrap">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a href="../">Shop</a> /
+            <span data-category-name><!--ssr:crumb--><!--/ssr:crumb--></span>
+          </nav>
+          <div class="shop__head">
+            <h1 id="shop-title" data-category-name>
+              <!--ssr:title-->The shop<!--/ssr:title-->
+            </h1>
+          </div>
+          <div class="notice" data-notice hidden></div>
+          <div class="shop__bar">
+            <nav class="filters" aria-label="Categories" data-filters>
+              <!--ssr:filters--><!--/ssr:filters-->
+            </nav>
+            <label class="toggle"
+              ><input type="checkbox" data-show-sold /> Show sold pieces</label
+            >
+          </div>
+          <ul class="grid" data-grid aria-live="polite">
+            <!--ssr:grid--><!--/ssr:grid-->
+          </ul>
         </div>
-        <div class="notice" data-notice hidden></div>
-        <div class="shop__bar">
-          <nav class="filters" aria-label="Categories" data-filters><!--ssr:filters--><!--/ssr:filters--></nav>
-          <label class="toggle"><input type="checkbox" data-show-sold> Show sold pieces</label>
-        </div>
-        <ul class="grid" data-grid aria-live="polite"><!--ssr:grid--><!--/ssr:grid--></ul>
-      </div>
-    </section>
-  </main>
-  <footer data-site-footer></footer>
-  <script src="../js/config.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/site.js"></script>
-  <script src="../js/shop.js"></script>
-</body>
+      </section>
+    </main>
+    <footer data-site-footer></footer>
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/site.js"></script>
+    <script src="../js/shop.js"></script>
+  </body>
 </html>

@@ -17,13 +17,20 @@
     // ---------- List ----------
     const stars = (n) => `<span class="stars" role="img" aria-label="${n} out of 5 stars">${"★".repeat(n)}<span class="stars__off">${"★".repeat(5 - n)}</span></span>`;
     function card(r) {
-        const when = new Date(r.at).toLocaleDateString("en-US", { year: "numeric", month: "long" });
+        const when = new Date(r.at).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+        });
         const from = r.source === "etsy" ? "Etsy buyer" : r.name;
         return `
       <li class="review">
         <p class="review__head">${stars(r.rating)}</p>
         ${r.text ? `<p class="review__text">${esc(r.text)}</p>` : ""}
-        ${r.photos.length ? `<div class="review__photos">${r.photos.map((src) => `<a href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="Photo from this review" loading="lazy"></a>`).join("")}</div>` : ""}
+        ${r.photos.length
+            ? `<div class="review__photos">${r.photos
+                .map((src) => `<a href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="Photo from this review" loading="lazy"></a>`)
+                .join("")}</div>`
+            : ""}
         <p class="review__by">${esc(from)}${r.product ? ` · ${esc(r.product)}` : ""} · ${esc(when)}${r.source === "etsy" ? " · on Etsy" : ""}</p>
       </li>`;
     }
@@ -35,19 +42,27 @@
             : `<li class="empty">No reviews here yet. Yours could be the first.</li>`;
         moreBtn.hidden = shown >= reviews.length;
     }
-    moreBtn.addEventListener("click", () => { shown += PAGE; render(); });
-    api.getReviews().then((data) => {
+    moreBtn.addEventListener("click", () => {
+        shown += PAGE;
+        render();
+    });
+    api
+        .getReviews()
+        .then((data) => {
         reviews = data.reviews;
         const s = data.stats;
         const parts = [
-            s.average !== null ? `${stars(Math.round(s.average))} ${s.average.toFixed(1)} from ${s.count.toLocaleString("en-US")} ${s.count === 1 ? "review" : "reviews"}` : "",
-            s.sales != null ? `${s.sales.toLocaleString("en-US")} sales` : ""
+            s.average !== null
+                ? `${stars(Math.round(s.average))} ${s.average.toFixed(1)} from ${s.count.toLocaleString("en-US")} ${s.count === 1 ? "review" : "reviews"}`
+                : "",
+            s.sales != null ? `${s.sales.toLocaleString("en-US")} sales` : "",
         ].filter(Boolean);
         summaryEl.innerHTML = parts.join(" · ");
         summaryEl.hidden = !parts.length;
         etsyNote.hidden = !reviews.some((r) => r.source === "etsy");
         render();
-    }).catch(() => {
+    })
+        .catch(() => {
         listEl.innerHTML = `<li class="empty">Reviews couldn't load right now. Refresh to try again.</li>`;
     });
     // ---------- Form ----------
@@ -63,7 +78,9 @@
             const canvas = document.createElement("canvas");
             canvas.width = Math.round(img.width * scale);
             canvas.height = Math.round(img.height * scale);
-            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas
+                .getContext("2d")
+                .drawImage(img, 0, 0, canvas.width, canvas.height);
             const blob = await new Promise((done) => canvas.toBlob(done, "image/jpeg", 0.85));
             return blob || file;
         }
@@ -73,7 +90,8 @@
     }
     // Cloudflare's spam check, only when a site key is set in config.ts.
     if (cfg.turnstileSiteKey) {
-        document.querySelector("[data-turnstile]").innerHTML = `<div class="cf-turnstile" data-sitekey="${esc(cfg.turnstileSiteKey)}"></div>`;
+        document.querySelector("[data-turnstile]").innerHTML =
+            `<div class="cf-turnstile" data-sitekey="${esc(cfg.turnstileSiteKey)}"></div>`;
         const s = document.createElement("script");
         s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
         s.async = true;
@@ -84,7 +102,9 @@
         e.preventDefault();
         const data = new FormData(form);
         const text = (name) => String(data.get(name) || "").trim();
-        const files = data.getAll("photos").filter((f) => f instanceof File && f.size > 0);
+        const files = data
+            .getAll("photos")
+            .filter((f) => f instanceof File && f.size > 0);
         const missing = [];
         if (!text("name"))
             missing.push("your name");
@@ -114,11 +134,15 @@
                 reviews.unshift(sent.review);
                 render();
             }
-            say(sent.review ? "Thank you! Your review is posted." : "Thank you! Your review is in.");
+            say(sent.review
+                ? "Thank you! Your review is posted."
+                : "Thank you! Your review is in.");
         }
         catch (e) {
             const err = e;
-            say(err.status && err.body && err.body.error ? err.message : "Your review didn't send. Try again in a moment.", true);
+            say(err.status && err.body && err.body.error
+                ? err.message
+                : "Your review didn't send. Try again in a moment.", true);
         }
         finally {
             button.disabled = false;

@@ -19,9 +19,14 @@ Perfect for your own TTRPG campaigns, or as a cool gift for someone who apprecia
 Thanks for checking out my work!`;
 
 // `"WILD MAGIC" TTRPG Dice Set` -> `WILD MAGIC`. Null for anything that isn't named like a dice set.
-export const diceSetName = (itemName: string) => itemName.trim().match(/^"(.+)" TTRPG Dice Set$/)?.[1] ?? null;
+export const diceSetName = (itemName: string) =>
+  itemName.trim().match(/^"(.+)" TTRPG Dice Set$/)?.[1] ?? null;
 
-const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 const opening = (s: string) => words(s).split(" ").slice(0, 4).join(" ");
 
 // A line of the template, or an older wording of one: it opens with the same four words. The title
@@ -31,35 +36,61 @@ function isTemplateLine(line: string) {
   if (!w) return false;
   return DICE_SET_TEMPLATE.split("\n").some((t) => {
     if (!words(t) || t.includes("{NOTES}")) return false;
-    return t.includes("{NAME}") ? w.endsWith(words(t.replace("{NAME}", ""))) : opening(line) === opening(t);
+    return t.includes("{NAME}")
+      ? w.endsWith(words(t.replace("{NAME}", "")))
+      : opening(line) === opening(t);
   });
 }
 
 // What a dice set's Square description says beyond the template: the set-specific part.
 export function setNotes(description: string) {
-  return description.split(/\r?\n/).filter((line) => !isTemplateLine(line)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return description
+    .split(/\r?\n/)
+    .filter((line) => !isTemplateLine(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // The full description for a dice set. Template lines still sitting in Square's text are dropped
 // first, so a description that hasn't been trimmed down yet doesn't say everything twice.
 export function diceSetDescription(name: string, squareText: string) {
-  return DICE_SET_TEMPLATE
-    .replace("{NAME}", () => name).replace("{NOTES}", () => setNotes(squareText))
-    .replace(/\n{3,}/g, "\n\n").trim();
+  return DICE_SET_TEMPLATE.replace("{NAME}", () => name)
+    .replace("{NOTES}", () => setNotes(squareText))
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // "can&#39;t" -> "can't". Text from Etsy and Square arrives with characters written as HTML codes.
-const NAMED_ENTITIES: Record<string, string> = { nbsp: " ", lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" };
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  amp: "&",
+};
 export const decodeEntities = (s: string) =>
   s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, dec, hex, name) =>
-    dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : NAMED_ENTITIES[name.toLowerCase()] ?? m);
+    dec
+      ? String.fromCodePoint(Number(dec))
+      : hex
+        ? String.fromCodePoint(parseInt(hex, 16))
+        : (NAMED_ENTITIES[name.toLowerCase()] ?? m),
+  );
 
 // Formatted text to plain text, keeping the shape: a blank line between paragraphs, single breaks within them.
 export function htmlToText(html?: string) {
   if (!html) return "";
-  return decodeEntities(html
-    .replace(/\s*\n\s*/g, " ")
-    .replace(/<\/(p|div|ul|ol|h\d)>/gi, "\n\n").replace(/<(br\s*\/?|\/li)>/gi, "\n").replace(/<li[^>]*>/gi, "- ")
-    .replace(/<[^>]+>/g, ""))
-    .replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return decodeEntities(
+    html
+      .replace(/\s*\n\s*/g, " ")
+      .replace(/<\/(p|div|ul|ol|h\d)>/gi, "\n\n")
+      .replace(/<(br\s*\/?|\/li)>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "- ")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

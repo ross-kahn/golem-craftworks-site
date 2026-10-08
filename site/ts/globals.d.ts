@@ -57,7 +57,10 @@ interface Variation extends RawVariation {
   available: number;
 }
 
-interface Product extends Omit<RawProduct, "category" | "variations" | "modifierLists" | "unique"> {
+interface Product extends Omit<
+  RawProduct,
+  "category" | "variations" | "modifierLists" | "unique"
+> {
   category: string; // "Other" when Square has none
   variations: Variation[];
   modifierLists: ModifierList[];
@@ -117,8 +120,13 @@ interface ApiError extends Error {
 interface GCApi {
   getProducts(opts?: { fresh?: boolean }): Promise<Product[]>;
   getProduct(id: string): Promise<Product | null>;
-  createCheckout(order: { lines: CartLine[]; fulfillment: Fulfillment }): Promise<{ url?: string }>;
-  sendCommission(data: CommissionData): Promise<{ ok: boolean; confirmationSent: boolean }>;
+  createCheckout(order: {
+    lines: CartLine[];
+    fulfillment: Fulfillment;
+  }): Promise<{ url?: string }>;
+  sendCommission(
+    data: CommissionData,
+  ): Promise<{ ok: boolean; confirmationSent: boolean }>;
   getReviews(): Promise<ReviewData>;
   sendReview(data: FormData): Promise<{ ok: boolean; review?: Review }>;
   money(cents: number | null | undefined): string;
@@ -134,7 +142,12 @@ type CartAddResult = { ok: true } | { ok: false; reason: string };
 interface GCCart {
   lines(): CartLine[];
   count(): number;
-  add(product: Product, variation: Variation, qty?: number, modifiers?: Modifier[]): CartAddResult;
+  add(
+    product: Product,
+    variation: Variation,
+    qty?: number,
+    modifiers?: Modifier[],
+  ): CartAddResult;
   setQty(key: string, qty: number): void;
   clear(): void;
 }

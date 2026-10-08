@@ -15,7 +15,9 @@
         try {
             bought = Number(sessionStorage.getItem("gc-bought")) || 0;
         }
-        catch (_) { /* storage unavailable */ }
+        catch (_) {
+            /* storage unavailable */
+        }
         if (e.persisted && bought > loadedAt)
             location.reload();
     });
@@ -24,9 +26,15 @@
         menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/></svg>',
         close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
         moon: '<svg class="when-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
-        sun: '<svg class="when-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+        sun: '<svg class="when-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     };
-    const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+    const ESCAPES = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    };
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESCAPES[c]);
     // ---------- Cart store ----------
     let memoryCart = [];
@@ -55,10 +63,13 @@
             return "ship";
         }
     }
-    function setFulfillment(v) { try {
-        localStorage.setItem(FULFIL_KEY, v);
+    function setFulfillment(v) {
+        try {
+            localStorage.setItem(FULFIL_KEY, v);
+        }
+        catch (_) { }
+        renderDrawer();
     }
-    catch (_) { } renderDrawer(); }
     // How many of a variation are in the cart across all of its lines.
     const inCart = (lines, variationId) => lines.reduce((n, l) => n + (l.variationId === variationId ? l.qty : 0), 0);
     const cart = {
@@ -71,9 +82,16 @@
             const max = variation.available;
             const room = max - inCart(lines, variation.id);
             if (room <= 0)
-                return { ok: false, reason: max === 1 ? "That piece is already in your cart." : `Only ${max} available.` };
-            lines.forEach((l) => { if (l.variationId === variation.id)
-                l.max = max; });
+                return {
+                    ok: false,
+                    reason: max === 1
+                        ? "That piece is already in your cart."
+                        : `Only ${max} available.`,
+                };
+            lines.forEach((l) => {
+                if (l.variationId === variation.id)
+                    l.max = max;
+            });
             if (existing) {
                 existing.qty += Math.min(qty, room);
             }
@@ -85,10 +103,11 @@
                     name: product.name,
                     variationName: product.variations.length > 1 ? variation.name : "",
                     modifiers: modifiers.map((m) => ({ id: m.id, name: m.name })),
-                    priceCents: variation.priceCents + modifiers.reduce((n, m) => n + m.priceCents, 0),
+                    priceCents: variation.priceCents +
+                        modifiers.reduce((n, m) => n + m.priceCents, 0),
                     image: (product.images && product.images[0]) || "",
                     qty: Math.min(qty, room),
-                    max
+                    max,
                 });
             }
             writeCart(lines);
@@ -96,16 +115,22 @@
         },
         setQty(key, qty) {
             let lines = readCart();
-            lines = lines.map((l) => (l.key === key ? { ...l, qty } : l)).filter((l) => l.qty > 0);
+            lines = lines
+                .map((l) => (l.key === key ? { ...l, qty } : l))
+                .filter((l) => l.qty > 0);
             writeCart(lines);
         },
-        clear() { writeCart([]); }
+        clear() {
+            writeCart([]);
+        },
     };
     // ---------- Theme ----------
     // theme.ts picks the starting theme in <head>; this flips it and remembers the choice.
     // The switch names the theme it leads to; CSS shows the half that applies.
     const themeLabel = '<span class="when-light">Dark mode</span><span class="when-dark">Light mode</span>';
-    const themeTip = () => (document.documentElement.dataset.theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+    const themeTip = () => document.documentElement.dataset.theme === "dark"
+        ? "Switch to light mode"
+        : "Switch to dark mode";
     function toggleTheme() {
         const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
         document.documentElement.dataset.theme = next;
@@ -113,7 +138,9 @@
             localStorage.setItem(THEME_KEY, next);
         }
         catch (_) { }
-        document.querySelectorAll(".theme-btn").forEach((b) => { b.title = themeTip(); });
+        document.querySelectorAll(".theme-btn").forEach((b) => {
+            b.title = themeTip();
+        });
     }
     // ---------- Chrome ----------
     function header(active) {
@@ -122,7 +149,7 @@
             link(root, "Shop", "shop"),
             link(root + "commissions/", "Commissions", "commissions"),
             link(root + "reviews/", "Reviews", "reviews"),
-            link(root + "about/", "About", "about")
+            link(root + "about/", "About", "about"),
         ].join("");
         return `
       <a class="skip-link" href="#main">Skip to content</a>
@@ -197,7 +224,9 @@
     }
     function renderCount() {
         const n = cart.count();
-        document.querySelectorAll("[data-cart-count]").forEach((el) => {
+        document
+            .querySelectorAll("[data-cart-count]")
+            .forEach((el) => {
             el.textContent = String(n);
             el.dataset.empty = n === 0 ? "true" : "false";
         });
@@ -221,9 +250,12 @@
             foot.innerHTML = "";
             return;
         }
-        body.innerHTML = lines.map((l) => {
+        body.innerHTML = lines
+            .map((l) => {
             const note = lineNotes[l.key];
-            const variant = [l.variationName, ...l.modifiers.map((m) => m.name)].filter(Boolean).join(" · ");
+            const variant = [l.variationName, ...l.modifiers.map((m) => m.name)]
+                .filter(Boolean)
+                .join(" · ");
             return `
       <div class="line">
         <div class="line__img">${l.image ? `<img src="${esc(l.image)}" alt="">` : `<div class="ph"><img src="${root}assets/logo.png" alt=""></div>`}</div>
@@ -241,7 +273,8 @@
         </div>
         <div class="line__price">${api.money(l.priceCents * l.qty)}</div>
       </div>`;
-        }).join("");
+        })
+            .join("");
         const subtotal = lines.reduce((n, l) => n + l.priceCents * l.qty, 0);
         const f = getFulfillment();
         const shipping = f === "ship" ? cfg.shippingCents : 0;
@@ -274,17 +307,20 @@
             }
             const chosen = chosenModifiers(hit.p, l.modifiers.map((m) => m.id));
             if (!chosen) {
-                lineNotes[l.key] = "The options on this have changed. Remove it and add it again.";
+                lineNotes[l.key] =
+                    "The options on this have changed. Remove it and add it again.";
                 return { ...l, max: 0 };
             }
             const next = {
-                ...l, max: hit.v.available,
+                ...l,
+                max: hit.v.available,
                 modifiers: chosen.map((m) => ({ id: m.id, name: m.name })),
-                priceCents: hit.v.priceCents + chosen.reduce((n, m) => n + m.priceCents, 0)
+                priceCents: hit.v.priceCents + chosen.reduce((n, m) => n + m.priceCents, 0),
             };
             if (l.qty > remaining) {
                 next.qty = remaining;
-                lineNotes[l.key] = `Only ${hit.v.available} left, so your quantity was lowered.`;
+                lineNotes[l.key] =
+                    `Only ${hit.v.available} left, so your quantity was lowered.`;
             }
             left.set(l.variationId, remaining - next.qty);
             return next;
@@ -311,11 +347,15 @@
         try {
             const ok = await reconcileCart();
             if (!ok) {
-                checkoutError = "Something in your cart is no longer available. Remove it to continue.";
+                checkoutError =
+                    "Something in your cart is no longer available. Remove it to continue.";
                 renderDrawer();
                 return;
             }
-            const res = await api.createCheckout({ lines: readCart(), fulfillment: getFulfillment() });
+            const res = await api.createCheckout({
+                lines: readCart(),
+                fulfillment: getFulfillment(),
+            });
             if (res && res.url) {
                 window.location.href = res.url;
                 return;
@@ -324,11 +364,14 @@
         }
         catch (e) {
             const err = e;
-            const flag = (ids, note) => readCart().forEach((l) => { if (ids && ids.includes(l.variationId))
-                lineNotes[l.key] = note; });
+            const flag = (ids, note) => readCart().forEach((l) => {
+                if (ids && ids.includes(l.variationId))
+                    lineNotes[l.key] = note;
+            });
             flag(err.body?.soldOut, "This just sold. Remove it to continue.");
             flag(err.body?.changed, "The options on this have changed. Remove it and add it again.");
-            checkoutError = err.message || "Checkout couldn't start. Try again in a moment.";
+            checkoutError =
+                err.message || "Checkout couldn't start. Try again in a moment.";
             renderDrawer();
         }
     }
@@ -419,10 +462,12 @@
             if (e.key === "Escape" && document.querySelector(".drawer.is-open"))
                 closeCart();
         });
-        window.addEventListener("storage", (e) => { if (e.key === CART_KEY) {
-            renderCount();
-            renderDrawer();
-        } });
+        window.addEventListener("storage", (e) => {
+            if (e.key === CART_KEY) {
+                renderCount();
+                renderDrawer();
+            }
+        });
     }
     window.GC = { cart, openCart, toast, esc, root };
     if (document.readyState === "loading")

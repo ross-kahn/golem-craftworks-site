@@ -54,7 +54,11 @@ export interface SquareVariationData {
   pricing_type?: string;
   sellable?: boolean;
   track_inventory?: boolean;
-  location_overrides?: { location_id: string; track_inventory?: boolean; sold_out?: boolean }[];
+  location_overrides?: {
+    location_id: string;
+    track_inventory?: boolean;
+    sold_out?: boolean;
+  }[];
   image_ids?: string[];
 }
 
@@ -102,7 +106,11 @@ export interface SquareModifierData {
   on_by_default?: boolean;
   hidden_online?: boolean;
   ordinal?: number;
-  location_overrides?: { location_id: string; price_money?: SquareMoney; sold_out?: boolean }[];
+  location_overrides?: {
+    location_id: string;
+    price_money?: SquareMoney;
+    sold_out?: boolean;
+  }[];
 }
 
 export interface SquareObject {
@@ -133,7 +141,9 @@ export interface SquareCount {
 export interface SquareWebhookEvent {
   event_id?: string;
   type?: string;
-  data?: { object?: { inventory_counts?: SquareCount[]; payment?: SquarePayment } };
+  data?: {
+    object?: { inventory_counts?: SquareCount[]; payment?: SquarePayment };
+  };
 }
 
 // The parts of a Square payment the sale email uses.
@@ -153,8 +163,15 @@ export interface SquarePayment {
 }
 
 export interface SquareAddress {
-  first_name?: string; last_name?: string; address_line_1?: string; address_line_2?: string; address_line_3?: string;
-  locality?: string; administrative_district_level_1?: string; postal_code?: string; country?: string;
+  first_name?: string;
+  last_name?: string;
+  address_line_1?: string;
+  address_line_2?: string;
+  address_line_3?: string;
+  locality?: string;
+  administrative_district_level_1?: string;
+  postal_code?: string;
+  country?: string;
 }
 
 export interface StorefrontVariation {
@@ -195,7 +212,9 @@ export interface StorefrontProduct {
 }
 
 // What the site and its pages are given: no SKUs, which are internal.
-export type PublicProduct = Omit<StorefrontProduct, "variations"> & { variations: Omit<StorefrontVariation, "sku">[] };
+export type PublicProduct = Omit<StorefrontProduct, "variations"> & {
+  variations: Omit<StorefrontVariation, "sku">[];
+};
 
 export interface StorefrontCatalog {
   products: PublicProduct[];
@@ -346,9 +365,20 @@ export interface ReceiptResult {
 export interface ReconcileReport {
   at: string;
   etsySalesChecked: number;
-  changed: { sku: string; listing: number; from?: number; to?: number; dryRun: boolean }[];
+  changed: {
+    sku: string;
+    listing: number;
+    from?: number;
+    to?: number;
+    dryRun: boolean;
+  }[];
   // In stock in Square but not on sale on Etsy: the sync never republishes, so these wait for you.
-  notPublished: { listing: number; title?: string; state: string; square: number }[];
+  notPublished: {
+    listing: number;
+    title?: string;
+    state: string;
+    square: number;
+  }[];
   squareOnly: string[];
   etsyOnly: string[];
   errors: string[];
@@ -357,7 +387,13 @@ export interface ReconcileReport {
 export interface DraftReport {
   at: string;
   dryRun: boolean;
-  created: { sku: string; listingId: number; title: string; photos: number; published: boolean }[];
+  created: {
+    sku: string;
+    listingId: number;
+    title: string;
+    photos: number;
+    published: boolean;
+  }[];
   waiting: string[]; // SKUs that qualify but weren't made this run
   photosUpdated: { sku: string; listingId: number; photos: number }[];
   photosWaiting: string[]; // SKUs whose Square photos changed but Etsy's weren't replaced this run

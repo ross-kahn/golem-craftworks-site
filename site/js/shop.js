@@ -12,7 +12,9 @@
     const slug = api.slugify(new URLSearchParams(location.search).get("category") ||
         decodeURIComponent((location.pathname.split("/shop/")[1] || "").replace(/\/$/, "")));
     // The Worker serves each product at a readable address. Demo mode has no Worker, so it uses the plain page.
-    const productLink = (p) => api.isDemo() || !p.slug ? `${root}product/?id=${encodeURIComponent(p.id)}` : `${root}product/${encodeURIComponent(p.slug)}`;
+    const productLink = (p) => api.isDemo() || !p.slug
+        ? `${root}product/?id=${encodeURIComponent(p.id)}`
+        : `${root}product/${encodeURIComponent(p.slug)}`;
     function card(p) {
         const img = p.images && p.images[0];
         const media = img
@@ -42,10 +44,14 @@
     // A to Z, with "Other" last: the same order as the home page.
     function renderFilters() {
         const names = new Map();
-        products.forEach((p) => { if (!names.has(api.slugify(p.category)))
-            names.set(api.slugify(p.category), p.category); });
+        products.forEach((p) => {
+            if (!names.has(api.slugify(p.category)))
+                names.set(api.slugify(p.category), p.category);
+        });
         const cats = [...names].sort(([, a], [, b]) => Number(a === "Other") - Number(b === "Other") || a.localeCompare(b));
-        filtersEl.innerHTML = cats.map(([s, name]) => `<a class="chip" href="${esc(api.categoryLink(name))}"${s === slug ? ' aria-current="page"' : ""}>${esc(name)}</a>`).join("");
+        filtersEl.innerHTML = cats
+            .map(([s, name]) => `<a class="chip" href="${esc(api.categoryLink(name))}"${s === slug ? ' aria-current="page"' : ""}>${esc(name)}</a>`)
+            .join("");
         return names.get(slug);
     }
     function render() {
@@ -63,7 +69,8 @@
     // The Worker may have filled the grid already; only show placeholders when it's empty.
     if (!grid.children.length)
         grid.innerHTML = Array.from({ length: 8 }, () => `<li><div class="skeleton"></div><div class="skeleton-line"></div></li>`).join("");
-    api.getProducts()
+    api
+        .getProducts()
         .then((data) => {
         products = data;
         if (api.isDemo()) {
@@ -77,7 +84,11 @@
             return;
         }
         document.title = `${name} · Golem Craftworks`;
-        document.querySelectorAll("[data-category-name]").forEach((el) => { el.textContent = name; });
+        document
+            .querySelectorAll("[data-category-name]")
+            .forEach((el) => {
+            el.textContent = name;
+        });
         render();
     })
         .catch(() => {

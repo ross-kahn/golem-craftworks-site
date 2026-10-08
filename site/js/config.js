@@ -17,5 +17,5 @@ window.GC_CONFIG = {
     shippingCents: 800,
     pickupLabel: "Local pickup or drop-off in Madison, WI",
     pickupNote: "I'll email you to set a time.",
-    currency: "USD"
+    currency: "USD",
 };

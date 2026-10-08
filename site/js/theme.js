@@ -6,7 +6,11 @@
     try {
         saved = localStorage.getItem("gc-theme");
     }
-    catch (_) { /* storage unavailable */ }
-    const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    catch (_) {
+        /* storage unavailable */
+    }
+    const dark = saved
+        ? saved === "dark"
+        : matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.dataset.theme = dark ? "dark" : "light";
 })();

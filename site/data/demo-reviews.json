@@ -1,39 +1,39 @@
 {
- "reviews": [
-  {
-   "id": "demo-1",
-   "source": "site",
-   "name": "Sam",
-   "rating": 5,
-   "text": "Sample review. Real ones come from Etsy and from this page's form once the Worker is connected.",
-   "product": "Hex dice vault",
-   "photos": [],
-   "at": "2026-09-12T00:00:00Z"
-  },
-  {
-   "id": "demo-2",
-   "source": "etsy",
-   "name": "Etsy buyer",
-   "rating": 5,
-   "text": "Sample Etsy review. The dice are even better in person, and the box arrived well packed.",
-   "product": "",
-   "photos": [],
-   "at": "2026-08-03T00:00:00Z"
-  },
-  {
-   "id": "demo-3",
-   "source": "etsy",
-   "name": "Etsy buyer",
-   "rating": 4,
-   "text": "Sample Etsy review. Lovely set; shipping took a little longer than I expected.",
-   "product": "",
-   "photos": [],
-   "at": "2026-06-20T00:00:00Z"
+  "reviews": [
+    {
+      "id": "demo-1",
+      "source": "site",
+      "name": "Sam",
+      "rating": 5,
+      "text": "Sample review. Real ones come from Etsy and from this page's form once the Worker is connected.",
+      "product": "Hex dice vault",
+      "photos": [],
+      "at": "2026-09-12T00:00:00Z"
+    },
+    {
+      "id": "demo-2",
+      "source": "etsy",
+      "name": "Etsy buyer",
+      "rating": 5,
+      "text": "Sample Etsy review. The dice are even better in person, and the box arrived well packed.",
+      "product": "",
+      "photos": [],
+      "at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "id": "demo-3",
+      "source": "etsy",
+      "name": "Etsy buyer",
+      "rating": 4,
+      "text": "Sample Etsy review. Lovely set; shipping took a little longer than I expected.",
+      "product": "",
+      "photos": [],
+      "at": "2026-06-20T00:00:00Z"
+    }
+  ],
+  "stats": {
+    "count": 3,
+    "average": 4.7,
+    "sales": 1234
   }
- ],
- "stats": {
-  "count": 3,
-  "average": 4.7,
-  "sales": 1234
- }
 }

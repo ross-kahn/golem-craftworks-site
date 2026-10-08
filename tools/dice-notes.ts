@@ -12,18 +12,44 @@ export interface SetNotes {
   changed: boolean;
 }
 
-export function planNotes(items: { id: string; name: string; description: string }[]): SetNotes[] {
+export function planNotes(
+  items: { id: string; name: string; description: string }[],
+): SetNotes[] {
   const sets = items.flatMap((item) => {
     const name = diceSetName(item.name);
-    return name ? [{ id: item.id, name, description: item.description.trim(), lines: setNotes(item.description).split("\n") }] : [];
+    return name
+      ? [
+          {
+            id: item.id,
+            name,
+            description: item.description.trim(),
+            lines: setNotes(item.description).split("\n"),
+          },
+        ]
+      : [];
   });
   const uses = new Map<string, number>();
-  for (const s of sets) for (const line of new Set(s.lines.map(norm))) if (line) uses.set(line, (uses.get(line) || 0) + 1);
+  for (const s of sets)
+    for (const line of new Set(s.lines.map(norm)))
+      if (line) uses.set(line, (uses.get(line) || 0) + 1);
 
   return sets.map((s) => {
     // A line on several sets was pasted along from one of them. It stays only on the set it names.
-    const copied = s.lines.filter((line) => (uses.get(norm(line)) || 0) > 1 && !norm(line).includes(norm(s.name)));
-    const notes = s.lines.filter((line) => !copied.includes(line)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
-    return { id: s.id, name: s.name, notes, copied, changed: notes !== s.description };
+    const copied = s.lines.filter(
+      (line) =>
+        (uses.get(norm(line)) || 0) > 1 && !norm(line).includes(norm(s.name)),
+    );
+    const notes = s.lines
+      .filter((line) => !copied.includes(line))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return {
+      id: s.id,
+      name: s.name,
+      notes,
+      copied,
+      changed: notes !== s.description,
+    };
   });
 }

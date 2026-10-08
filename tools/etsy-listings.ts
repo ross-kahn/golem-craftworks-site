@@ -55,11 +55,19 @@ export function diceSetTitle(title: string): string | null {
 }
 
 // Columns the import uses directly. Anything else is carried along as metadata.
-const CORE = /^(DESCRIPTION|PRICE|CURRENCY_CODE|QUANTITY|SKU|IMAGE\d+|VARIATION \d+ (TYPE|NAME|VALUES))$/;
+const CORE =
+  /^(DESCRIPTION|PRICE|CURRENCY_CODE|QUANTITY|SKU|IMAGE\d+|VARIATION \d+ (TYPE|NAME|VALUES))$/;
 
-const list = (s: string | undefined) => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const list = (s: string | undefined) =>
+  (s || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 
-export function planListings(rows: Record<string, string>[], existing: { skus: Set<string>; titles: Set<string> }): Plan {
+export function planListings(
+  rows: Record<string, string>[],
+  existing: { skus: Set<string>; titles: Set<string> },
+): Plan {
   const plan: Plan = { create: [], update: [], skipped: [] };
   const claimed = new Set<string>(); // SKUs an earlier row has already used
   // SKUs are compared without regard to case: "yahtzee-walnut" on Etsy is "YAHTZEE-WALNUT" in Square.
@@ -71,46 +79,90 @@ export function planListings(rows: Record<string, string>[], existing: { skus: S
     const short = diceSetTitle(etsyTitle);
     const title = short || etsyTitle;
     const skus = list(r.SKU);
-    const skip = (reason: string) => { plan.skipped.push({ title, reason }); };
-    if (!title) { skip("no title"); continue; }
+    const skip = (reason: string) => {
+      plan.skipped.push({ title, reason });
+    };
+    if (!title) {
+      skip("no title");
+      continue;
+    }
     const repeat = skus.find((s) => claimed.has(s.toLowerCase()));
-    if (repeat) { skip(`SKU ${repeat} is on an earlier listing in this export`); continue; }
+    if (repeat) {
+      skip(`SKU ${repeat} is on an earlier listing in this export`);
+      continue;
+    }
 
     const details: ListingDetails = {
       title,
       description: r.DESCRIPTION || "",
-      metadata: Object.fromEntries(Object.entries(r).filter(([k, v]) => v && !CORE.test(k)))
+      metadata: Object.fromEntries(
+        Object.entries(r).filter(([k, v]) => v && !CORE.test(k)),
+      ),
     };
 
     // Already in Square under this SKU: bring its details up to date, leave price and stock alone.
     const match = skus.find((s) => inSquare.has(s.toLowerCase()));
     if (match) {
-      plan.update.push({ ...details, sku: inSquare.get(match.toLowerCase())!, keepTitle: !short });
+      plan.update.push({
+        ...details,
+        sku: inSquare.get(match.toLowerCase())!,
+        keepTitle: !short,
+      });
       skus.forEach((s) => claimed.add(s.toLowerCase()));
       continue;
     }
 
     const price = Math.round(Number(r.PRICE) * 100);
-    if (!(price > 0)) { skip(`no usable price ("${r.PRICE || ""}")`); continue; }
-    if (seenTitles.has(norm(title)) || seenTitles.has(norm(etsyTitle))) { skip("an item with this title is already in Square under a different SKU"); continue; }
+    if (!(price > 0)) {
+      skip(`no usable price ("${r.PRICE || ""}")`);
+      continue;
+    }
+    if (seenTitles.has(norm(title)) || seenTitles.has(norm(etsyTitle))) {
+      skip(
+        "an item with this title is already in Square under a different SKU",
+      );
+      continue;
+    }
 
     // Etsy lists up to two options ("Wood: Walnut, Maple"). One becomes Square variations; two are combined.
-    const a = list(r["VARIATION 1 VALUES"]), b = list(r["VARIATION 2 VALUES"]);
-    const names = !a.length ? [] : !b.length ? a : a.flatMap((x) => b.map((y) => `${x}, ${y}`));
+    const a = list(r["VARIATION 1 VALUES"]),
+      b = list(r["VARIATION 2 VALUES"]);
+    const names = !a.length
+      ? []
+      : !b.length
+        ? a
+        : a.flatMap((x) => b.map((y) => `${x}, ${y}`));
     const notes: string[] = [];
     let variations: PlannedVariation[];
     if (names.length > 1) {
       // Only pair SKUs with options when they line up one to one; otherwise any pairing would be a guess.
       const paired = skus.length === names.length;
-      if (skus.length && !paired) notes.push(`${skus.length} SKUs (${skus.join(", ")}) for ${names.length} options: left off, add them in Square`);
-      variations = names.map((name, i) => ({ name, sku: paired ? skus[i] : "" }));
-      notes.push("prices per option aren't in Etsy's export: every option gets the listing price");
+      if (skus.length && !paired)
+        notes.push(
+          `${skus.length} SKUs (${skus.join(", ")}) for ${names.length} options: left off, add them in Square`,
+        );
+      variations = names.map((name, i) => ({
+        name,
+        sku: paired ? skus[i] : "",
+      }));
+      notes.push(
+        "prices per option aren't in Etsy's export: every option gets the listing price",
+      );
     } else {
       variations = [{ name: names[0] || "Regular", sku: skus[0] || "" }];
-      if (!skus.length) notes.push("no SKU: the Etsy sync can't match this until both sides have one");
+      if (!skus.length)
+        notes.push(
+          "no SKU: the Etsy sync can't match this until both sides have one",
+        );
     }
 
-    plan.create.push({ ...details, priceCents: price, currency: r.CURRENCY_CODE || "USD", variations, notes });
+    plan.create.push({
+      ...details,
+      priceCents: price,
+      currency: r.CURRENCY_CODE || "USD",
+      variations,
+      notes,
+    });
     skus.forEach((s) => claimed.add(s.toLowerCase()));
     seenTitles.add(norm(title));
   }
@@ -119,6 +171,9 @@ export function planListings(rows: Record<string, string>[], existing: { skus: S
 
 // Square custom attribute for one metadata column: "TAGS" -> key "etsy_tags", shown as "Etsy tags".
 export const attributeFor = (column: string) => ({
-  key: `etsy_${column.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`.slice(0, 60),
-  name: `Etsy ${column.toLowerCase().replace(/_/g, " ")}`
+  key: `etsy_${column
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")}`.slice(0, 60),
+  name: `Etsy ${column.toLowerCase().replace(/_/g, " ")}`,
 });

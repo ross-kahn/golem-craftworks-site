@@ -39,7 +39,9 @@ const APPLY = args.includes("--apply");
 const TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 if (!TOKEN) {
-  console.error("Usage: SQUARE_ACCESS_TOKEN=... node tools/clear-dice-descriptions.ts [--apply]");
+  console.error(
+    "Usage: SQUARE_ACCESS_TOKEN=... node tools/clear-dice-descriptions.ts [--apply]",
+  );
   process.exit(1);
 }
 
@@ -48,36 +50,80 @@ const sq = squareClient({ token: TOKEN, sandbox: args.includes("--sandbox") });
 const items: CatalogObject[] = [];
 let cursor: string | undefined;
 do {
-  const d = await sq<{ objects?: CatalogObject[]; cursor?: string }>("/v2/catalog/search", postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }));
-  items.push(...(d.objects || []).filter((o) => !o.is_deleted)); cursor = d.cursor;
+  const d = await sq<{ objects?: CatalogObject[]; cursor?: string }>(
+    "/v2/catalog/search",
+    postJSON({ object_types: ["ITEM"], cursor, limit: 1000 }),
+  );
+  items.push(...(d.objects || []).filter((o) => !o.is_deleted));
+  cursor = d.cursor;
 } while (cursor);
 
 const byId = new Map(items.map((i) => [i.id, i]));
-const plan = planNotes(items.map((i) => {
-  const d = i.item_data || {};
-  // The formatted description first: Square's plain-text copy runs every paragraph together.
-  return { id: i.id, name: d.name || "", description: htmlToText(d.description_html) || d.description_plaintext || d.description || "" };
-}));
+const plan = planNotes(
+  items.map((i) => {
+    const d = i.item_data || {};
+    // The formatted description first: Square's plain-text copy runs every paragraph together.
+    return {
+      id: i.id,
+      name: d.name || "",
+      description:
+        htmlToText(d.description_html) ||
+        d.description_plaintext ||
+        d.description ||
+        "",
+    };
+  }),
+);
 const changes = plan.filter((s) => s.changed);
 
-console.log(`${plan.length} dice set(s) in Square, ${changes.length} to trim.\n`);
+console.log(
+  `${plan.length} dice set(s) in Square, ${changes.length} to trim.\n`,
+);
 for (const s of plan) {
   console.log(`${s.name}${s.changed ? "" : "  (already trimmed)"}`);
-  console.log(s.notes ? s.notes.split("\n").map((l) => `   ${l}`).join("\n") : "   (nothing of its own: the description will be empty)");
-  s.copied.forEach((l) => console.log(`   dropped, belongs to another set: ${l}`));
+  console.log(
+    s.notes
+      ? s.notes
+          .split("\n")
+          .map((l) => `   ${l}`)
+          .join("\n")
+      : "   (nothing of its own: the description will be empty)",
+  );
+  s.copied.forEach((l) =>
+    console.log(`   dropped, belongs to another set: ${l}`),
+  );
   console.log("");
 }
 
 if (APPLY && changes.length) {
   const objects = changes.map((s) => {
     const item = byId.get(s.id)!;
-    const { description: _old, description_plaintext: _derived, description_html: _html, ...data } = item.item_data || {};
-    return { ...item, item_data: { ...data, ...(s.notes ? { description_html: descriptionHtml(s.notes) } : {}) } };
+    const {
+      description: _old,
+      description_plaintext: _derived,
+      description_html: _html,
+      ...data
+    } = item.item_data || {};
+    return {
+      ...item,
+      item_data: {
+        ...data,
+        ...(s.notes ? { description_html: descriptionHtml(s.notes) } : {}),
+      },
+    };
   });
   for (let i = 0; i < objects.length; i += 20) {
-    await sq("/v2/catalog/batch-upsert", postJSON({ idempotency_key: randomUUID(), batches: [{ objects: objects.slice(i, i + 20) }] }));
+    await sq(
+      "/v2/catalog/batch-upsert",
+      postJSON({
+        idempotency_key: randomUUID(),
+        batches: [{ objects: objects.slice(i, i + 20) }],
+      }),
+    );
   }
   console.log(`Trimmed ${changes.length} description(s).`);
 } else {
-  console.log(`${changes.length} to trim.${APPLY ? "" : " This was a preview. Run again with --apply to make the changes."}`);
+  console.log(
+    `${changes.length} to trim.${APPLY ? "" : " This was a preview. Run again with --apply to make the changes."}`,
+  );
 }

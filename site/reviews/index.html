@@ -1,92 +1,211 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reviews · Golem Craftworks</title>
-  <meta name="description" content="What people say about Golem Craftworks dice, vaults, and game sets.">
-  <meta property="og:title" content="Reviews · Golem Craftworks">
-  <meta property="og:description" content="What people say about Golem Craftworks dice, vaults, and game sets.">
-  <meta property="og:image" content="https://golemcraftworks.com/assets/logo.png">
-  <link rel="canonical" href="https://golemcraftworks.com/reviews/">
-  <meta name="theme-color" content="#000000">
-  <script src="../js/theme.js"></script>
-  <link rel="icon" type="image/png" href="../assets/favicon.png">
-  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../styles/main.css">
-</head>
-<body data-page="reviews">
-  <header data-site-header></header>
-  <main id="main">
-    <div class="wrap">
-      <header class="page-head">
-        <h1>What people say.</h1>
-        <p>Reviews from Etsy buyers and from people who bought here or in person.</p>
-        <p class="review-summary" data-review-summary hidden></p>
-      </header>
-      <div class="split">
-        <div>
-          <ul class="reviews" data-reviews aria-live="polite"></ul>
-          <p><button class="btn btn--ghost" type="button" data-more-reviews hidden>Show more reviews</button></p>
-          <p class="review-legal" data-etsy-note hidden>Etsy reviews are shown through the Etsy API. The term "Etsy" is a trademark of Etsy, Inc. This site uses the Etsy API but is not endorsed or certified by Etsy, Inc.</p>
-        </div>
-        <div>
-          <div class="form-panel">
-            <h2>Leave a review</h2>
-            <form class="form" data-review-form novalidate>
-              <fieldset class="field stars-input">
-                <legend>Your rating</legend>
-                <div class="stars-input__row">
-                  <input type="radio" name="rating" value="5" id="r-5"><label for="r-5"><span class="visually-hidden">5 stars</span></label>
-                  <input type="radio" name="rating" value="4" id="r-4"><label for="r-4"><span class="visually-hidden">4 stars</span></label>
-                  <input type="radio" name="rating" value="3" id="r-3"><label for="r-3"><span class="visually-hidden">3 stars</span></label>
-                  <input type="radio" name="rating" value="2" id="r-2"><label for="r-2"><span class="visually-hidden">2 stars</span></label>
-                  <input type="radio" name="rating" value="1" id="r-1"><label for="r-1"><span class="visually-hidden">1 star</span></label>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Reviews · Golem Craftworks</title>
+    <meta
+      name="description"
+      content="What people say about Golem Craftworks dice, vaults, and game sets."
+    />
+    <meta property="og:title" content="Reviews · Golem Craftworks" />
+    <meta
+      property="og:description"
+      content="What people say about Golem Craftworks dice, vaults, and game sets."
+    />
+    <meta
+      property="og:image"
+      content="https://golemcraftworks.com/assets/logo.png"
+    />
+    <link rel="canonical" href="https://golemcraftworks.com/reviews/" />
+    <meta name="theme-color" content="#000000" />
+    <script src="../js/theme.js"></script>
+    <link rel="icon" type="image/png" href="../assets/favicon.png" />
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles/main.css" />
+  </head>
+  <body data-page="reviews">
+    <header data-site-header></header>
+    <main id="main">
+      <div class="wrap">
+        <header class="page-head">
+          <h1>What people say.</h1>
+          <p>
+            Reviews from Etsy buyers and from people who bought here or in
+            person.
+          </p>
+          <p class="review-summary" data-review-summary hidden></p>
+        </header>
+        <div class="split">
+          <div>
+            <ul class="reviews" data-reviews aria-live="polite"></ul>
+            <p>
+              <button
+                class="btn btn--ghost"
+                type="button"
+                data-more-reviews
+                hidden
+              >
+                Show more reviews
+              </button>
+            </p>
+            <p class="review-legal" data-etsy-note hidden>
+              Etsy reviews are shown through the Etsy API. The term "Etsy" is a
+              trademark of Etsy, Inc. This site uses the Etsy API but is not
+              endorsed or certified by Etsy, Inc.
+            </p>
+          </div>
+          <div>
+            <div class="form-panel">
+              <h2>Leave a review</h2>
+              <form class="form" data-review-form novalidate>
+                <fieldset class="field stars-input">
+                  <legend>Your rating</legend>
+                  <div class="stars-input__row">
+                    <input
+                      type="radio"
+                      name="rating"
+                      value="5"
+                      id="r-5"
+                    /><label for="r-5"
+                      ><span class="visually-hidden">5 stars</span></label
+                    >
+                    <input
+                      type="radio"
+                      name="rating"
+                      value="4"
+                      id="r-4"
+                    /><label for="r-4"
+                      ><span class="visually-hidden">4 stars</span></label
+                    >
+                    <input
+                      type="radio"
+                      name="rating"
+                      value="3"
+                      id="r-3"
+                    /><label for="r-3"
+                      ><span class="visually-hidden">3 stars</span></label
+                    >
+                    <input
+                      type="radio"
+                      name="rating"
+                      value="2"
+                      id="r-2"
+                    /><label for="r-2"
+                      ><span class="visually-hidden">2 stars</span></label
+                    >
+                    <input
+                      type="radio"
+                      name="rating"
+                      value="1"
+                      id="r-1"
+                    /><label for="r-1"
+                      ><span class="visually-hidden">1 star</span></label
+                    >
+                  </div>
+                </fieldset>
+                <div class="field">
+                  <label for="r-name">Your name</label>
+                  <p class="hint" id="r-name-hint">
+                    Shown with your review. A first name is fine.
+                  </p>
+                  <input
+                    id="r-name"
+                    name="name"
+                    autocomplete="name"
+                    maxlength="60"
+                    aria-describedby="r-name-hint"
+                    required
+                  />
                 </div>
-              </fieldset>
-              <div class="field">
-                <label for="r-name">Your name</label>
-                <p class="hint" id="r-name-hint">Shown with your review. A first name is fine.</p>
-                <input id="r-name" name="name" autocomplete="name" maxlength="60" aria-describedby="r-name-hint" required>
-              </div>
-              <div class="field">
-                <label for="r-email">Email</label>
-                <p class="hint" id="r-email-hint">Never shown and not stored on this site. It's only sent to me, so I can write to you directly about your review.</p>
-                <input id="r-email" name="email" type="email" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="off" aria-describedby="r-email-hint" required>
-              </div>
-              <div hidden aria-hidden="true">
-                <label for="r-website">Leave this empty</label>
-                <input id="r-website" name="website" tabindex="-1" autocomplete="off">
-              </div>
-              <div class="field">
-                <label for="r-product">What did you get? (optional)</label>
-                <input id="r-product" name="product" maxlength="120" placeholder="e.g. Walnut dice vault">
-              </div>
-              <div class="field">
-                <label for="r-text">Your review</label>
-                <textarea id="r-text" name="text" maxlength="2000" required></textarea>
-              </div>
-              <div class="field">
-                <label for="r-photos">Photos (optional)</label>
-                <p class="hint" id="r-photos-hint">Up to 3. They're resized before sending.</p>
-                <input id="r-photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="r-photos-hint">
-              </div>
-              <div data-turnstile></div>
-              <button class="btn btn--block" type="submit">Send review</button>
-              <p class="form-status" data-form-status role="status" aria-live="polite"></p>
-            </form>
+                <div class="field">
+                  <label for="r-email">Email</label>
+                  <p class="hint" id="r-email-hint">
+                    Never shown and not stored on this site. It's only sent to
+                    me, so I can write to you directly about your review.
+                  </p>
+                  <input
+                    id="r-email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    inputmode="email"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    aria-describedby="r-email-hint"
+                    required
+                  />
+                </div>
+                <div hidden aria-hidden="true">
+                  <label for="r-website">Leave this empty</label>
+                  <input
+                    id="r-website"
+                    name="website"
+                    tabindex="-1"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="field">
+                  <label for="r-product">What did you get? (optional)</label>
+                  <input
+                    id="r-product"
+                    name="product"
+                    maxlength="120"
+                    placeholder="e.g. Walnut dice vault"
+                  />
+                </div>
+                <div class="field">
+                  <label for="r-text">Your review</label>
+                  <textarea
+                    id="r-text"
+                    name="text"
+                    maxlength="2000"
+                    required
+                  ></textarea>
+                </div>
+                <div class="field">
+                  <label for="r-photos">Photos (optional)</label>
+                  <p class="hint" id="r-photos-hint">
+                    Up to 3. They're resized before sending.
+                  </p>
+                  <input
+                    id="r-photos"
+                    name="photos"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    aria-describedby="r-photos-hint"
+                  />
+                </div>
+                <div data-turnstile></div>
+                <button class="btn btn--block" type="submit">
+                  Send review
+                </button>
+                <p
+                  class="form-status"
+                  data-form-status
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </main>
-  <footer data-site-footer></footer>
-  <script src="../js/config.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/site.js"></script>
-  <script src="../js/reviews.js"></script>
-</body>
+    </main>
+    <footer data-site-footer></footer>
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/site.js"></script>
+    <script src="../js/reviews.js"></script>
+  </body>
 </html>

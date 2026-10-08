@@ -35,8 +35,10 @@
             data.when ? `Needed by: ${data.when}` : "",
             data.budget ? `Budget: ${data.budget}` : "",
             "",
-            data.idea
-        ].filter((l) => l !== "").join("\n");
+            data.idea,
+        ]
+            .filter((l) => l !== "")
+            .join("\n");
         window.location.href = `mailto:${cfg.contactEmail}?subject=${encodeURIComponent(`Commission request: ${data.type}`)}&body=${encodeURIComponent(body)}`;
         say(`Your email app should open with the request ready to send. If it doesn't, email ${cfg.contactEmail}.`);
     }

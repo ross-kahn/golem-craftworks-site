@@ -1,263 +1,263 @@
 {
- "products": [
-  {
-   "id": "demo-dice-ember",
-   "slug": "ember-ttrpg-dice-set",
-   "name": "\"EMBER\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "EMBER 8-Piece Dice Set\n\nOrange and red swirls with gold numbers.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23b8431f%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EEMBER%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23b8431fcc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EEMBER%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23b8431f99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EEMBER%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
+  "products": [
     {
-     "id": "demo-v-ember",
-     "name": "Default",
-     "priceCents": 4500,
-     "qty": 1,
-     "sku": "DEMO-EMBER"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-java",
-   "slug": "java-ttrpg-dice-set",
-   "name": "\"JAVA\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "JAVA 8-Piece Dice Set\n\nInspired by that perfect cup of coffee.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%236b4a2b%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EJAVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%236b4a2bcc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EJAVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%236b4a2b99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EJAVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "demo-v-java",
-     "name": "Default",
-     "priceCents": 5500,
-     "qty": 1,
-     "sku": "DEMO-JAVA"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-wild-magic",
-   "slug": "wild-magic-ttrpg-dice-set",
-   "name": "\"WILD MAGIC\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "WILD MAGIC 8-Piece Dice Set\n\nPurple and teal with a shimmer.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%237a3fa0%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EWILD%20MAGIC%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%237a3fa0cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EWILD%20MAGIC%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%237a3fa099%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EWILD%20MAGIC%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "demo-v-wild-magic",
-     "name": "Default",
-     "priceCents": 5200,
-     "qty": 1,
-     "sku": "DEMO-WILD-MAGIC"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-applebane",
-   "slug": "applebane-ttrpg-dice-set",
-   "name": "\"APPLEBANE\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "APPLEBANE 8-Piece Dice Set\n\nRed and green, like the name says.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233f7d3a%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EAPPLEBANE%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233f7d3acc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EAPPLEBANE%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233f7d3a99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EAPPLEBANE%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "demo-v-applebane",
-     "name": "Default",
-     "priceCents": 4800,
-     "qty": 1,
-     "sku": "DEMO-APPLEBANE"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-deva",
-   "slug": "deva-ttrpg-dice-set",
-   "name": "\"DEVA\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "DEVA 8-Piece Dice Set\n\nRadiant.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23c9a227%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EDEVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "demo-v-deva",
-     "name": "Default",
-     "priceCents": 5000,
-     "qty": 1,
-     "sku": "DEMO-DEVA"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-frost",
-   "slug": "frost-ttrpg-dice-set",
-   "name": "\"FROST\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "FROST 8-Piece Dice Set\n\nPale blue with white numbers. Sold, to show how sold pieces look.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233c7fa6%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFROST%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233c7fa6cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFROST%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233c7fa699%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFROST%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "demo-v-frost",
-     "name": "Default",
-     "priceCents": 5200,
-     "qty": 0,
-     "sku": "DEMO-FROST"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-night-sky",
-   "slug": "night-sky-ttrpg-dice-set",
-   "name": "\"NIGHT SKY\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "NIGHT SKY 8-Piece Dice Set\n\nDeep blue with silver flecks.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23232a5c%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ENIGHT%20SKY%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23232a5ccc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ENIGHT%20SKY%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23232a5c99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ENIGHT%20SKY%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "demo-v-night-sky",
-     "name": "Default",
-     "priceCents": 4800,
-     "qty": 1,
-     "sku": "DEMO-NIGHT-SKY"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-dice-moss",
-   "slug": "moss-ttrpg-dice-set",
-   "name": "\"MOSS\" TTRPG Dice Set",
-   "category": "8-piece RPG Dice",
-   "description": "MOSS 8-Piece Dice Set\n\nGreen and brown.\n\nSample description. Your real description comes from Square.",
-   "images": [],
-   "variations": [
-    {
-     "id": "demo-v-moss",
-     "name": "Default",
-     "priceCents": 4600,
-     "qty": 1,
-     "sku": "DEMO-MOSS"
-    }
-   ],
-   "modifierLists": []
-  },
-  {
-   "id": "demo-yahtzee",
-   "slug": "yahtzee-set",
-   "name": "Yahtzee set",
-   "category": "Woodworks",
-   "optionLabel": "Wood",
-   "description": "A hardwood box that holds five dice, a pencil, and a score pad, with a lid that doubles as a dice tray.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%238a5a33%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EYahtzee%20set%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%238a5a33cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EYahtzee%20set%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%238a5a3399%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EYahtzee%20set%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "y-walnut",
-     "name": "Walnut",
-     "priceCents": 6500,
-     "qty": 4,
-     "sku": "YZ-WAL"
+      "id": "demo-dice-ember",
+      "slug": "ember-ttrpg-dice-set",
+      "name": "\"EMBER\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "EMBER 8-Piece Dice Set\n\nOrange and red swirls with gold numbers.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23b8431f%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EEMBER%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23b8431fcc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EEMBER%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23b8431f99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EEMBER%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-ember",
+          "name": "Default",
+          "priceCents": 4500,
+          "qty": 1,
+          "sku": "DEMO-EMBER"
+        }
+      ],
+      "modifierLists": []
     },
     {
-     "id": "y-cherry",
-     "name": "Cherry",
-     "priceCents": 6000,
-     "qty": 2,
-     "sku": "YZ-CHE"
+      "id": "demo-dice-java",
+      "slug": "java-ttrpg-dice-set",
+      "name": "\"JAVA\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "JAVA 8-Piece Dice Set\n\nInspired by that perfect cup of coffee.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%236b4a2b%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EJAVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%236b4a2bcc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EJAVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%236b4a2b99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EJAVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-java",
+          "name": "Default",
+          "priceCents": 5500,
+          "qty": 1,
+          "sku": "DEMO-JAVA"
+        }
+      ],
+      "modifierLists": []
     },
     {
-     "id": "y-maple",
-     "name": "Maple",
-     "priceCents": 5500,
-     "qty": 0,
-     "sku": "YZ-MAP"
+      "id": "demo-dice-wild-magic",
+      "slug": "wild-magic-ttrpg-dice-set",
+      "name": "\"WILD MAGIC\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "WILD MAGIC 8-Piece Dice Set\n\nPurple and teal with a shimmer.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%237a3fa0%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EWILD%20MAGIC%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%237a3fa0cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EWILD%20MAGIC%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%237a3fa099%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EWILD%20MAGIC%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-wild-magic",
+          "name": "Default",
+          "priceCents": 5200,
+          "qty": 1,
+          "sku": "DEMO-WILD-MAGIC"
+        }
+      ],
+      "modifierLists": []
     },
     {
-     "id": "y-padauk",
-     "name": "Padauk",
-     "priceCents": 7000,
-     "qty": 1,
-     "sku": "YZ-PAD"
-    }
-   ],
-   "modifierLists": [
-    {
-     "id": "demo-dice",
-     "name": "Dice",
-     "min": 0,
-     "max": 1,
-     "modifiers": [
-      {
-       "id": "demo-handmade",
-       "name": "Handmade dice",
-       "priceCents": 1500,
-       "default": true
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "id": "demo-vault",
-   "slug": "hex-dice-vault",
-   "name": "Hex dice vault",
-   "category": "Woodworks",
-   "optionLabel": "Wood",
-   "description": "Holds a full set in a magnetic-lid hexagon vault.\n\nSample description. Your real description comes from Square.",
-   "images": [
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%234a3626%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EHex%20dice%20vault%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%234a3626cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EHex%20dice%20vault%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E"
-   ],
-   "variations": [
-    {
-     "id": "dv-wal",
-     "name": "Walnut",
-     "priceCents": 4000,
-     "qty": 6,
-     "sku": "DV-HEX-WAL"
+      "id": "demo-dice-applebane",
+      "slug": "applebane-ttrpg-dice-set",
+      "name": "\"APPLEBANE\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "APPLEBANE 8-Piece Dice Set\n\nRed and green, like the name says.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233f7d3a%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EAPPLEBANE%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233f7d3acc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EAPPLEBANE%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233f7d3a99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EAPPLEBANE%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-applebane",
+          "name": "Default",
+          "priceCents": 4800,
+          "qty": 1,
+          "sku": "DEMO-APPLEBANE"
+        }
+      ],
+      "modifierLists": []
     },
     {
-     "id": "dv-map",
-     "name": "Maple",
-     "priceCents": 3600,
-     "qty": 5,
-     "sku": "DV-HEX-MAP"
+      "id": "demo-dice-deva",
+      "slug": "deva-ttrpg-dice-set",
+      "name": "\"DEVA\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "DEVA 8-Piece Dice Set\n\nRadiant.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23c9a227%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EDEVA%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-deva",
+          "name": "Default",
+          "priceCents": 5000,
+          "qty": 1,
+          "sku": "DEMO-DEVA"
+        }
+      ],
+      "modifierLists": []
+    },
+    {
+      "id": "demo-dice-frost",
+      "slug": "frost-ttrpg-dice-set",
+      "name": "\"FROST\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "FROST 8-Piece Dice Set\n\nPale blue with white numbers. Sold, to show how sold pieces look.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233c7fa6%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFROST%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233c7fa6cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFROST%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%233c7fa699%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EFROST%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-frost",
+          "name": "Default",
+          "priceCents": 5200,
+          "qty": 0,
+          "sku": "DEMO-FROST"
+        }
+      ],
+      "modifierLists": []
+    },
+    {
+      "id": "demo-dice-night-sky",
+      "slug": "night-sky-ttrpg-dice-set",
+      "name": "\"NIGHT SKY\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "NIGHT SKY 8-Piece Dice Set\n\nDeep blue with silver flecks.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23232a5c%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ENIGHT%20SKY%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23232a5ccc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ENIGHT%20SKY%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%23232a5c99%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3ENIGHT%20SKY%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "demo-v-night-sky",
+          "name": "Default",
+          "priceCents": 4800,
+          "qty": 1,
+          "sku": "DEMO-NIGHT-SKY"
+        }
+      ],
+      "modifierLists": []
+    },
+    {
+      "id": "demo-dice-moss",
+      "slug": "moss-ttrpg-dice-set",
+      "name": "\"MOSS\" TTRPG Dice Set",
+      "category": "8-piece RPG Dice",
+      "description": "MOSS 8-Piece Dice Set\n\nGreen and brown.\n\nSample description. Your real description comes from Square.",
+      "images": [],
+      "variations": [
+        {
+          "id": "demo-v-moss",
+          "name": "Default",
+          "priceCents": 4600,
+          "qty": 1,
+          "sku": "DEMO-MOSS"
+        }
+      ],
+      "modifierLists": []
+    },
+    {
+      "id": "demo-yahtzee",
+      "slug": "yahtzee-set",
+      "name": "Yahtzee set",
+      "category": "Woodworks",
+      "optionLabel": "Wood",
+      "description": "A hardwood box that holds five dice, a pencil, and a score pad, with a lid that doubles as a dice tray.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%238a5a33%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EYahtzee%20set%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%238a5a33cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EYahtzee%20set%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%238a5a3399%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EYahtzee%20set%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%203%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "y-walnut",
+          "name": "Walnut",
+          "priceCents": 6500,
+          "qty": 4,
+          "sku": "YZ-WAL"
+        },
+        {
+          "id": "y-cherry",
+          "name": "Cherry",
+          "priceCents": 6000,
+          "qty": 2,
+          "sku": "YZ-CHE"
+        },
+        {
+          "id": "y-maple",
+          "name": "Maple",
+          "priceCents": 5500,
+          "qty": 0,
+          "sku": "YZ-MAP"
+        },
+        {
+          "id": "y-padauk",
+          "name": "Padauk",
+          "priceCents": 7000,
+          "qty": 1,
+          "sku": "YZ-PAD"
+        }
+      ],
+      "modifierLists": [
+        {
+          "id": "demo-dice",
+          "name": "Dice",
+          "min": 0,
+          "max": 1,
+          "modifiers": [
+            {
+              "id": "demo-handmade",
+              "name": "Handmade dice",
+              "priceCents": 1500,
+              "default": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "demo-vault",
+      "slug": "hex-dice-vault",
+      "name": "Hex dice vault",
+      "category": "Woodworks",
+      "optionLabel": "Wood",
+      "description": "Holds a full set in a magnetic-lid hexagon vault.\n\nSample description. Your real description comes from Square.",
+      "images": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%234a3626%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EHex%20dice%20vault%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%201%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%20600%22%3E%3Crect%20width%3D%22600%22%20height%3D%22600%22%20fill%3D%22%234a3626cc%22%2F%3E%3Ctext%20x%3D%22300%22%20y%3D%22300%22%20font-family%3D%22sans-serif%22%20font-size%3D%2244%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EHex%20dice%20vault%3C%2Ftext%3E%3Ctext%20x%3D%22300%22%20y%3D%22360%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3Ephoto%202%3C%2Ftext%3E%3C%2Fsvg%3E"
+      ],
+      "variations": [
+        {
+          "id": "dv-wal",
+          "name": "Walnut",
+          "priceCents": 4000,
+          "qty": 6,
+          "sku": "DV-HEX-WAL"
+        },
+        {
+          "id": "dv-map",
+          "name": "Maple",
+          "priceCents": 3600,
+          "qty": 5,
+          "sku": "DV-HEX-MAP"
+        }
+      ],
+      "modifierLists": []
     }
-   ],
-   "modifierLists": []
-  }
- ],
- "demo": true
+  ],
+  "demo": true
 }
