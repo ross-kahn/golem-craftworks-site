@@ -25,6 +25,9 @@
   }
 
   async function getProducts({ fresh = false } = {}): Promise<Product[]> {
+    // For two minutes after a purchase (the thank-you page notes the time), skip every saved copy.
+    // Square can take a moment to lower the stock, so the first look after paying may still show the piece.
+    try { if (Date.now() - Number(sessionStorage.getItem("gc-bought")) < 2 * 60 * 1000) fresh = true; } catch (_) { /* storage unavailable */ }
     if (!fresh) {
       try {
         const hit = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");

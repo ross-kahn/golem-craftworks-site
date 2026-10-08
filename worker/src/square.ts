@@ -372,7 +372,10 @@ export async function createPaymentLink(
         quantity: String(l.qty),
         ...(l.modifiers && l.modifiers.length ? { modifiers: l.modifiers.map((id) => ({ catalog_object_id: id })) } : {})
       })),
-      pricing_options: { auto_apply_taxes: true }
+      // Pickup is always local, so it's charged the taxes set on the items in Square. Shipped orders add
+      // none: Square can't tax by destination here, most ship out of state where none is due, and on
+      // Wisconsin ones the shop pays it out of the price (the order email points those out).
+      pricing_options: { auto_apply_taxes: !ship }
     },
     checkout_options: {
       redirect_url: `${site}/thanks/`,

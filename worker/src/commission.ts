@@ -29,7 +29,7 @@ interface Email {
 }
 
 // An Env with the email settings filled in.
-type MailEnv = Env & Required<Pick<Env, "RESEND_API_KEY" | "EMAIL_FROM" | "COMMISSION_TO">>;
+export type MailEnv = Env & Required<Pick<Env, "RESEND_API_KEY" | "EMAIL_FROM" | "COMMISSION_TO">>;
 export const mailReady = (env: Env): env is MailEnv => !!(env.RESEND_API_KEY && env.EMAIL_FROM && env.COMMISSION_TO);
 
 export const isEmail = (s: unknown): s is string =>

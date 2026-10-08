@@ -254,7 +254,7 @@
           <span><strong>Pick up · free</strong><small>${esc(cfg.pickupLabel)}. ${esc(cfg.pickupNote)}</small></span></label>
       </fieldset>
       <p class="totals"><span>Subtotal</span><span>${api.money(subtotal + shipping)}</span></p>
-      <p class="totals-note">${f === "ship" ? "Includes shipping. " : ""}Sales tax is added at checkout.</p>
+      <p class="totals-note">${f === "ship" ? "Includes shipping and tax." : "Sales tax is added at checkout."}</p>
       <button class="btn btn--block" type="button" data-checkout>Check out securely with Square</button>
       ${checkoutError ? `<p class="form-error" role="alert">${esc(checkoutError)}</p>` : ""}`;
     }

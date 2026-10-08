@@ -553,7 +553,7 @@ test("Etsy drafts: dry run, publishing straight away, and a missing template", a
   assert.match(none.errors[0], /TEMPLATE/);
 });
 
-test("checkout: blocks sold items and builds a Square link with shipping and taxes", async () => {
+test("checkout: blocks sold items and builds a Square link with shipping and no added tax", async () => {
   const env = makeEnv();
   const post = (b: unknown) => worker.fetch(new Request("https://w.example/api/checkout", {
     method: "POST", body: JSON.stringify(b), headers: { "content-type": "application/json", origin: "https://golemcraftworks.com" } }), env, ctx());
@@ -568,13 +568,14 @@ test("checkout: blocks sold items and builds a Square link with shipping and tax
   assert.equal(((await okRes.json()) as any).url, "https://square.link/u/abc");
   const link = state.paymentLinks[0];
   assert.deepEqual(link.order.line_items, [{ catalog_object_id: "V_WAL", quantity: "2" }, { catalog_object_id: "V_DICE", quantity: "1" }]);
-  assert.equal(link.order.pricing_options.auto_apply_taxes, true);
+  assert.equal(link.order.pricing_options.auto_apply_taxes, false, "shipped orders add no tax");
   assert.equal(link.checkout_options.shipping_fee.charge.amount, 800);
   assert.equal(link.checkout_options.redirect_url, "https://golemcraftworks.com/thanks/");
 
   await post({ lines: [{ variationId: "V_WAL", qty: 1 }], fulfillment: "pickup" });
   const pickup = state.paymentLinks[1];
   assert.equal(pickup.checkout_options.ask_for_shipping_address, false);
+  assert.equal(pickup.order.pricing_options.auto_apply_taxes, true, "pickup is local, so it's taxed");
   assert.equal(pickup.checkout_options.shipping_fee, undefined);
 
   const tooMany = await post({ lines: [{ variationId: "V_DICE", qty: 2 }] });

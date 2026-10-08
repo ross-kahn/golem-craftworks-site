@@ -138,6 +138,8 @@ export interface SquareWebhookEvent {
 
 // The parts of a Square payment the sale email uses.
 export interface SquarePayment {
+  id?: string;
+  customer_id?: string;
   status?: string;
   order_id?: string;
   note?: string;
@@ -145,6 +147,8 @@ export interface SquarePayment {
   total_money?: SquareMoney;
   processing_fee?: { amount_money?: SquareMoney }[];
   receipt_url?: string;
+  receipt_number?: string; // the short code on the buyer's receipt, like "ox1B"
+  created_at?: string;
   shipping_address?: SquareAddress;
 }
 

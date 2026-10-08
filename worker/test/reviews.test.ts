@@ -49,6 +49,7 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
     total_tax_money: { amount: 520 },
     total_money: { amount: 7820 }
   } });
+  if (url.includes("/v2/payments?")) return ok({ payments: recentPayments });
   if (url.includes("/v2/orders/search")) {
     squareCalls.push(JSON.parse(init.body));
     if (squareDown) return new Response("{}", { status: 500 });
@@ -71,7 +72,11 @@ function makeEnv(extra: Partial<Env> = {}): Env {
     ...extra
   };
 }
-const ctx = () => ({ waitUntil: () => {} });
+// Work the Worker finishes after it has answered; settle() waits for it.
+const pending: Promise<unknown>[] = [];
+const ctx = () => ({ waitUntil: (p: Promise<unknown>) => { pending.push(p); } });
+const settle = () => Promise.all(pending.splice(0));
+let recentPayments: object[] = [];
 const call = (env: Env, path: string, init?: RequestInit) => worker.fetch(new Request("https://w.example" + path, init), env, ctx());
 
 function reviewForm(over: Record<string, string> = {}, photos: Uint8Array[] = []) {
@@ -223,14 +228,16 @@ test("reviews: Square sales since the cutoff date are added to Etsy's sales coun
 test("sales: a paid website order emails the shop once; in-person sales don't; a failed email is retried", async () => {
   const { createHmac } = await import("node:crypto");
   const env = makeEnv({ SQUARE_WEBHOOK_SIGNATURE_KEY: "sigkey", SQUARE_WEBHOOK_URL: "https://w.example/webhooks/square", SALES_TO: "sales@example.com" });
-  const hook = (id: string, payment: object, type = "payment.updated") => {
+  const hook = async (id: string, payment: object, type = "payment.updated") => {
     const raw = JSON.stringify({ event_id: id, type, data: { object: { payment } } });
     const sig = createHmac("sha256", "sigkey").update(env.SQUARE_WEBHOOK_URL + raw).digest("base64");
-    return call(env, "/webhooks/square", { method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": sig } });
+    const res = await call(env, "/webhooks/square", { method: "POST", body: raw, headers: { "x-square-hmacsha256-signature": sig } });
+    await settle();
+    return res;
   };
   const paid = {
     status: "COMPLETED", order_id: "ORDER1", note: "Website order: ship", buyer_email_address: "jane@example.com", total_money: { amount: 7820 },
-    processing_fee: [{ amount_money: { amount: 257 } }], receipt_url: "https://squareup.com/receipt/x",
+    processing_fee: [{ amount_money: { amount: 257 } }], receipt_url: "https://squareup.com/receipt/x", receipt_number: "ox1B", created_at: "2026-10-07T23:05:00Z",
     shipping_address: { first_name: "Jane", last_name: "Doe", address_line_1: "1 Main St", locality: "Ithaca", administrative_district_level_1: "NY", postal_code: "14850", country: "US" }
   };
 
@@ -243,23 +250,29 @@ test("sales: a paid website order emails the shop once; in-person sales don't; a
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].to, ["sales@example.com"]);
   assert.equal(sent[0].reply_to, "jane@example.com");
-  assert.equal(sent[0].subject, "New website order: Dice vault (ship)");
+  assert.equal(sent[0].subject, "💲You got a sale! Dice vault #ox1B (ship)");
   for (const part of ["SHIP TO:\nJane Doe\n1 Main St\nIthaca, NY 14850", "Buyer: Jane Doe · jane@example.com · 555-0100", "1 x Dice vault (Walnut, Engraving)  $65.00",
-    "Shipping:     $8.00", "Sales tax:    $5.20", "Total paid:   $78.20", "Square fee:   -$2.57", "You receive:  $75.63", "https://squareup.com/receipt/x", "ORDER1"]) {
+    "Shipping:     $8.00", "Sales tax:    $5.20", "Total paid:   $78.20", "Square fee:   -$2.57", "You receive:  $75.63", "https://squareup.com/receipt/x", "ORDER1", "Ordered: Oct 7, 2026, 6:05 PM Central", "Receipt: #ox1B"]) {
     assert.ok(sent[0].text.includes(part), part);
   }
 
-  // Email down: Square gets an error and its retry of the same event goes through.
+  // Email down: Square is still answered at once, and the hourly check sends the email it finds missing, once.
   kv = new KV(); env.GC_KV = kv as unknown as KVNamespace; sent = [];
   const pickup = { ...paid, note: "Website order: LOCAL PICKUP", processing_fee: undefined };
-  const key = env.RESEND_API_KEY; env.RESEND_API_KEY = "re_down";
   resendDown = true;
-  assert.equal((await hook("e4", pickup)).status, 500);
-  resendDown = false; env.RESEND_API_KEY = key;
   assert.equal((await hook("e4", pickup)).status, 200);
+  assert.equal(sent.length, 0);
+  assert.match(JSON.stringify(await kv.get("log", "json")), /WEBSITE ORDER: the email to the shop failed/);
+  resendDown = false;
+  const { mailMissedSales } = await import("../src/sales.ts");
+  recentPayments = [pickup, { ...paid, note: "" }];
+  await mailMissedSales(env);
+  await mailMissedSales(env);
+  recentPayments = [];
   assert.equal(sent.length, 1);
   assert.ok(sent[0].subject.endsWith("(pickup)") && sent[0].text.startsWith("LOCAL PICKUP"));
   assert.ok(sent[0].text.includes("Square fee:   not posted yet") && !sent[0].text.includes("SHIP TO"));
+  assert.ok(!sent[0].text.includes("WISCONSIN ORDER"), "tax was collected on this one");
 });
 
 test("daily report: quiet when all is well, one email when something needs a look, SKUs mentioned once", async () => {
@@ -296,4 +309,56 @@ test("daily report: quiet when all is well, one email when something needs a loo
   await check({ etsyOnly: ["yahtzee-walnut"], at: new Date(Date.now() - 5 * 3600000).toISOString() });
   await report();
   assert.ok(sent[1].text.includes("hasn't run lately") && !sent[1].text.includes("yahtzee-walnut"));
+});
+
+test("sales: a Wisconsin order with no tax collected is pointed out; an out-of-state one isn't", async () => {
+  const { notifySale } = await import("../src/sales.ts");
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown, init: any) => String(input).endsWith("/v2/orders/ORDER1")
+    ? new Response(JSON.stringify({ order: { line_items: [{ name: "Dice", quantity: "1", total_money: { amount: 4000 } }], total_money: { amount: 4000 } } }))
+    : real(input as any, init)) as typeof fetch;
+  try {
+    const env = makeEnv();
+    const event = (state: string) => ({ data: { object: { payment: {
+      status: "COMPLETED", order_id: "ORDER1", note: "Website order: ship", total_money: { amount: 4000, currency: "USD" },
+      shipping_address: { address_line_1: "1 Main St", locality: "Town", administrative_district_level_1: state, postal_code: "53703" }
+    } } } });
+    await notifySale(env, event("WI"));
+    assert.ok(sent[0].text.includes("WISCONSIN ORDER (shipped in state)"));
+    kv = new KV(); env.GC_KV = kv as unknown as KVNamespace;
+    await notifySale(env, event("MN"));
+    assert.ok(!sent[1].text.includes("WISCONSIN ORDER"));
+  } finally { globalThis.fetch = real; }
+});
+
+test("sales: a wallet payment's address is picked up from the order once Square attaches it, or from the customer", async () => {
+  const { notifySale } = await import("../src/sales.ts");
+  const real = globalThis.fetch;
+  const address = { address_line_1: "9 Elm St", locality: "Duluth", administrative_district_level_1: "MN", postal_code: "55802" };
+  let orderReads = 0, onOrder = true;
+  globalThis.fetch = (async (input: unknown, init: any) => {
+    const url = String(input);
+    const ok = (b: unknown) => new Response(JSON.stringify(b));
+    if (url.endsWith("/v2/payments/PAY1")) return ok({ payment: event.data.object.payment });
+    if (url.endsWith("/v2/customers/CUST1")) return ok({ customer: { given_name: "Sam", family_name: "Lee", phone_number: "555-0199", address } });
+    if (url.endsWith("/v2/orders/ORDER1")) {
+      orderReads++;
+      // Not there on the first read: Square adds it a moment later.
+      const recipient = { display_name: "Sam Lee", phone_number: "555-0199", address };
+      return ok({ order: { customer_id: "CUST1", line_items: [{ name: "Dice", quantity: "1" }], fulfillments: onOrder && orderReads > 1 ? [{ shipment_details: { recipient } }] : [] } });
+    }
+    return real(input as any, init);
+  }) as typeof fetch;
+  const event = { data: { object: { payment: { id: "PAY1", status: "COMPLETED", order_id: "ORDER1", note: "Website order: ship", total_money: { amount: 4000, currency: "USD" },
+    shipping_address: { first_name: "Sam", last_name: "Lee" } } } } }; // as a real Google Pay payment arrives: a name and no street
+  try {
+    const env = makeEnv();
+    await notifySale(env, event, 1);
+    assert.equal(orderReads, 2);
+    assert.ok(sent[0].text.includes("SHIP TO:\nSam Lee\n9 Elm St\nDuluth, MN 55802") && sent[0].text.includes("555-0199"));
+
+    kv = new KV(); env.GC_KV = kv as unknown as KVNamespace; onOrder = false;
+    await notifySale(env, event, 1);
+    assert.ok(sent[1].text.includes("SHIP TO (from the buyer's customer record in Square; check it against the order):\nSam Lee\n9 Elm St"));
+  } finally { globalThis.fetch = real; }
 });

@@ -11,6 +11,7 @@
 //   GET  /admin/reviews         every site review (needs ?token=); each has its own link to hide or delete it
 //   GET  /admin/status          sync health (needs ?token=ADMIN_TOKEN)
 //   GET  /admin/catalog         every Square item and why it is or isn't on the site (needs ?token=)
+//   GET  /admin/order           everything Square holds on one order (needs ?token= and ?id=)
 //   POST /admin/reconcile       run the hourly check now (needs ?token=)
 //   POST /admin/etsy/drafts     make Etsy drafts for new dice sets now (needs ?token=)
 //   POST /admin/report          send the daily report now, if there's anything in it (needs ?token=)
@@ -25,7 +26,7 @@ import { handleSquareInventoryEvent, handleEtsyEvent, reconcile } from "./sync.t
 import { createEtsyDrafts } from "./drafts.ts";
 import { commission } from "./commission.ts";
 import * as reviews from "./reviews.ts";
-import { notifySale } from "./sales.ts";
+import { notifySale, mailMissedSales } from "./sales.ts";
 import { dailyReport } from "./report.ts";
 import * as pages from "./pages.ts";
 import { json, corsHeaders, safeEqual, logEvent, errMsg } from "./util.ts";
@@ -81,6 +82,8 @@ export default {
       return;
     }
     ctx.waitUntil((async () => {
+      try { await mailMissedSales(env); }
+      catch (e) { await logEvent(env, "Check for website orders without an email failed", { error: errMsg(e) }); }
       try { await reviews.refreshEtsyReviews(env); }
       catch (e) { await logEvent(env, "Etsy reviews didn't refresh", { error: errMsg(e) }); }
       try {
@@ -249,13 +252,11 @@ async function squareWebhook(request: Request, env: Env, ctx: Ctx) {
     if (event.data?.object?.payment?.status === "COMPLETED") {
       ctx.waitUntil(reviews.refreshSquareSales(env).catch((e) => logEvent(env, "Square sales count didn't refresh", { error: errMsg(e) })));
     }
-    try { await notifySale(env, event); }
-    catch (e) {
-      // A sale nobody hears about is the worst failure here: answer with an error so Square sends it again.
-      await logEvent(env, "WEBSITE ORDER: the email to the shop failed (Square will retry). Check Square Dashboard for the order", { error: errMsg(e) });
-      if (seenKey) await env.GC_KV.delete(seenKey);
-      return json({ error: "Try again" }, 500);
-    }
+    // Answered straight away and finished afterwards: Square gives up on a slow reply, which would stop
+    // this part-way with nothing sent. A sale nobody hears about is the worst failure here, so the hourly
+    // check sends any email that didn't go out (mailMissedSales).
+    ctx.waitUntil(notifySale(env, event).catch((e) =>
+      logEvent(env, "WEBSITE ORDER: the email to the shop failed (the hourly check will try again). Check Square Dashboard for the order", { error: errMsg(e) })));
   } else if (event.type === "inventory.count.updated") {
     ctx.waitUntil((async () => {
       await purgeProducts();
@@ -335,7 +336,19 @@ async function admin(request: Request, env: Env, url: URL) {
     await env.GC_KV.put("status:catalog", JSON.stringify(report));
     return json(report);
   }
+  // Everything Square holds on one order, as Square sends it: for working out where a detail (like a
+  // wallet payment's shipping address) is kept. ?id= is the Square order ID from the order email.
+  if (url.pathname === "/admin/order") {
+    const { order } = await square.sq<{ order: { customer_id?: string; tenders?: { id?: string; customer_id?: string }[] } }>(env, `/v2/orders/${encodeURIComponent(url.searchParams.get("id") || "")}`);
+    const tenders = order.tenders || [];
+    const payments = await Promise.all(tenders.map((t) => square.sq<unknown>(env, `/v2/payments/${t.id}`).catch((e) => ({ error: errMsg(e) }))));
+    const customerId = order.customer_id || tenders.find((t) => t.customer_id)?.customer_id;
+    const customer = customerId ? await square.sq<unknown>(env, `/v2/customers/${customerId}`).catch((e) => ({ error: errMsg(e) })) : null;
+    return json({ order, payments, customer });
+  }
   if (url.pathname === "/admin/reconcile" && request.method === "POST") {
+    try { await mailMissedSales(env); }
+    catch (e) { await logEvent(env, "Check for website orders without an email failed", { error: errMsg(e) }); }
     return json(await reconcile(env));
   }
   if (url.pathname === "/admin/etsy/drafts" && request.method === "POST") {

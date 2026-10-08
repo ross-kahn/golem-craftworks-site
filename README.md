@@ -108,7 +108,7 @@ The first deploy in step 4 creates the `preview` address by itself; there is no 
    - URL: `https://preview.golemcraftworks.com/webhooks/square`
    - Events: `inventory.count.updated`, `catalog.version.updated`, `payment.created`, and `payment.updated`
    - Copy the **signature key**.
-5. Make sure the tax you charge in person is set on your items in Square. Online checkout applies the same catalog taxes.
+5. Make sure the tax you charge in person is set on your items in Square. In-person sales and website pickup orders use it; shipped website orders don't add sales tax (see [Known limits](#known-limits)).
 
 ### 4. First deploy
 
@@ -277,7 +277,7 @@ Things to know:
 - **Two buyers, one piece, same minute.** Website checkout re-checks stock before sending someone to pay, but Square doesn't hold the item while they're paying, and Etsy updates take a few seconds. A simultaneous double sale is possible but rare. Refund one in Square or Etsy if it happens.
 - **Etsy cancellations** aren't added back to Square automatically. Adjust the count in Square and the sync will update Etsy.
 - **Turning an Etsy listing back on** may count as a renewal with Etsy's listing fee.
-- **Sales tax** uses the taxes attached to your items in Square. If you need destination-based tax for shipped orders, that needs a separate decision.
+- **Sales tax** is not added to shipped website orders, because Square can't work out tax by destination for this kind of checkout. Most ship out of state, where none is due. On orders shipped within Wisconsin you pay it out of the price; the order email marks those "WISCONSIN ORDER" so you can total them when you file. Pickup orders and in-person sales are charged the taxes set on your items in Square. The switch is `auto_apply_taxes` in `worker/src/square.ts`; turning it on for shipped orders charges every buyer your rate wherever they are.
 - **Commission form** only sends email once Resend is set up (below). In demo mode it opens the visitor's email app with the request filled in.
 
 ## Commission emails
@@ -333,7 +333,7 @@ This needs two things:
 - Resend set up, as in [Commission emails](#commission-emails).
 - The Square webhook subscription (setup step 3) must include `payment.created` and `payment.updated`. To add them later: Square Developer Console, your app, **Webhooks → Subscriptions**, edit the subscription and tick both. The URL and signature key stay the same.
 
-If the email fails to send, Square is told to try again, and `/admin/status` shows a line starting "WEBSITE ORDER". The same payment events also update the sales count on the site straight away.
+If the email fails to send, `/admin/status` shows a line starting "WEBSITE ORDER", and the hourly check sends it: each hour it looks through the last day's website payments for any that never got their email. The same payment events also update the sales count on the site straight away.
 
 ## Reviews
 
