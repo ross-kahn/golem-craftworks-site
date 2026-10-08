@@ -36,7 +36,7 @@ function customPrompt(p: Product) {
   if (/\b(dice|die)\b/.test(category))
     return "Want a set in colors of your own?";
   if (/wood/.test(category))
-    return "Want it engraved or made in a different wood?";
+    return "Want it engraved or made with a different wood?";
   return "Want something made just for you?";
 }
 

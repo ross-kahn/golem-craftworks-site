@@ -206,6 +206,19 @@ Pick a quiet hour. Between steps 3 and 5 below, sale notifications from Square a
 
 Nothing changes for commission emails: they already send from `golemcraftworks.com`.
 
+### Checks by hand
+
+`npm test` can't see how a page looks or whether a real payment goes through. Before going public, and after any big change, go through these at the preview address:
+
+- [ ] **Styles.** Every page looks right, the shipping and returns page especially.
+- [ ] **Light and dark.** Every page in both modes.
+- [ ] **Shop navigation.** Home to a category to a product and back; the category links; sold pieces.
+- [ ] **Commission form.** An email reaches both the sender and `commissions@golemcraftworks.com`, and a reply to the sender comes from `commissions@golemcraftworks.com`.
+- [ ] **Review form.** A review with photos shows straight away, the Cloudflare check passes, and the email arrives with its link to hide or delete.
+- [ ] **A shipped purchase.** The order email has the address; no sales tax is added.
+- [ ] **A pickup purchase.** Sales tax is added at checkout, and the order email has a "Sales tax" amount and no "WISCONSIN ORDER" note. Use something priced over a few dollars: on a one-cent test item the tax rounds to nothing.
+- [ ] **Google Pay** (express checkout). The order email still has the shipping address.
+
 ## Search engines, AI assistants and Google Shopping
 
 The Worker builds the home page, each category page (`/shop/<category>`), and each product page (`/product/<name>`) in full, plus `/sitemap.xml`, `/robots.txt`, `/llms.txt` (a plain-text guide for AI assistants) and `/feeds/google.xml` (a product feed). All of them update from Square on their own.
