@@ -19,7 +19,6 @@ export interface Env {
   SYNC_DRY_RUN?: string;
   ETSY_DRAFT_CATEGORIES?: string; // Square categories whose new items get an Etsy draft (drafts.ts)
   ETSY_DRAFTS_AUTO_PUBLISH?: string; // "true" publishes those drafts straight away
-  NOINDEX?: string; // "true" keeps search engines away (the pre-launch preview address)
   EMAIL_FROM?: string;
   COMMISSION_TO?: string;
   SALES_TO?: string; // where website order emails go (sales.ts); COMMISSION_TO if empty

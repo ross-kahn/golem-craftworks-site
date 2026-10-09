@@ -1304,7 +1304,7 @@ test("product pages are complete before any script runs", async () => {
   state.catalog[1].item_data.name = '"JAVA" TTRPG Dice Set';
   state.catalog[1].item_data.description_plaintext =
     "Coffee swirl dice.\n\nPrice is $55 & worth it <really>.";
-  const env = makeEnv({ ASSETS, NOINDEX: undefined });
+  const env = makeEnv({ ASSETS });
 
   const feed = (await (await get(env, "/api/products")).json()) as any;
   assert.deepEqual(feed.products.map((p: any) => p.slug).sort(), [
@@ -1438,7 +1438,7 @@ test("category pages list what's available; same-named items get distinct addres
   state.catalog[0].item_data.name = "Yahtzee set";
   state.catalog[0].item_data.categories = [{ id: "C_GAME" }];
   state.counts.V_DICE = 0;
-  const env = makeEnv({ ASSETS, NOINDEX: undefined });
+  const env = makeEnv({ ASSETS });
   const res = await get(env, "/shop/game-sets");
   assert.equal(res.status, 200);
   const html = await res.text();
@@ -1608,7 +1608,7 @@ test("renaming an item in Square redirects its old address to the new one", asyn
 });
 
 test("crawler files: sitemap, robots, llms.txt and the Google feed", async () => {
-  const live = makeEnv({ ASSETS, NOINDEX: "false" });
+  const live = makeEnv({ ASSETS });
   const map = await (await get(live, "/sitemap.xml")).text();
   for (const path of [
     "/",
@@ -1666,21 +1666,6 @@ test("crawler files: sitemap, robots, llms.txt and the Google feed", async () =>
   ]) {
     assert.ok(feed.includes(part), part);
   }
-
-  // Before launch: everything is closed to search engines.
-  const preview = makeEnv({ ASSETS, NOINDEX: "true" });
-  assert.equal(
-    await (await get(preview, "/robots.txt")).text(),
-    "User-agent: *\nDisallow: /\n",
-  );
-  assert.equal(
-    (await get(preview, "/product/yahtzee-set")).headers.get("x-robots-tag"),
-    "noindex",
-  );
-  assert.equal(
-    (await get(preview, "/")).headers.get("x-robots-tag"),
-    "noindex",
-  );
 });
 
 test("if Square is unreachable, pages are built from the last saved catalog", async () => {

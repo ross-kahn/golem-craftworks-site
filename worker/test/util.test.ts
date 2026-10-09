@@ -72,11 +72,11 @@ test("admin addresses need the exact token, and one has to be set", () => {
 });
 
 test("siteUrl: SITE_URL without its slash, or else where the request came in", () => {
-  const url = new URL("https://preview.shop.test/some/page");
+  const url = new URL("https://www.shop.test/some/page");
   assert.equal(
     siteUrl({ SITE_URL: "https://shop.test/" } as Env, url),
     "https://shop.test",
   );
-  assert.equal(siteUrl({} as Env, url), "https://preview.shop.test");
+  assert.equal(siteUrl({} as Env, url), "https://www.shop.test");
   assert.equal(siteUrl({} as Env), "");
 });

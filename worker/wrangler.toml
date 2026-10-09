@@ -21,22 +21,15 @@ command = "npm run build"
 cwd = ".."
 watch_dir = ["../site/ts", "../shared"]
 
-# The domain must already be active in this Cloudflare account (README step 2).
-# PRE-LAUNCH: the site lives at preview.golemcraftworks.com while the main domain still forwards
-# from GoDaddy. To go live: delete the A records for golemcraftworks.com and www in Cloudflare DNS,
-# swap the route below for the two commented ones, switch the two URLs in [vars] back,
-# and set NOINDEX to "false" so search engines can list the site.
+# The domain must already be active in this Cloudflare account (README step 2). The deploy makes
+# the DNS records for both names itself, and fails if other records for them are in the way.
 [[routes]]
-pattern = "preview.golemcraftworks.com"
+pattern = "golemcraftworks.com"
 custom_domain = true
 
-# [[routes]]
-# pattern = "golemcraftworks.com"
-# custom_domain = true
-#
-# [[routes]]
-# pattern = "www.golemcraftworks.com"
-# custom_domain = true
+[[routes]]
+pattern = "www.golemcraftworks.com"
+custom_domain = true
 
 # Hourly safety check (minute 7 to stay off the top of the hour), then Etsy drafts for new dice
 # sets half an hour later. The third is the daily report email, at 13:17 UTC (8:17am Central in summer,
@@ -51,13 +44,10 @@ binding = "GC_KV"
 id = "68298024fb784e2ba7914b0c297a625b"
 
 [vars]
-# PRE-LAUNCH values. Live: SITE_URL = "https://golemcraftworks.com"
-#   SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"
-SITE_URL = "https://preview.golemcraftworks.com"
-NOINDEX = "true"                     # keeps the preview address out of search results; "false" at launch
+SITE_URL = "https://golemcraftworks.com"
 SQUARE_ENV = "production"            # "sandbox" while testing
 SQUARE_LOCATION_ID = "LNQ38H5968VDC"
-SQUARE_WEBHOOK_URL = "https://preview.golemcraftworks.com/webhooks/square"   # must match the URL given to Square exactly
+SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"   # must match the URL given to Square exactly
 ETSY_KEYSTRING = "6ae72rteu6oiyw8qal74efaq"
 ETSY_SHOP_ID = "52196219"
 # The flat shipping price, in cents. This is the only place it's set: checkout, the cart,

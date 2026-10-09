@@ -11,7 +11,7 @@
 
 import type { Env, PublicProduct, StorefrontCatalog } from "./types.ts";
 import { group } from "radashi";
-import { isTrue, siteUrl } from "./util.ts";
+import { siteUrl } from "./util.ts";
 import { esc, slugify } from "../../shared/text.ts";
 import { OTHER, byCategory, tilePhotos } from "../../shared/catalog.ts";
 
@@ -35,7 +35,6 @@ const AI_CRAWLERS = [
 
 const money = (cents: number) =>
   `$${cents % 100 === 0 ? cents / 100 : (cents / 100).toFixed(2)}`;
-const noindex = (env: Env) => isTrue(env.NOINDEX);
 const oneLine = (s: string, max: number) => {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length <= max ? t : t.slice(0, max - 1).replace(/\s+\S*$/, "") + "…";
@@ -73,13 +72,12 @@ function categories(catalog: StorefrontCatalog): Category[] {
     .sort((a, b) => byCategory(a.name, b.name));
 }
 
-function page(html: string, env: Env, status = 200) {
+function page(html: string, status = 200) {
   return new Response(html, {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-cache", // browsers ask each time, so sold pieces don't linger
-      ...(noindex(env) ? { "x-robots-tag": "noindex" } : {}),
     },
   });
 }
@@ -240,7 +238,7 @@ export async function productPage(
     `<meta name="twitter:card" content="summary_large_image">`,
     `<script type="application/ld+json">${JSON.stringify(productData(p, link, env)).replace(/</g, "\\u003c")}</script>`,
   ].join("\n  ");
-  return page(fill(fill(html, "head", head), "product", productBody(p)), env);
+  return page(fill(fill(html, "head", head), "product", productBody(p)));
 }
 
 // Sold pieces stay reachable by their own address and the sitemap; the grids open on what's available.
@@ -260,7 +258,7 @@ const cards = (products: PublicProduct[]) =>
 async function missingPage(env: Env, url: URL) {
   const missing = await template(env, url, "/404.html");
   return missing
-    ? page(missing, env, 404)
+    ? page(missing, 404)
     : new Response("Not found", { status: 404 });
 }
 
@@ -292,7 +290,7 @@ export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
           </a></li>`;
     })
     .join("");
-  return page(fill(html, "grid", tiles), env);
+  return page(fill(html, "grid", tiles));
 }
 
 export async function categoryPage(
@@ -352,7 +350,6 @@ export async function categoryPage(
       (out, [name, content]) => fill(out, name, content),
       html,
     ),
-    env,
   );
 }
 
@@ -379,7 +376,7 @@ export async function shippingPage(env: Env, url: URL) {
   const html = await template(env, url, "/shipping/");
   return html === null
     ? null
-    : page(fill(html, "shipping-price", money(shippingCents(env))), env);
+    : page(fill(html, "shipping-price", money(shippingCents(env))));
 }
 
 // ---------- Files for crawlers ----------
@@ -413,8 +410,6 @@ export function sitemap(env: Env, url: URL, catalog: StorefrontCatalog) {
 }
 
 export function robots(env: Env, url: URL) {
-  // Before launch the preview address stays out of search results entirely.
-  if (noindex(env)) return file("User-agent: *\nDisallow: /\n", "text/plain");
   const rules =
     "Allow: /\nDisallow: /admin/\nDisallow: /api/\nDisallow: /thanks/\n";
   return file(

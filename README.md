@@ -4,7 +4,7 @@ A storefront for golemcraftworks.com that sells straight from your Square invent
 
 The whole thing runs on Cloudflare's free plan as one Worker: Cloudflare serves the pages in `site/`, and the Worker code handles checkout, the commission form and the Square/Etsy sync. GitHub holds the source in a private repo and plays no part in hosting.
 
-**Before launch the shop lives at `https://preview.golemcraftworks.com`**, hidden from search engines, while `golemcraftworks.com` still shows the old link page. Every address in the setup steps below uses the preview address. [Going public](#going-public) lists what to change when the shop is ready for the main address.
+The shop is live at `https://golemcraftworks.com`; `www.golemcraftworks.com` shows the same site.
 
 ```
 site/      The website: pages and styles as they are, scripts bundled from ts/.
@@ -102,7 +102,7 @@ Restocked pieces waiting to be published on Etsy are listed under `notPublished`
 
 ## First-time setup
 
-Do these in order. Steps 1 to 4 put the shop online at the preview address; 5 and 6 connect Etsy. [Going public](#going-public) comes after all six.
+This is how the shop was set up, kept for the day something has to be set up again. Do these in order. Steps 1 to 4 put the shop online; 5 and 6 connect Etsy.
 
 ### 1. SKUs
 
@@ -117,11 +117,11 @@ After setup, `/admin/status` lists any SKUs found on only one side so you can fi
 The Worker can only be attached to a domain that Cloudflare manages, so the domain's DNS moves from GoDaddy to Cloudflare. The domain stays registered at GoDaddy.
 
 1. Create a free Cloudflare account. In the dashboard, add the domain `golemcraftworks.com` on the Free plan.
-2. Cloudflare copies your existing DNS records. Keep all of them for now, including the ones for `golemcraftworks.com` and `www` that point at the old link page: the main address keeps showing the link page until you go public.
+2. Cloudflare copies your existing DNS records. Keep the email records (`MX`, `TXT`, and any `CNAME`s your email service asked for). Delete any `A` or `CNAME` records for `golemcraftworks.com` and `www` themselves, such as ones left by GoDaddy's forwarding: the deploy makes its own records for those two names, and fails if others are in the way. Delete them rather than switching them to Proxied.
 3. At GoDaddy, change the domain's nameservers to the two Cloudflare shows you.
 4. Wait until Cloudflare lists the domain as **Active**.
 
-The first deploy in step 4 creates the `preview` address by itself; there is no DNS record to add for it.
+The first deploy in step 4 creates the DNS records for `golemcraftworks.com` and `www` by itself; there are none to add by hand.
 
 ### 3. Square
 
@@ -129,7 +129,7 @@ The first deploy in step 4 creates the `preview` address by itself; there is no 
 2. Start in **Sandbox**: copy the sandbox access token and a sandbox location ID.
 3. Later for real use, copy your **Production** access token and your shop's **Location ID** (Locations page in the Developer Console).
 4. Under **Webhooks**, add a subscription:
-   - URL: `https://preview.golemcraftworks.com/webhooks/square`
+   - URL: `https://golemcraftworks.com/webhooks/square`
    - Events: `inventory.count.updated`, `catalog.version.updated`, `payment.created`, and `payment.updated`
    - Copy the **signature key**.
 5. Make sure the tax you charge in person is set on your items in Square. In-person sales and website pickup orders use it; shipped website orders don't add sales tax (see [Known limits](#known-limits)).
@@ -152,7 +152,7 @@ npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
 npx wrangler secret put ADMIN_TOKEN           # any long random string, keep it private (weaker than most)
 ```
 
-The site is now at https://preview.golemcraftworks.com, showing your Square inventory.
+The site is now at https://golemcraftworks.com, showing your Square inventory.
 
 Set your email, Instagram and Etsy links in `site/ts/pages/config.ts`, and run `npm run deploy` from the project folder.
 
@@ -164,9 +164,9 @@ The admin addresses (`/admin/...`) answer "Not found" unless `?token=` matches `
 
 1. Register an app at developers.etsy.com. Copy the **keystring** and **shared secret**.
 2. Put the keystring in `ETSY_KEYSTRING` in wrangler.toml, and from `worker/` run `npx wrangler secret put ETSY_SHARED_SECRET`.
-3. In the app's settings, add the callback URL `https://preview.golemcraftworks.com/admin/etsy/callback`. It has to match exactly; if it doesn't, Etsy's sign-in page says "The requested redirect URL is not permitted."
-4. Run `npm run deploy`, then visit `https://preview.golemcraftworks.com/admin/etsy/connect?token=YOUR_ADMIN_TOKEN` and approve. The confirmation page shows your **shop ID**; put it in `ETSY_SHOP_ID` and deploy again.
-5. In Etsy's Webhooks portal, add an endpoint for `order.paid` pointing to `https://preview.golemcraftworks.com/webhooks/etsy`. Copy its signing secret (starts with `whsec_`), then from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
+3. In the app's settings, add the callback URL `https://golemcraftworks.com/admin/etsy/callback`. It has to match exactly; if it doesn't, Etsy's sign-in page says "The requested redirect URL is not permitted."
+4. Run `npm run deploy`, then visit `https://golemcraftworks.com/admin/etsy/connect?token=YOUR_ADMIN_TOKEN` and approve. The confirmation page shows your **shop ID**; put it in `ETSY_SHOP_ID` and deploy again.
+5. In Etsy's Webhooks portal, add an endpoint for `order.paid` pointing to `https://golemcraftworks.com/webhooks/etsy`. Copy its signing secret (starts with `whsec_`), then from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
 
 The hourly check also refreshes the Etsy sign-in, which otherwise expires after 90 days unused.
 
@@ -175,40 +175,15 @@ The hourly check also refreshes the Etsy sign-in, which otherwise expires after 
 `SYNC_DRY_RUN = "true"` is the default. In this mode the Worker logs what it would change on Etsy and Square but changes nothing.
 
 1. Leave dry run on for a few days of normal selling.
-2. Check `https://preview.golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: recent activity, SKUs missing on either side, and the last hourly check.
+2. Check `https://golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: recent activity, SKUs missing on either side, and the last hourly check.
 3. When the planned changes look right, set `SYNC_DRY_RUN = "false"` and `npm run deploy`.
 4. Place one real website order for something cheap (pickup option) to confirm checkout, receipt and the Etsy update end to end.
 
-To run the hourly check on demand: `curl -X POST "https://preview.golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
+To run the hourly check on demand: `curl -X POST "https://golemcraftworks.com/admin/reconcile?token=YOUR_ADMIN_TOKEN"`.
 
-## Going public
+## Checks by hand
 
-This moves the shop from `preview.golemcraftworks.com` to `golemcraftworks.com` and lets search engines in. Do it once setup steps 1 to 6 are done and the shop looks right at the preview address.
-
-Pick a quiet hour. Between steps 3 and 5 below, sale notifications from Square and Etsy have nowhere to land; the hourly check picks up anything missed. After step 3 the preview address stops working, and every address in this file that says `preview.golemcraftworks.com` becomes `golemcraftworks.com`.
-
-1. **Read the policy page once more.** `site/shipping/index.html` says how soon orders ship and what the return policy is; Google requires both.
-2. **Free up the main address.** In Cloudflare DNS, delete the `A` records for `golemcraftworks.com` and `www` that point at the old link page. Keep the email records (`MX`, `TXT`). The deploy creates its own records and fails if the old ones are in the way. You can also turn off forwarding at GoDaddy; nothing uses it after this.
-3. **Switch the settings** in `worker/wrangler.toml`, then run `npm run deploy`:
-   - Routes: remove the `preview.golemcraftworks.com` route and uncomment the two for `golemcraftworks.com` and `www.golemcraftworks.com`.
-   - `SITE_URL = "https://golemcraftworks.com"`
-   - `SQUARE_WEBHOOK_URL = "https://golemcraftworks.com/webhooks/square"`
-   - `NOINDEX = "false"`
-4. **Square.** In the Developer Console under Webhooks, edit the subscription's URL to `https://golemcraftworks.com/webhooks/square`, exactly as in `SQUARE_WEBHOOK_URL`. If you make a new subscription instead of editing, it has a new signature key: from `worker/` run `npx wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY`.
-5. **Etsy.**
-   - In the Webhooks portal, point the `order.paid` endpoint at `https://golemcraftworks.com/webhooks/etsy`. If that gives you a new signing secret, from `worker/` run `npx wrangler secret put ETSY_WEBHOOK_SECRET`.
-   - In the app's settings, add the callback URL `https://golemcraftworks.com/admin/etsy/callback`. The existing Etsy connection carries over; this is only for the day you need to connect again.
-6. **Check it.**
-   - `https://golemcraftworks.com` shows the shop, and a product page opens.
-   - `https://golemcraftworks.com/robots.txt` says `Allow: /`.
-   - Change the stock of something in Square that is also listed on Etsy, then look at `https://golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: the change should be in the recent activity within a minute.
-7. **Tell the search engines.** Follow the list in the next section.
-
-Nothing changes for commission emails: they already send from `golemcraftworks.com`.
-
-### Checks by hand
-
-`npm test` can't see how a page looks or whether a real payment goes through. Before going public, and after any big change, go through these at the preview address:
+`npm test` can't see how a page looks or whether a real payment goes through. After any big change, go through these on the live site:
 
 - [ ] **Styles.** Every page looks right, the shipping and returns page especially.
 - [ ] **Light and dark.** Every page in both modes.
@@ -218,14 +193,14 @@ Nothing changes for commission emails: they already send from `golemcraftworks.c
 - [ ] **A shipped purchase.** The order email has the address; no sales tax is added.
 - [ ] **A pickup purchase.** Sales tax is added at checkout, and the order email has a "Sales tax" amount and no "WISCONSIN ORDER" note. Use something priced over a few dollars: on a one-cent test item the tax rounds to nothing.
 - [ ] **Google Pay** (express checkout). The order email still has the shipping address.
+- [ ] **The sync.** Change the stock of something in Square that is also listed on Etsy, then look at `https://golemcraftworks.com/admin/status?token=YOUR_ADMIN_TOKEN`: the change should be in the recent activity within a minute.
+- [ ] **Search engines.** `https://golemcraftworks.com/robots.txt` says `Allow: /`.
 
 ## Search engines, AI assistants and Google Shopping
 
 The Worker builds the home page, each category page (`/shop/<category>`), and each product page (`/product/<name>`) in full, plus `/sitemap.xml`, `/robots.txt`, `/llms.txt` (a plain-text guide for AI assistants) and `/feeds/google.xml` (a product feed). All of them update from Square on their own.
 
-While `NOINDEX = "true"` in `worker/wrangler.toml`, search engines are told to stay away. That is right for the preview address; [Going public](#going-public) turns it off.
-
-After going public, once:
+Once, to get the shop listed:
 
 1. **Check the policy page** says how soon orders ship and what the return policy is. Google requires both to be on the site.
 2. **Google Search Console** (search.google.com/search-console): add `golemcraftworks.com`, verify it with the DNS record it gives you (add the TXT record in Cloudflare DNS), then under Sitemaps submit `https://golemcraftworks.com/sitemap.xml`.
@@ -296,7 +271,7 @@ Things to know:
 - **Dry run.** While `SYNC_DRY_RUN = "true"`, nothing is created. `/admin/status` shows which SKUs are waiting under `lastEtsyDraftsCheck`, and the recent activity says what would be made.
 - **A few at a time.** Each run can only do so much, mostly because of photos: one set with 10 photos, or two with 4 each. If you save several sets in a row, the rest are picked up on the next save or the next hourly check. `lastEtsyDraftsCheck` in `/admin/status` lists what is still waiting.
 - **Photos follow Square.** When you change a dice item's photos in Square (say, swapping a quick placeholder for proper ones), its Etsy listing's photos are replaced with Square's, in Square's order, usually within a minute. This goes for drafts and published listings alike, including dice listings that were on Etsy before this was set up. Photo changes made on Etsy are overwritten the next time the Square photos change. Removing every photo in Square leaves Etsy's as they are.
-- **Nothing else follows.** Title, description, and price are set when the draft is made. Later changes to them in Square don't reach Etsy. To run it now: `curl -X POST "https://preview.golemcraftworks.com/admin/etsy/drafts?token=YOUR_ADMIN_TOKEN"`.
+- **Nothing else follows.** Title, description, and price are set when the draft is made. Later changes to them in Square don't reach Etsy. To run it now: `curl -X POST "https://golemcraftworks.com/admin/etsy/drafts?token=YOUR_ADMIN_TOKEN"`.
 - **Once per SKU.** If you delete a draft on Etsy, it isn't made again.
 - **A draft's stock isn't kept in step.** If the set sells before you publish, don't publish the draft. If you do, the hourly check turns the listing off within the hour.
 - **Publishing without review.** Set `ETSY_DRAFTS_AUTO_PUBLISH = "true"` and deploy. Each new set is then listed straight away, and Etsy charges its fee each time.
@@ -358,7 +333,7 @@ Once a day (13:17 UTC, early morning Central) the Worker looks at the same infor
 - A SKU that's on one side only. Each is mentioned once, when it first shows up, since many are on purpose.
 - Anything that failed in the last day (an email that didn't send, Square or Etsy not answering).
 
-No email means nothing was wrong. To send it now: `curl -X POST "https://preview.golemcraftworks.com/admin/report?token=YOUR_ADMIN_TOKEN"`. The reply shows what the report contains even when no email goes out. It needs Resend, as in [Commission emails](#commission-emails).
+No email means nothing was wrong. To send it now: `curl -X POST "https://golemcraftworks.com/admin/report?token=YOUR_ADMIN_TOKEN"`. The reply shows what the report contains even when no email goes out. It needs Resend, as in [Commission emails](#commission-emails).
 
 ## Order emails
 
@@ -373,13 +348,13 @@ If the email fails to send, `/admin/status` shows a line starting "WEBSITE ORDER
 
 ## Reviews
 
-The reviews page shows Etsy reviews plus ones left on the site. A review left on the site shows straight away, and you get an email with a link to hide or delete it. One with a web address in it is held back as likely spam until you press **Show on the site** from that link. Every site review is also listed at `https://preview.golemcraftworks.com/admin/reviews?token=YOUR_ADMIN_TOKEN`. The notification email uses the same Resend setup as [Commission emails](#commission-emails).
+The reviews page shows Etsy reviews plus ones left on the site. A review left on the site shows straight away, and you get an email with a link to hide or delete it. One with a web address in it is held back as likely spam until you press **Show on the site** from that link. Every site review is also listed at `https://golemcraftworks.com/admin/reviews?token=YOUR_ADMIN_TOKEN`. The notification email uses the same Resend setup as [Commission emails](#commission-emails).
 
 ### Spam check (Turnstile)
 
 Cloudflare Turnstile is a free check that the visitor is a person, usually without asking them to do anything. It's off until both keys below are set. Without it the form still has a hidden trap field, a too-fast-to-be-human timer, and a limit of three reviews a day per visitor.
 
-1. In the Cloudflare dashboard, open **Turnstile** and add a widget. Name it anything, add the hostname `golemcraftworks.com` (this covers `preview.golemcraftworks.com` too), and leave the mode on **Managed**.
+1. In the Cloudflare dashboard, open **Turnstile** and add a widget. Name it anything, add the hostname `golemcraftworks.com` (this covers `www.golemcraftworks.com` too), and leave the mode on **Managed**.
 2. Copy the **site key** into `turnstileSiteKey` in `site/ts/pages/config.ts`. This one is public, so it's fine in the repo.
 3. Copy the **secret key**, then from `worker/` run `npx wrangler secret put TURNSTILE_SECRET` and paste it.
 4. Run `npm run deploy` straight after. Between steps 3 and 4 the Worker expects the check but the page doesn't show it yet, so reviews sent in that gap are refused.
