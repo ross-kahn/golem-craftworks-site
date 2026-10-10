@@ -8,6 +8,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { Browser } from "happy-dom";
 import worker from "../src/index.ts";
 import type { Env } from "../src/types.ts";
+import { PIECES } from "../src/past-commissions.ts";
+import photoList from "../src/commission-photos.json" with { type: "json" };
+
+const photos: Record<string, string[]> = photoList;
 
 const SITE = "https://shop.test";
 const TYPES: Record<string, string> = {
@@ -388,6 +392,38 @@ test("product page: options and add-ons change the price; the cart keeps them", 
   assert.deepEqual(v.errors, []);
 });
 
+// Which photo a gallery is showing: its place in the strip, and what the big picture holds.
+const galleryOf = (v: Awaited<ReturnType<typeof visitor>>) => ({
+  shown: () =>
+    v
+      .$$("[data-thumb]")
+      .findIndex((b) => b.getAttribute("aria-current") === "true"),
+  main: () => v.$("[data-main]").getAttribute("src"),
+});
+
+test("product page: the arrows and thumbnails step through the photos", async () => {
+  const v = await visitor();
+  await v.go("/product/yahtzee-set");
+  await v.until("the photos", () => v.$$("[data-thumb]").length === 3);
+  const { shown, main } = galleryOf(v);
+  const first = main();
+  assert.equal(shown(), 0);
+
+  v.click('[data-step="1"]');
+  assert.equal(shown(), 1);
+  assert.notEqual(main(), first);
+  v.click('[data-step="-1"]');
+  v.click('[data-step="-1"]'); // back past the first photo, round to the last
+  assert.equal(shown(), 2);
+  v.click('[data-step="1"]');
+  assert.equal(shown(), 0);
+  assert.equal(main(), first);
+
+  v.click('[data-thumb="2"]');
+  assert.equal(shown(), 2);
+  assert.deepEqual(v.errors, []);
+});
+
 test("product page: a piece that isn't there says so", async () => {
   const v = await visitor();
   await v.go("/product/never-made");
@@ -460,6 +496,110 @@ test("commission form: says what's missing, then sends", async () => {
   assert.match(sent[0].text, /Needed by: before December 15/);
   assert.equal(v.$('[name="name"]').value, "", "the form is cleared");
   assert.deepEqual(v.errors, []);
+});
+
+// These follow whatever pieces and photos are in the repo today, so rewriting a piece doesn't break them.
+test("past commissions: listed on the commissions page, each linked to its own page", async () => {
+  const v = await visitor();
+  await v.go("/commissions/");
+  assert.deepEqual(
+    v.$$(".showcase .card__name").map((el) => el.textContent),
+    PIECES.map((p) => p.name),
+  );
+  assert.deepEqual(
+    v.$$(".showcase .card a").map((a) => a.pathname),
+    PIECES.map((p) => `/commissions/${p.slug}`),
+  );
+  for (const p of PIECES.filter((p) => photos[p.slug])) {
+    // Its first four photos, as a tile.
+    const tile = v
+      .$$(`[data-piece="${p.slug}"] img`)
+      .map((img) => img.getAttribute("src"));
+    assert.deepEqual(
+      tile,
+      photos[p.slug]
+        .slice(0, 4)
+        .map((file) => `/assets/commissions/${p.slug}/thumb/${file}`),
+    );
+    const res = await serve(v.env, new Request(SITE + tile[0]));
+    assert.equal(res.status, 200, `${tile[0]} is published`);
+  }
+  assert.equal(v.$('[name="idea"]').value, "", "the form starts empty");
+  assert.deepEqual(v.errors, []);
+});
+
+test("past commission page: photos, the write-up, and a way into the form", async (t) => {
+  const p = PIECES.find((p) => photos[p.slug]?.length > 1);
+  // The photos aren't in git: a fresh copy of the repo has none until the originals are put back.
+  if (!p) return t.skip("no commission photos on this computer");
+  const v = await visitor();
+  await v.go(`/commissions/${p.slug}`);
+  assert.equal(v.text("h1"), p.name);
+  assert.equal(v.win().document.title, `${p.name} · Golem Craftworks`);
+  assert.equal(v.text('.nav a[aria-current="page"]'), "Commissions");
+  assert.ok(
+    v.text(".product__desc").startsWith(p.story.split("\n")[0].slice(0, 40)),
+  );
+  assert.equal(v.$$("[data-thumb]").length, photos[p.slug].length);
+  assert.equal(
+    v.$$(".showcase .card").length,
+    PIECES.length - 1,
+    "the other pieces are listed underneath",
+  );
+
+  const { shown, main } = galleryOf(v);
+  const file = (i: number) =>
+    `/assets/commissions/${p.slug}/${photos[p.slug][i]}`;
+  assert.equal(main(), file(0));
+  v.click('[data-step="1"]');
+  assert.equal(shown(), 1);
+  assert.equal(main(), file(1));
+  v.click('[data-step="-1"]');
+  v.click('[data-step="-1"]');
+  assert.equal(main(), file(photos[p.slug].length - 1));
+  v.click('[data-thumb="0"]');
+  assert.equal(main(), file(0));
+
+  const start = v.$(".product__buy a");
+  assert.equal(start.textContent, "Start a commission like this");
+  await v.go(start.getAttribute("href"));
+  assert.equal(v.$('[name="type"]').value, p.type);
+  assert.equal(
+    v.$('[name="idea"]').value,
+    `I'd like something like "${p.name}". `,
+  );
+  assert.ok(v.$("#start"), "the link lands on the form");
+  assert.deepEqual(v.errors, []);
+});
+
+test("past commission page: one address each, and a piece that isn't there says so", async () => {
+  const env = makeEnv();
+  const { slug, name, summary } = PIECES[0];
+  const get = (path: string) => serve(env, new Request(SITE + path));
+
+  const res = await get(`/commissions/${slug}`);
+  const html = await res.text();
+  assert.equal(res.status, 200);
+  assert.ok(
+    html.includes(`<link rel="canonical" href="${SITE}/commissions/${slug}">`),
+  );
+  assert.ok(html.includes(`<h1>${name}</h1>`), "there without any script");
+
+  const slash = await get(`/commissions/${slug}/`);
+  assert.equal(slash.status, 301);
+  assert.equal(slash.headers.get("location"), `${SITE}/commissions/${slug}`);
+  assert.equal((await get("/commissions/never-made")).status, 404);
+
+  assert.ok(
+    (await (await get("/sitemap.xml")).text()).includes(
+      `<loc>${SITE}/commissions/${slug}</loc>`,
+    ),
+  );
+  assert.ok(
+    (await (await get("/llms.txt")).text()).includes(
+      `- [${name}](${SITE}/commissions/${slug}): ${summary}`,
+    ),
+  );
 });
 
 test("reviews: the list, the summary, and leaving one", async () => {

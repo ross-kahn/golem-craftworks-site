@@ -7,5 +7,11 @@ node_modules/
 !.dev.vars.example
 !.env.example
 
+# Photos of past commissions: the originals, and the copies `npm run build` sizes from them
+# for the site, with its list of them. Too big for git; the originals are backed up elsewhere.
+commission-photos/
+site/assets/commissions/
+worker/src/commission-photos.json
+
 # Built from site/ts by `npm run build`
 site/js/

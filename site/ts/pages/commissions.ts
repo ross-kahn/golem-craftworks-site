@@ -1,5 +1,5 @@
 // Commission form. Sends the request to the Worker, which emails it to the shop and
-// a confirmation to the client.
+// a confirmation to the client. The past commissions above it are written into the page by the Worker.
 import * as api from "../api.ts";
 import { formStatus } from "../chrome.ts";
 import { check } from "../../../shared/validate.ts";
@@ -18,6 +18,20 @@ function markInvalid(names: string[]) {
     else field(n).removeAttribute("aria-invalid");
   });
   if (names.length) field(names[0]).focus();
+}
+
+// Arriving from "Start a commission like this" on a past commission's page (?like=<its slug>):
+// the form opens on that kind of piece, with the idea started.
+const like = new URLSearchParams(location.search).get("like");
+const piece = [...document.querySelectorAll<HTMLElement>("[data-piece]")].find(
+  (el) => el.dataset.piece === like,
+);
+if (piece) {
+  const type = field("type") as unknown as HTMLSelectElement;
+  if ([...type.options].some((o) => o.value === piece.dataset.type))
+    type.value = piece.dataset.type!;
+  (field("idea") as HTMLTextAreaElement).value =
+    `I'd like something like "${piece.dataset.name}". `;
 }
 
 form.addEventListener("submit", async (e) => {

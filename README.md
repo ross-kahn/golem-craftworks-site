@@ -12,17 +12,21 @@ site/      The website: pages and styles as they are, scripts bundled from ts/.
   shop/                 Category page (/shop/<category>)
   product/              Product page  (/product/<name>)
   about/  commissions/  reviews/  shipping/  thanks/   Content pages
+  commission/           One past commission's page (/commissions/<slug>)
   styles/main.css       All styling
   ts/pages/             One script per page, plus config.ts (the shop's settings) and theme.ts
-  ts/                   What the pages share: api.ts (talking to the Worker), chrome.ts (header, footer, cart)
+  ts/                   What the pages share: api.ts (talking to the Worker), chrome.ts (header, footer, cart), gallery.ts (photo galleries)
   js/                   Built from ts/ by `npm run build`. Not in git; don't edit by hand.
   assets/               Logo, favicon, hero golem
+  assets/commissions/   Photos of past commissions, sized by `npm run build`. Not in git; don't edit by hand.
   .assetsignore         Files in site/ that are not published (the TypeScript source)
 worker/    Cloudflare Worker in TypeScript (Square + Etsy logic, keeps your API keys secret)
   wrangler.toml         Cloudflare settings: domain, site folder, shop options
   src/demo-products.json   Sample products for `npm run dev` and the tests
+  src/past-commissions.ts  The past commissions and what's written about each
 shared/    Code the site, the Worker and the tools all use (form rules, text helpers, category order)
-tools/     One-time helpers that brought the Etsy listings and photos into Square
+tools/     One-time helpers that brought the Etsy listings and photos into Square, and the photo sizing `npm run build` runs
+commission-photos/      Photos of past commissions as they came off the camera, one folder per piece. Not in git.
 ```
 
 ## Build and deploy
@@ -59,7 +63,7 @@ npm run deploy
 
 - **The Worker** against fake Square, Etsy and Resend (`worker/test/sync.test.ts`, `reviews.test.ts`, `commission.test.ts`, `util.test.ts`).
 - **The whole shop in a pretend browser** (`worker/test/site.test.ts`): the Worker serves the real pages and scripts with the sample products, and the test clicks through them: browsing, the cart, checkout, both forms, the theme switch. It only knows what a visitor sees, so it keeps passing however the scripts are rearranged, and fails if a page stops working.
-- **The shared helpers and the import tools** (`shared/test/`, `tools/test/`).
+- **The shared helpers, the import tools, and the photo sizing** (`shared/test/`, `tools/test/`).
 
 ### Libraries and shared helpers
 
@@ -291,6 +295,25 @@ Things to know:
 - **Sales tax** is not added to shipped website orders, because Square can't work out tax by destination for this kind of checkout. Most ship out of state, where none is due. On orders shipped within Wisconsin you pay it out of the price; the order email marks those "WISCONSIN ORDER" so you can total them when you file. Pickup orders and in-person sales are charged the taxes set on your items in Square. The switch is `auto_apply_taxes` in `worker/src/square.ts`; turning it on for shipped orders charges every buyer your rate wherever they are.
 - **Commission form** only sends email once Resend is set up (below). Until then it tells the visitor to email you directly.
 
+## Past commissions
+
+The commissions page lists past commissions above the form, and each one has its own page at `/commissions/<slug>` with its photos, a write-up, and a **Start a commission like this** button that opens the form on that kind of piece.
+
+To add one:
+
+1. **Write it up.** Add an entry to `worker/src/past-commissions.ts`: a `slug` (its address, like `walnut-crest-vault`), a name, the kind of piece, a one-line summary, and the story. The order in that file is the order on the page.
+2. **Add the photos.** Make a folder named after the slug in `commission-photos/` and drop the photos in as they are: `commission-photos/walnut-crest-vault/`. JPEG and PNG both work. iPhone `.heic` files don't; export those as JPEG first.
+3. **Put them in order.** Photos show in file-name order, and the first four make up the piece's tile on the commissions page. Number them (`01-front.jpg`, `02-lid.jpg`) to choose. Don't make thumbnails yourself, and don't put anything in `site/assets/commissions/`: the build fills that folder, thumbnails included, and warns if it finds an original there.
+4. **Look, then deploy.** `npm run dev` to see it, `npm run deploy` to publish.
+
+`npm run build` (which `dev`, `test`, and `deploy` all run) makes two copies of each photo in `site/assets/commissions/<slug>/`: one 1600 pixels on its longest side and a 640-pixel thumbnail. The copies have no location or camera details in them. Only new or replaced photos are worked on, and it warns about a piece with no photos or a photo it couldn't read. While `npm run dev` is running, stop and start it to pick up new photos.
+
+- **Change or remove a photo:** change it in `commission-photos/<slug>/` and build again; the site's copies follow.
+- **Remove a piece:** delete its entry, its folder in `commission-photos/`, and its folder in `site/assets/commissions/`.
+- **Rename a slug:** rename both of those folders to match. Links to the old address stop working.
+- **What's in git:** the write-ups only. The photos are too big for it: neither the originals in `commission-photos/` nor the sized copies in `site/assets/commissions/` are committed, so keep your own backup of the originals.
+- **On a fresh copy of the repo:** put the originals back in `commission-photos/`, one folder per slug, before deploying. Until then `npm run dev` and `npm test` work, with the logo standing in for the photos, and `npm run deploy` stops with a message rather than publish the pieces without them.
+
 ## Commission emails
 
 The commission form posts to the Worker, which sends two emails through [Resend](https://resend.com) (free plan covers 100 a day):
@@ -366,4 +389,4 @@ To turn it off again, empty `turnstileSiteKey`, run `npx wrangler secret delete 
 
 The repo is private and is only a backup and history of the source. It holds no secrets: API keys live in Cloudflare (`wrangler secret put`) and in `worker/.dev.vars`, which git ignores. Never paste a key into `wrangler.toml` or any other tracked file.
 
-`site/js/` is built, not committed. `npm run deploy`, `npm run dev` and `npm test` each build it first, so a fresh copy of the repo only needs `npm install`.
+`site/js/` is built, not committed. `npm run deploy`, `npm run dev` and `npm test` each build it first, so a fresh copy of the repo only needs `npm install`. The photos of past commissions aren't committed either; see [Past commissions](#past-commissions) for putting them back.

@@ -11,6 +11,8 @@ run_worker_first = [
   "/api/*", "/webhooks/*", "/admin/*",
   # Built from the catalog so search engines and AI crawlers see real content (worker/src/pages.ts).
   "/", "/product/*", "/shop/*", "/sitemap.xml", "/robots.txt", "/llms.txt", "/feeds/*",
+  # The commissions page and one page per past commission (worker/src/past-commissions.ts).
+  "/commissions/*",
   # These two show the shipping price, which is filled in from SHIPPING_FLAT_CENTS below.
   "/js/config.js", "/shipping/"
 ]

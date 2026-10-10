@@ -4,6 +4,8 @@
 //   /product/<slug>     the product page, complete: name, price, photos, description, product data
 //   /shop/<slug>        a category page with its product grid filled in
 //   /                   the home page with one tile per category
+//   /commissions/       the commissions page with the past commissions listed
+//   /commissions/<slug> one past commission: its photos and write-up
 //   /sitemap.xml  /robots.txt  /llms.txt  /feeds/google.xml
 //
 // The pages start from the static files in site/ and fill the <!--ssr:…--> slots. The browser scripts
@@ -14,6 +16,8 @@ import { group } from "radashi";
 import { siteUrl } from "./util.ts";
 import { esc, slugify } from "../../shared/text.ts";
 import { OTHER, byCategory, tilePhotos } from "../../shared/catalog.ts";
+import { PIECES, type Piece } from "./past-commissions.ts";
+import photoList from "./commission-photos.json" with { type: "json" };
 
 // KV: every address a product has been served at -> its Square id (kept up to date in index.ts).
 export const ADDRESSES_KEY = "product:addresses";
@@ -353,6 +357,142 @@ export async function categoryPage(
   );
 }
 
+// ---------- Past commissions ----------
+// The pieces are written up in past-commissions.ts. Their photos are listed in commission-photos.json,
+// which `npm run build` makes from what's in site/assets/commissions/.
+
+const pieceLink = (p: Piece) => `/commissions/${p.slug}`;
+const piecePhotos = (p: Piece) =>
+  ((photoList as Record<string, string[]>)[p.slug] || []).map((file) => ({
+    full: `/assets/commissions/${p.slug}/${file}`,
+    thumb: `/assets/commissions/${p.slug}/thumb/${file}`,
+  }));
+
+// data-name and data-type are what the form starts from after "Start a commission like this".
+const pieceCards = (pieces: Piece[]) =>
+  pieces
+    .map((p) => {
+      // The first four photos, laid out like a category's tile on the home page.
+      const tile = piecePhotos(p).slice(0, 4);
+      return `
+          <li class="card" data-piece="${esc(p.slug)}" data-name="${esc(p.name)}" data-type="${esc(p.type)}"><a href="${esc(pieceLink(p))}">
+            <div class="cat__media" data-n="${tile.length}">${
+              tile.length
+                ? tile
+                    .map(
+                      (photo) =>
+                        `<img src="${esc(photo.thumb)}" alt="" loading="lazy" decoding="async">`,
+                    )
+                    .join("")
+                : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`
+            }</div>
+            <h3 class="card__name">${esc(p.name)}</h3>
+            <p class="card__note">${esc(p.summary)}</p>
+          </a></li>`;
+    })
+    .join("");
+
+const pieceGrid = (heading: string, pieces: Piece[]) =>
+  pieces.length
+    ? `
+        <section class="showcase" id="past">
+          <h2>${heading}</h2>
+          <ul class="grid">${pieceCards(pieces)}
+          </ul>
+        </section>`
+    : "";
+
+export async function commissionsPage(env: Env, url: URL) {
+  const html = await template(env, url, "/commissions/");
+  return html === null
+    ? null
+    : page(fill(html, "pieces", pieceGrid("Past commissions", PIECES)));
+}
+
+const chevron = (d: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+
+// Laid out like a product page, with the write-up where the price and the cart button would be.
+// commission.ts makes the arrows and thumbnails work.
+function pieceBody(p: Piece) {
+  const photos = piecePhotos(p);
+  const several = photos.length > 1;
+  return `
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/commissions/">Commissions</a> / <a href="/commissions/#past">Past commissions</a></nav>
+      <div class="product">
+        <div class="gallery gallery--whole">
+          <div class="gallery__main">${
+            photos.length
+              ? `<img src="${esc(photos[0].full)}" alt="${esc(p.name)}" data-main>`
+              : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`
+          }${
+            several
+              ? `
+            <button class="gallery__nav gallery__nav--prev" type="button" data-step="-1" aria-label="Previous photo">${chevron("M15 5l-7 7 7 7")}</button>
+            <button class="gallery__nav gallery__nav--next" type="button" data-step="1" aria-label="Next photo">${chevron("M9 5l7 7-7 7")}</button>`
+              : ""
+          }</div>
+          ${
+            several
+              ? `<div class="gallery__thumbs">${photos
+                  .map(
+                    (photo, i) =>
+                      `<button type="button" data-thumb="${i}" data-full="${esc(photo.full)}" aria-current="${i === 0}" aria-label="Photo ${i + 1} of ${photos.length}"><img src="${esc(photo.thumb)}" alt="" loading="lazy"></button>`,
+                  )
+                  .join("")}</div>`
+              : ""
+          }
+        </div>
+        <div class="product__info">
+          <h1>${esc(p.name)}</h1>
+          <p class="product__stock">${p.type === "Something else" ? "Commission" : `Commission · ${esc(p.type)}`}</p>
+          <div class="product__desc">${p.story
+            .split(/\n{2,}/)
+            .map((para) => `<p>${esc(para)}</p>`)
+            .join("")}</div>
+          <div class="product__buy product__buy--after">
+            <a class="btn btn--block" href="/commissions/?like=${encodeURIComponent(p.slug)}#start">Start a commission like this</a>
+          </div>
+        </div>
+      </div>${pieceGrid(
+        "More past commissions",
+        PIECES.filter((x) => x !== p),
+      )}
+    `;
+}
+
+export async function commissionPage(env: Env, url: URL) {
+  const slug = decodeURIComponent(url.pathname.replace(/^\/commissions\//, ""));
+  // One address per piece: the one without a slash on the end.
+  if (slug.endsWith("/"))
+    return Response.redirect(
+      new URL(`/commissions/${slug.replace(/\/+$/, "")}`, url).toString(),
+      301,
+    );
+  const p = PIECES.find((x) => x.slug === slug);
+  const html = p && (await template(env, url, "/commission/"));
+  if (!p || !html) return missingPage(env, url);
+
+  const link = siteUrl(env, url) + pieceLink(p);
+  const title = `${p.name} · ${SHOP}`;
+  const description = oneLine(p.summary, 160) || TAGLINE;
+  const image =
+    siteUrl(env, url) + (piecePhotos(p)[0]?.full || "/assets/logo.png");
+  const head = [
+    `<title>${esc(title)}</title>`,
+    `<meta name="description" content="${esc(description)}">`,
+    `<link rel="canonical" href="${esc(link)}">`,
+    `<meta property="og:type" content="article">`,
+    `<meta property="og:site_name" content="${SHOP}">`,
+    `<meta property="og:title" content="${esc(title)}">`,
+    `<meta property="og:description" content="${esc(description)}">`,
+    `<meta property="og:url" content="${esc(link)}">`,
+    `<meta property="og:image" content="${esc(image)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+  ].join("\n  ");
+  return page(fill(fill(html, "head", head), "piece", pieceBody(p)));
+}
+
 // ---------- The shipping price, from SHIPPING_FLAT_CENTS ----------
 
 const shippingCents = (env: Env) => Number(env.SHIPPING_FLAT_CENTS || 0);
@@ -403,6 +543,7 @@ export function sitemap(env: Env, url: URL, catalog: StorefrontCatalog) {
         ...catalog.products.map((p) =>
           entry(`/product/${p.slug}`, p.updatedAt),
         ),
+        ...PIECES.map((p) => entry(pieceLink(p))),
       ].join("\n") +
       `\n</urlset>\n`,
     "application/xml",
@@ -436,12 +577,22 @@ export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
       "",
       `- [Shop](${base}/): everything currently available, by category`,
       ...all.map((c) => `- [${c.name}](${base}/shop/${c.slug})`),
-      `- [Commissions](${base}/commissions/): how custom orders work, and the request form`,
+      `- [Commissions](${base}/commissions/): how custom orders work, past commissions, and the request form`,
       `- [Reviews](${base}/reviews/): reviews from Etsy buyers and from this site`,
       `- [About](${base}/about/): who makes the pieces and how`,
       `- [Shipping and returns](${base}/shipping/)`,
       "",
       ...all.flatMap((c) => [`## ${c.name}`, "", ...c.products.map(line), ""]),
+      ...(PIECES.length
+        ? [
+            "## Past commissions",
+            "",
+            ...PIECES.map(
+              (p) => `- [${p.name}](${base}${pieceLink(p)}): ${p.summary}`,
+            ),
+            "",
+          ]
+        : []),
     ].join("\n"),
     "text/markdown",
   );

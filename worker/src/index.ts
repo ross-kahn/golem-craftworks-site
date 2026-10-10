@@ -3,8 +3,9 @@
 //   POST /api/checkout          creates a Square checkout link
 //   POST /api/commission        emails a commission request to the shop + a confirmation to the client
 //   GET  /product/<slug>, /shop/<slug>, /   pages built from the catalog so crawlers get the real content
+//   GET  /commissions/, /commissions/<slug> the commissions page and one page per past commission
 //   GET  /sitemap.xml, /robots.txt, /llms.txt, /feeds/google.xml
-//   POST /webhooks/square       Square inventory changes -> Etsy; website payments -> email to the shop
+//   POST /webhooks/square      Square inventory changes -> Etsy; website payments -> email to the shop
 //   POST /webhooks/etsy         Etsy paid orders -> Square
 //   GET  /api/reviews           Etsy reviews + site reviews, with totals
 //   POST /api/reviews           leave a review (shows straight away unless it looks like spam)
@@ -254,6 +255,8 @@ async function builtPage(env: Env, ctx: Ctx, url: URL) {
   if (path === "/robots.txt") return pages.robots(env, url);
   if (path === "/js/config.js") return pages.siteConfig(env, url);
   if (path === "/shipping/") return pages.shippingPage(env, url);
+  if (path === "/commissions/") return pages.commissionsPage(env, url);
+  if (path.startsWith("/commissions/")) return pages.commissionPage(env, url);
   const isProduct = path.startsWith("/product/") && path !== "/product/";
   const isCategory = path.startsWith("/shop/") && path !== "/shop/";
   if (

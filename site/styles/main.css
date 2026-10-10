@@ -635,7 +635,8 @@ p {
 .cat__media[data-n="3"] img:first-child {
   grid-row: 1 / -1;
 }
-.cat a:hover .cat__media img {
+.cat a:hover .cat__media img,
+.card a:hover .cat__media img {
   opacity: 0.88;
 }
 .cat__name {
@@ -703,6 +704,13 @@ p {
 .card__stock {
   color: var(--graphite);
   font-size: 0.875rem;
+}
+/* A line about the piece, where a product has its price (past commissions). */
+.card__note {
+  margin: 0;
+  color: var(--graphite);
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 .card--sold .card__media img {
   filter: grayscale(1);
@@ -850,6 +858,10 @@ p {
   height: 100%;
   object-fit: cover;
 }
+/* Past commissions: photos come in every shape, so the whole picture is shown rather than a square cut from it. */
+.gallery--whole .gallery__main img {
+  object-fit: contain;
+}
 .gallery__nav {
   position: absolute;
   top: 50%;
@@ -993,6 +1005,10 @@ p {
   display: grid;
   gap: 12px;
   margin-bottom: 28px;
+}
+/* Under the write-up instead of over it (a past commission's page). */
+.product__buy--after {
+  margin: 28px 0 0;
 }
 .product__desc {
   border-top: 1px solid var(--rule);
@@ -1280,6 +1296,21 @@ body.cart-open {
   display: grid;
   gap: 36px;
   padding: 48px 0 80px;
+}
+
+/* Past commissions: the grid on the commissions page, and "more" under a single piece. */
+.showcase {
+  padding: 48px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.showcase h2 {
+  margin-bottom: 24px;
+}
+/* Under a piece it closes the page, so the rule goes on top. */
+.product + .showcase {
+  border-top: 1px solid var(--rule);
+  border-bottom: 0;
+  padding-bottom: 80px;
 }
 @media (min-width: 900px) {
   .split {

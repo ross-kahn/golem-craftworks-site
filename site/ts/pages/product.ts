@@ -1,6 +1,7 @@
 // Product page: gallery, option picker, add to cart.
 import * as api from "../api.ts";
 import { cart, openCart, toast } from "../chrome.ts";
+import { gallery } from "../gallery.ts";
 import { esc } from "../../../shared/text.ts";
 
 const mount = document.querySelector<HTMLElement>("[data-product]")!;
@@ -190,17 +191,7 @@ function render(p: Product) {
     }
   }
 
-  let shown = 0;
-  function show(i: number) {
-    shown = i;
-    mount.querySelector<HTMLImageElement>("[data-main]")!.src = images[i];
-    mount.querySelectorAll<HTMLElement>("[data-thumb]").forEach((b) => {
-      const on = Number(b.dataset.thumb) === i;
-      b.setAttribute("aria-current", String(on));
-      // Keeps the strip following along when the arrows move past its edge.
-      if (on) b.scrollIntoView({ block: "nearest", inline: "nearest" });
-    });
-  }
+  gallery(mount.querySelector<HTMLElement>(".gallery")!, images);
 
   mount.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
@@ -229,12 +220,6 @@ function render(p: Product) {
   });
   mount.addEventListener("click", (e) => {
     const target = e.target as Element;
-    const thumb = target.closest<HTMLElement>("[data-thumb]");
-    if (thumb) show(Number(thumb.dataset.thumb));
-    const step = target.closest<HTMLElement>("[data-step]");
-    // Stepping past either end wraps around to the other.
-    if (step)
-      show((shown + Number(step.dataset.step) + images.length) % images.length);
     if (target.closest("[data-add]")) {
       if (addBtn.dataset.view) {
         openCart();
