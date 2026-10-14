@@ -18,6 +18,10 @@ const SEEN_KEY = "status:report-skus";
 // The activity log has no levels; these are the words its failure lines use.
 const FAILURE =
   /fail|didn't|couldn't|without the catalog|isn't set up|no notification/i;
+// Logged when a page falls back to the saved catalog. The hourly check reads the same catalog, so one
+// that finished afterwards means Square came back on its own; only a fallback since then is reported.
+export const SQUARE_FALLBACK =
+  "Square couldn't be reached; showing the last saved catalog";
 
 interface SeenSkus {
   squareOnly: string[];
@@ -81,9 +85,16 @@ export async function dailyReport(env: Env) {
   );
 
   // The same failure every hour is one line, not twenty-four.
+  const recovered = (l: LogLine) =>
+    l.message === SQUARE_FALLBACK &&
+    !!last &&
+    Date.parse(l.at) < Date.parse(last.at);
   const failures = group(
     (log || []).filter(
-      (l) => FAILURE.test(l.message) && Date.now() - Date.parse(l.at) < DAY_MS,
+      (l) =>
+        FAILURE.test(l.message) &&
+        Date.now() - Date.parse(l.at) < DAY_MS &&
+        !recovered(l),
     ),
     (l) => l.message,
   );

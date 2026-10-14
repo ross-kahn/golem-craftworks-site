@@ -32,7 +32,7 @@ import { createEtsyDrafts } from "./drafts.ts";
 import { commission } from "./commission.ts";
 import * as reviews from "./reviews.ts";
 import { notifySale, mailMissedSales } from "./sales.ts";
-import { dailyReport } from "./report.ts";
+import { dailyReport, SQUARE_FALLBACK } from "./report.ts";
 import * as pages from "./pages.ts";
 import demo from "./demo-products.json" with { type: "json" };
 import { unique } from "radashi";
@@ -201,11 +201,10 @@ async function catalog(
       "json",
     );
     if (!saved) throw e;
-    await logEvent(
-      env,
-      "Square couldn't be reached; showing the last saved catalog",
-      { savedAt: saved.generatedAt, error: errMsg(e) },
-    );
+    await logEvent(env, SQUARE_FALLBACK, {
+      savedAt: saved.generatedAt,
+      error: errMsg(e),
+    });
     return saved;
   }
   ctx.waitUntil(

@@ -9,6 +9,7 @@ import worker from "../src/index.ts";
 import * as square from "../src/square.ts";
 import { pushToEtsy, recordEtsyReceipt, reconcile } from "../src/sync.ts";
 import { createEtsyDrafts } from "../src/drafts.ts";
+import { dailyReport, SQUARE_FALLBACK } from "../src/report.ts";
 import type { Env, LogLine } from "../src/types.ts";
 
 // ---------- fakes ----------
@@ -1684,6 +1685,38 @@ test("if Square is unreachable, pages are built from the last saved catalog", as
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("daily report: a Square blip on the storefront is left out once an hourly check gets through", async () => {
+  const env = makeEnv();
+  const ago = (min: number) => new Date(Date.now() - min * 60e3).toISOString();
+  const fallback = (min: number): LogLine => ({
+    at: ago(min),
+    message: SQUARE_FALLBACK,
+    data: { error: "Square POST /v2/catalog/search failed (403)" },
+  });
+  await env.GC_KV.put(
+    "status:last-reconcile",
+    JSON.stringify({ at: ago(30), errors: [], squareOnly: [], etsyOnly: [] }),
+  );
+  const failures = async (log: LogLine[]) => {
+    await env.GC_KV.put("log", JSON.stringify(log));
+    const { sections } = await dailyReport(env);
+    return sections.find((s) => s.startsWith("Failures in the last day"));
+  };
+
+  // Square answered the hourly check after each of these: nothing to report.
+  assert.equal(await failures([fallback(60), fallback(300)]), undefined);
+  // Still failing after the last good check: those are reported, the earlier one isn't counted.
+  assert.match(
+    (await failures([fallback(10), fallback(20), fallback(60)]))!,
+    /showing the last saved catalog \(2 times\): .*403/,
+  );
+  // Other failures are reported as before.
+  assert.match(
+    (await failures([{ at: ago(60), message: "Hourly check failed" }]))!,
+    /Hourly check failed/,
+  );
 });
 
 test("catalog report: says why each Square item is or isn't on the site", async () => {
