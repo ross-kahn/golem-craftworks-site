@@ -92,7 +92,7 @@ function render(p: Product) {
       </div>
       <div class="product__info">
         <h1>${esc(p.name)}</h1>
-        <p class="product__price" data-price>${api.money(firstAvail.priceCents)}</p>
+        <p class="product__price" data-price>${api.pickedPriceHtml(p, firstAvail.priceCents, 0)}</p>
         <p class="product__stock" data-stock></p>
         ${
           multi
@@ -167,8 +167,10 @@ function render(p: Product) {
   function update() {
     const s = stockText(p, current);
     const mods = selected();
-    priceEl.textContent = api.money(
-      current.priceCents + mods.reduce((n, m) => n + m.priceCents, 0),
+    priceEl.innerHTML = api.pickedPriceHtml(
+      p,
+      current.priceCents,
+      mods.reduce((n, m) => n + m.priceCents, 0),
     );
     stockEl.textContent = s.text;
     stockEl.className = "product__stock " + s.cls;

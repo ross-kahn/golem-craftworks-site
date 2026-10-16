@@ -345,6 +345,7 @@ export async function reconcile(env: Env, { maxChecks = 10 } = {}) {
 
   // 2. Fresh view of both sides.
   const {
+    products,
     skuMap,
     counts,
     tracked: trackedIds,
@@ -356,8 +357,14 @@ export async function reconcile(env: Env, { maxChecks = 10 } = {}) {
   const listings = await etsyApi.fetchShopListings(env);
   const etsyMap = (await refreshEtsySkuMap(env, listings)).map;
 
+  // Marked-down pieces are sold on the site only, so they're not missing from Etsy.
+  const siteOnly = new Set(
+    products
+      .filter((p) => p.originalCents)
+      .flatMap((p) => p.variations.map((v) => v.sku.trim())),
+  );
   report.squareOnly = Object.keys(skuMap)
-    .filter((s) => !etsyMap[s])
+    .filter((s) => !etsyMap[s] && !siteOnly.has(s))
     .sort();
   // Only listings that are on sale: a sold-out or inactive one with no Square item is just a piece that's gone.
   const onSale = new Set(

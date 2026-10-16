@@ -1,5 +1,5 @@
 // Talks to the Worker: products, checkout, reviews, and the commission form.
-import { OTHER } from "../../shared/catalog.ts";
+import { OTHER, percentOff, priceMarkup } from "../../shared/catalog.ts";
 import { slugify } from "../../shared/text.ts";
 
 const cfg = window.GC_CONFIG;
@@ -164,4 +164,29 @@ export function priceLabel(p: Product): string {
   return p.minPrice === p.maxPrice
     ? money(p.minPrice)
     : `From ${money(p.minPrice)}`;
+}
+
+// Percent off the lowest price, which is what the price shows. Zero when it isn't on sale.
+export const saleOff = (p: Product) =>
+  p.originalCents ? percentOff(p.originalCents, lowestPrice(p)) : 0;
+const lowestPrice = (p: Product) =>
+  Math.min(...p.variations.map((v) => v.priceCents));
+
+// The price as markup: a marked-down piece shows what it was, struck through (as the Worker draws it).
+export const priceHtml = (p: Product) =>
+  priceMarkup(priceLabel(p), money(p.originalCents), saleOff(p));
+
+// One price on the product page, add-ons included. Add-ons cost the same either way, so they go on
+// the original too, and the percent off is of the whole.
+export function pickedPriceHtml(
+  p: Product,
+  nowCents: number,
+  extraCents: number,
+) {
+  const was = p.originalCents ? p.originalCents + extraCents : 0;
+  return priceMarkup(
+    money(nowCents + extraCents),
+    money(was),
+    was ? percentOff(was, nowCents + extraCents) : 0,
+  );
 }

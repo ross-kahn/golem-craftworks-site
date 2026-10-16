@@ -12,10 +12,15 @@
 // then take over as before.
 
 import type { Env, PublicProduct, StorefrontCatalog } from "./types.ts";
-import { group } from "radashi";
 import { siteUrl } from "./util.ts";
 import { esc, slugify } from "../../shared/text.ts";
-import { OTHER, byCategory, tilePhotos } from "../../shared/catalog.ts";
+import {
+  OTHER,
+  percentOff,
+  priceMarkup,
+  shopCategories,
+  tilePhotos,
+} from "../../shared/catalog.ts";
 import { PIECES, type Piece } from "./past-commissions.ts";
 import photoList from "./commission-photos.json" with { type: "json" };
 
@@ -54,27 +59,23 @@ const priceLabel = (p: PublicProduct) => {
     hi = Math.max(...prices(p));
   return lo === hi ? money(lo) : `From ${money(lo)}`;
 };
+// Off the lowest price, which is what the price shows.
+const off = (p: PublicProduct) =>
+  p.originalCents ? percentOff(p.originalCents, Math.min(...prices(p))) : 0;
+// The price on a page: marked-down pieces show what they were, struck through.
+const priceHtml = (p: PublicProduct) =>
+  priceMarkup(
+    priceLabel(p),
+    p.originalCents ? money(p.originalCents) : undefined,
+    off(p),
+  );
 
-// Categories as the shop shows them: each has its own page at /shop/<slug>, in A-to-Z order with
-// "Other" (anything without a Square category) last. The order is in shared/catalog.ts, which the site uses too.
+// Categories as the shop shows them: each has its own page at /shop/<slug>, Sale first, then A to Z
+// with "Other" (anything without a Square category) last. It's in shared/catalog.ts, which the site uses too.
 const categoryOf = (p: PublicProduct) => p.category || OTHER;
 
-interface Category {
-  name: string;
-  slug: string;
-  products: PublicProduct[];
-}
-
-function categories(catalog: StorefrontCatalog): Category[] {
-  const bySlug = group(catalog.products, (p) => slugify(categoryOf(p)));
-  return Object.entries(bySlug)
-    .map(([slug, products = []]) => ({
-      name: categoryOf(products[0]),
-      slug,
-      products,
-    }))
-    .sort((a, b) => byCategory(a.name, b.name));
-}
+const categories = (catalog: StorefrontCatalog) =>
+  shopCategories(catalog.products);
 
 function page(html: string, status = 200) {
   return new Response(html, {
@@ -149,7 +150,22 @@ function productData(p: PublicProduct, link: string, env: Env) {
     brand: { "@type": "Brand", name: SHOP },
     offers:
       lo === hi
-        ? { "@type": "Offer", price: (lo / 100).toFixed(2), ...common }
+        ? {
+            "@type": "Offer",
+            price: (lo / 100).toFixed(2),
+            // Marked down: what it was, the way Google reads a struck-through price.
+            ...(p.originalCents
+              ? {
+                  priceSpecification: {
+                    "@type": "UnitPriceSpecification",
+                    priceType: "https://schema.org/StrikethroughPrice",
+                    price: (p.originalCents / 100).toFixed(2),
+                    priceCurrency: "USD",
+                  },
+                }
+              : {}),
+            ...common,
+          }
         : {
             "@type": "AggregateOffer",
             lowPrice: (lo / 100).toFixed(2),
@@ -185,7 +201,7 @@ function productBody(p: PublicProduct) {
         </div>
         <div class="product__info">
           <h1>${esc(p.name)}</h1>
-          <p class="product__price">${priceLabel(p)}</p>
+          <p class="product__price">${priceHtml(p)}</p>
           <p class="product__stock">${stock}</p>
           ${p.variations.length > 1 ? `<p>${p.variations.map((v) => esc(v.name)).join(", ")}</p>` : ""}
           <div class="product__desc">${p.description
@@ -252,9 +268,9 @@ const cards = (products: PublicProduct[]) =>
     .map(
       (p) => `
           <li class="card"><a href="/product/${esc(p.slug)}">
-            <div class="card__media">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}</div>
+            <div class="card__media">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}${off(p) ? `<span class="salemark">Sale</span>` : ""}</div>
             <h3 class="card__name">${esc(p.name)}</h3>
-            <div class="card__meta"><span class="card__price">${priceLabel(p)}</span></div>
+            <div class="card__meta"><span class="card__price">${priceHtml(p)}</span></div>
           </a></li>`,
     )
     .join("");
@@ -565,7 +581,7 @@ export function robots(env: Env, url: URL) {
 export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
   const base = siteUrl(env, url);
   const line = (p: PublicProduct) =>
-    `- [${p.name}](${base}/product/${p.slug}): ${priceLabel(p)}, ${madeToOrder(p) ? "made to order" : inStock(p) ? "in stock" : "sold"}. ${oneLine(p.description, 140)}`;
+    `- [${p.name}](${base}/product/${p.slug}): ${priceLabel(p)}${off(p) ? ` (on sale, was ${money(p.originalCents!)})` : ""}, ${madeToOrder(p) ? "made to order" : inStock(p) ? "in stock" : "sold"}. ${oneLine(p.description, 140)}`;
   const all = categories(catalog);
   return file(
     [
@@ -603,6 +619,7 @@ export function googleFeed(env: Env, url: URL, catalog: StorefrontCatalog) {
   const base = siteUrl(env, url);
   const tag = (name: string, value: string) =>
     `<${name}>${esc(value)}</${name}>`;
+  const usd = (cents: number) => `${(cents / 100).toFixed(2)} USD`;
   const items = catalog.products
     .filter((p) => p.images.length)
     .flatMap((p) =>
@@ -622,7 +639,13 @@ export function googleFeed(env: Env, url: URL, catalog: StorefrontCatalog) {
             ...p.images
               .slice(1, 11)
               .map((src) => tag("g:additional_image_link", src)),
-            tag("g:price", `${(v.priceCents / 100).toFixed(2)} USD`),
+            // Marked down: Google wants the original as the price and the one it sells for as the sale price.
+            ...(p.originalCents
+              ? [
+                  tag("g:price", usd(p.originalCents)),
+                  tag("g:sale_price", usd(v.priceCents)),
+                ]
+              : [tag("g:price", usd(v.priceCents))]),
             tag(
               "g:availability",
               v.qty === null || v.qty > 0 ? "in_stock" : "out_of_stock",

@@ -134,11 +134,13 @@ export async function createEtsyDrafts(
     sentChanged = true;
   };
 
-  // Every item this looks after: in a named category, with one SKU.
+  // Every item this looks after: in a named category, with one SKU. Marked-down pieces stay on the
+  // site: Etsy has no way to show what they were, so they'd just look like cheap sets.
   const sets = products.flatMap((p) => {
     const v = p.variations[0];
     const sku = (v.sku || "").trim();
     return categories.includes(p.category.toLowerCase()) &&
+      !p.originalCents &&
       p.variations.length === 1 &&
       sku
       ? [

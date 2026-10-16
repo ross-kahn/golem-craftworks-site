@@ -246,16 +246,20 @@ async function visitor(env = makeEnv()) {
 test("home: one tile per category with something available, linked to its page", async () => {
   const v = await visitor();
   await v.go("/");
-  await v.until("the category tiles", () => v.$$(".cat").length === 2);
+  await v.until("the category tiles", () => v.$$(".cat").length === 3);
   assert.deepEqual(
     v.$$(".cat__name").map((el) => el.textContent),
-    ["8-piece RPG Dice", "Woodworks"],
+    ["Sale", "8-piece RPG Dice", "Woodworks"],
   );
   assert.deepEqual(
     v.$$(".cat a").map((a) => a.pathname),
-    ["/shop/8-piece-rpg-dice", "/shop/woodworks"],
+    ["/shop/sale", "/shop/8-piece-rpg-dice", "/shop/woodworks"],
   );
-  assert.equal(v.text(".cat__count"), "7 pieces"); // eight dice sets, one of them sold
+  // Eight dice sets, one of them sold. MOSS is on sale, so it's on the Sale tile too.
+  assert.deepEqual(
+    v.$$(".cat__count").map((el) => el.textContent),
+    ["1 piece", "7 pieces", "2 pieces"],
+  );
   assert.equal(v.text("[data-cart-count]"), "0");
   assert.deepEqual(v.errors, []);
 });
@@ -315,6 +319,34 @@ test("category page: available pieces, sold ones on request, links to the others
   await v.until("the not-here message", () =>
     /wandered off|isn't here/.test(v.text("main")),
   );
+  assert.deepEqual(v.errors, []);
+});
+
+test("sale: marked-down pieces have their own page and show what they were", async () => {
+  const v = await visitor();
+  await v.go("/shop/sale");
+  await v.until("the sale card", () => v.$$(".card").length === 1);
+  assert.equal(v.text("h1"), "Sale");
+  assert.equal(v.text('.chip[aria-current="page"]'), "Sale");
+  assert.equal(v.text(".card__name"), '"MOSS" TTRPG Dice Set');
+  assert.equal(v.text(".card .salemark"), "Sale");
+  assert.equal(v.text(".card .price__now"), "$46");
+  assert.equal(v.text(".card .price__was"), "was $60");
+  assert.equal(v.text(".card .price__off"), "23% off");
+
+  // Still in its own category, marked.
+  await v.go("/shop/8-piece-rpg-dice");
+  await v.until("the product cards", () => v.$$(".card").length === 7);
+  assert.equal(v.$$(".card .salemark").length, 1);
+
+  await v.go("/product/moss-ttrpg-dice-set");
+  await v.until("the add button", () => v.text("[data-add]") === "Add to cart");
+  assert.equal(v.text("[data-price] .price__now"), "$46");
+  assert.equal(v.text("[data-price] .price__was"), "was $60");
+  assert.equal(v.text("[data-price] .price__off"), "23% off");
+  assert.match(v.text(".product__desc"), /small bubble/);
+  // The crumb goes to its own category, not the sale page.
+  assert.equal(v.$$(".crumbs a")[1].pathname, "/shop/8-piece-rpg-dice");
   assert.deepEqual(v.errors, []);
 });
 

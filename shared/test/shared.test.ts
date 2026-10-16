@@ -11,7 +11,7 @@ import {
   withoutSlash,
   words,
 } from "../text.ts";
-import { byCategory, tilePhotos } from "../catalog.ts";
+import { byCategory, percentOff, tilePhotos } from "../catalog.ts";
 import { paged } from "../paged.ts";
 import { check, isEmail, line, paragraph } from "../validate.ts";
 import { Commission, Review } from "../forms.ts";
@@ -77,6 +77,15 @@ test("a category tile takes one photo from each piece before any second photos",
   ]);
   assert.deepEqual(tilePhotos([["a1", "a2"]]), ["a1", "a2"]);
   assert.deepEqual(tilePhotos([]), []);
+});
+
+test("percentOff: whole percent, rounded down, zero when nothing's off", () => {
+  assert.equal(percentOff(6000, 4500), 25);
+  assert.equal(percentOff(4500, 3000), 33); // 33.3
+  assert.equal(percentOff(3000, 1999), 33); // 33.36: never rounded up to 34
+  assert.equal(percentOff(4500, 4500), 0);
+  assert.equal(percentOff(4000, 4500), 0);
+  assert.equal(percentOff(0, 0), 0);
 });
 
 test("paged: follows the cursor until there isn't one", async () => {

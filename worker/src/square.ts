@@ -17,6 +17,8 @@ import type {
   StorefrontProduct,
 } from "./types.ts";
 
+const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
 const DEFAULT_VERSION = "2025-05-21"; // first version with the current modifier fields (defaults, min/max)
 
 interface SquareError {
@@ -242,6 +244,29 @@ function modifierLists(
   return lists;
 }
 
+const ORIGINAL_PRICE = "original price";
+
+// The item's "Original price" field (a custom attribute made in the Square Dashboard), in cents.
+// Found by its name, since Square gives fields made there an id for a key. A number, or text like "$45".
+export function originalPrice(item: SquareObject) {
+  const field = Object.values(item.custom_attribute_values || {}).find(
+    (a) => a.name?.trim().toLowerCase() === ORIGINAL_PRICE,
+  );
+  const text = (field?.number_value ?? field?.string_value ?? "").replace(
+    /[$,\s]/g,
+    "",
+  );
+  const amount = Number(text);
+  return text && amount > 0 ? Math.round(amount * 100) : undefined;
+}
+
+// The original price, if it's above every price the item sells at: anything else isn't a sale,
+// and showing it would make a markup look like a discount.
+const saleFrom = (original: number | undefined, prices: number[]) =>
+  original && prices.length && prices.every((c) => c < original)
+    ? original
+    : undefined;
+
 // Shape Square's catalog into what the storefront needs. Also returns a SKU map.
 export async function buildStorefront(env: Env) {
   const { items, related } = await fetchCatalog(env);
@@ -325,6 +350,10 @@ export async function buildStorefront(env: Env) {
       images,
       variations: vs,
       modifierLists: modifierLists(item, related, loc),
+      originalCents: saleFrom(
+        originalPrice(item),
+        vs.map((v) => v.priceCents),
+      ),
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     });
@@ -378,10 +407,21 @@ export async function catalogReport(env: Env) {
                 : !sellable
                   ? "no variation with a fixed price at this location"
                   : "on the site";
+      // So a markdown is easy to check: what the site makes of the item's "Original price".
+      const original = originalPrice(item);
+      const priced = sift(
+        variations.map((v) => v.item_variation_data?.price_money?.amount),
+      ).map(Number);
+      const sale = !original
+        ? undefined
+        : saleFrom(original, priced)
+          ? `on sale, was ${dollars(original)}`
+          : `original price ${dollars(original)} ignored: it isn't above the price`;
       return {
         status,
         name: d.name || "",
         categories: cats,
+        ...(sale ? { sale } : {}),
         updatedAt: item.updated_at,
         skus: sift(variations.map((v) => v.item_variation_data?.sku)),
       };

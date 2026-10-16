@@ -1,8 +1,8 @@
 // Category page: the product grid for one category, with links to the others.
 import * as api from "../api.ts";
 import { skeletons, shopDown } from "../chrome.ts";
-import { byCategory } from "../../../shared/catalog.ts";
-import { esc, slugify } from "../../../shared/text.ts";
+import { shopCategories } from "../../../shared/catalog.ts";
+import { esc } from "../../../shared/text.ts";
 
 const grid = document.querySelector<HTMLElement>("[data-grid]")!;
 const filtersEl = document.querySelector<HTMLElement>("[data-filters]")!;
@@ -17,7 +17,11 @@ function card(p: Product) {
   const media = img
     ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`
     : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`;
-  const mark = p.soldOut ? `<span class="soldmark">Sold</span>` : "";
+  const mark = p.soldOut
+    ? `<span class="soldmark">Sold</span>`
+    : api.saleOff(p)
+      ? `<span class="salemark">Sale</span>`
+      : "";
 
   let stock = "";
   if (!p.soldOut && !p.unique) {
@@ -31,34 +35,32 @@ function card(p: Product) {
         <div class="card__media">${media}${mark}</div>
         <h3 class="card__name">${esc(p.name)}</h3>
         <div class="card__meta">
-          <span class="card__price">${p.soldOut ? "Sold" : api.priceLabel(p)}</span>
+          <span class="card__price">${p.soldOut ? "Sold" : api.priceHtml(p)}</span>
           ${stock ? `<span class="card__stock">${esc(stock)}</span>` : ""}
         </div>
       </a>
     </li>`;
 }
 
+// This page's category, once the products are in.
+let shelf: Product[] = [];
+
 function renderFilters() {
-  const names = new Map<string, string>();
-  products.forEach((p) => {
-    if (!names.has(slugify(p.category)))
-      names.set(slugify(p.category), p.category);
-  });
-  const cats = [...names].sort(([, a], [, b]) => byCategory(a, b));
+  const cats = shopCategories(products);
   filtersEl.innerHTML = cats
     .map(
-      ([s, name]) =>
-        `<a class="chip" href="${esc(api.categoryLink(name))}"${s === slug ? ' aria-current="page"' : ""}>${esc(name)}</a>`,
+      (c) =>
+        `<a class="chip" href="/shop/${esc(c.slug)}"${c.slug === slug ? ' aria-current="page"' : ""}>${esc(c.name)}</a>`,
     )
     .join("");
-  return names.get(slug);
+  const here = cats.find((c) => c.slug === slug);
+  shelf = here?.products || [];
+  return here?.name;
 }
 
 function render() {
   const showSold = soldToggle.checked;
-  const list = products.filter(
-    (p) => slugify(p.category) === slug && (showSold || !p.soldOut),
-  );
+  const list = shelf.filter((p) => showSold || !p.soldOut);
   if (!list.length) {
     grid.innerHTML = `<li class="empty">
       Nothing here right now. ${showSold ? "" : `Turn on “Show sold pieces” to see past work, or `}

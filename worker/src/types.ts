@@ -126,6 +126,15 @@ export interface SquareObject {
   image_data?: { url?: string };
   modifier_list_data?: SquareModifierListData;
   modifier_data?: SquareModifierData;
+  // Values of the seller's own fields, keyed by an id Square makes up; `name` is what the seller called it.
+  custom_attribute_values?: Record<string, SquareCustomAttributeValue>;
+}
+
+export interface SquareCustomAttributeValue {
+  name?: string;
+  type?: string; // NUMBER | STRING | ...
+  number_value?: string; // a decimal, as text: "45.00"
+  string_value?: string;
 }
 
 export interface SquareCount {
@@ -205,6 +214,7 @@ export interface StorefrontProduct {
   images: string[];
   variations: StorefrontVariation[];
   modifierLists: StorefrontModifierList[];
+  originalCents?: number; // on sale: what it cost before, from the item's "Original price" in Square
   createdAt?: string; // when the item was added to Square: the shop's display order, newest first
   updatedAt?: string;
 }

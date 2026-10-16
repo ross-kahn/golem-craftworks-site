@@ -730,6 +730,38 @@ p {
   line-height: 1;
   border-radius: 2px;
 }
+/* A marked-down piece: the Sold mark's shape, outlined so the two never read alike. */
+.salemark {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 9px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: 0.78rem;
+  line-height: 1;
+  border-radius: 2px;
+}
+
+/* A sale price: what it sells for, what it was, and how much is off (shared/catalog.ts priceMarkup). */
+.price__was {
+  color: var(--graphite);
+  font-weight: 400;
+}
+.price__off {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-size: 0.75em;
+  font-weight: 650;
+  line-height: 1.2;
+  vertical-align: 0.1em;
+  white-space: nowrap;
+}
 
 /* Placeholder used when a product has no photo yet */
 .ph {

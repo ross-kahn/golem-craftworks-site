@@ -48,6 +48,7 @@ interface RawProduct {
   images?: string[];
   variations?: RawVariation[];
   modifierLists?: ModifierList[];
+  originalCents?: number; // on sale: what it cost before
   unique?: boolean;
   updatedAt?: string;
 }

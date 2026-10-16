@@ -1821,3 +1821,147 @@ test("hourly check: an Etsy SKU with no Square item is only reported while its l
   state.listings[404].state = "sold_out";
   assert.deepEqual((await reconcile(env)).etsyOnly, []);
 });
+
+// A marked-down dice set: its own Square item, with the "Original price" field made in the Square
+// Dashboard. Square keys a field made there by an id of its own, so only the name says what it is.
+function saleDiceSet(
+  value: { number_value?: string; string_value?: string },
+  price = 3500,
+) {
+  const sale: any = item(
+    "I_MUD",
+    '"MUD" TTRPG Dice Set',
+    [variation("V_MUD", "Default", price, "DICE-MUD", true)],
+    { cat: "C_DICE", image: "IMG1" },
+  );
+  sale.custom_attribute_values = {
+    "Square:6c0b3e2a-original": {
+      name: "Original price",
+      type: "NUMBER",
+      ...value,
+    },
+  };
+  state.catalog.push(sale);
+  state.counts.V_MUD = 1;
+}
+const mud = async (env: Env) =>
+  (await square.buildStorefront(env)).products.find((p) => p.id === "I_MUD")!;
+
+test("sale: the original price comes from the item's Original price field, by name", async () => {
+  const env = makeEnv();
+  saleDiceSet({ number_value: "50.00" });
+  assert.equal((await mud(env)).originalCents, 5000);
+  assert.equal(
+    (await square.buildStorefront(env)).products.find((p) => p.id === "I_DICE")!
+      .originalCents,
+    undefined,
+    "nothing filled in: not on sale",
+  );
+
+  state.catalog.at(-1).custom_attribute_values["Square:6c0b3e2a-original"] = {
+    name: " original PRICE ",
+    type: "STRING",
+    string_value: "$1,050",
+  };
+  assert.equal(
+    (await mud(env)).originalCents,
+    105000,
+    "typed as text works too",
+  );
+});
+
+test("sale: an original price that isn't above the price is ignored", async () => {
+  const env = makeEnv();
+  saleDiceSet({ number_value: "35.00" }); // the same as the price
+  assert.equal((await mud(env)).originalCents, undefined);
+  state.catalog.at(-1).custom_attribute_values[
+    "Square:6c0b3e2a-original"
+  ].number_value = "20";
+  assert.equal((await mud(env)).originalCents, undefined);
+
+  const r = (await (
+    await get(env, "/admin/catalog?token=admintoken")
+  ).json()) as any;
+  assert.equal(
+    r.items.find((i: any) => i.name === '"MUD" TTRPG Dice Set').sale,
+    "original price $20.00 ignored: it isn't above the price",
+  );
+});
+
+test("sale: its own page and tile, marked in its category, and priced for search engines", async () => {
+  saleDiceSet({ number_value: "50" });
+  const env = makeEnv({ ASSETS });
+
+  const home = await (await get(env, "/")).text();
+  assert.ok(
+    home.indexOf('href="/shop/sale"') < home.indexOf('href="/shop/dice"'),
+  );
+
+  const salePage = await (await get(env, "/shop/sale")).text();
+  assert.ok(salePage.includes("<title>Sale · Golem Craftworks</title>"));
+  assert.ok(salePage.includes('href="/product/mud-ttrpg-dice-set"'));
+  assert.ok(!salePage.includes('href="/product/ember-dice-set"'));
+  const price =
+    '<span class="price__now">$35</span> <s class="price__was"><span class="visually-hidden">was </span>$50</s> <span class="price__off">30% off</span>';
+  assert.ok(salePage.includes(price));
+
+  const dice = await (await get(env, "/shop/dice")).text();
+  assert.ok(
+    dice.includes('href="/product/mud-ttrpg-dice-set"'),
+    "still in its category",
+  );
+  assert.equal((dice.match(/class="salemark"/g) || []).length, 1);
+
+  const page = await (await get(env, "/product/mud-ttrpg-dice-set")).text();
+  assert.ok(page.includes(`<p class="product__price">${price}</p>`));
+  assert.ok(
+    page.includes('<a href="/shop/dice">Dice</a>'),
+    "the crumb is its own category",
+  );
+  const data = JSON.parse(
+    page.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1],
+  );
+  assert.equal(data.offers.price, "35.00");
+  assert.deepEqual(data.offers.priceSpecification, {
+    "@type": "UnitPriceSpecification",
+    priceType: "https://schema.org/StrikethroughPrice",
+    price: "50.00",
+    priceCurrency: "USD",
+  });
+
+  const feed = await (await get(env, "/feeds/google.xml")).text();
+  const entry = feed
+    .split("<item>")
+    .find((x) => x.includes("<g:id>V_MUD</g:id>"))!;
+  assert.ok(entry.includes("<g:price>50.00 USD</g:price>"));
+  assert.ok(entry.includes("<g:sale_price>35.00 USD</g:sale_price>"));
+  assert.ok(
+    !feed.includes("<g:sale_price>65.00"),
+    "only marked-down pieces have one",
+  );
+
+  const llms = await (await get(env, "/llms.txt")).text();
+  assert.ok(llms.includes("- [Sale](https://golemcraftworks.com/shop/sale)"));
+  assert.ok(
+    llms.includes("mud-ttrpg-dice-set): $35 (on sale, was $50), in stock."),
+  );
+});
+
+test("sale: marked-down pieces stay off Etsy and aren't reported as missing from it", async () => {
+  newDiceSet();
+  saleDiceSet({ number_value: "50" });
+  const env = makeEnv({ ETSY_DRAFT_CATEGORIES: "Dice" });
+  const report = await createEtsyDrafts(env);
+  assert.deepEqual(
+    report.created.map((c) => c.sku),
+    ["DICE-JAVA"],
+  );
+  assert.ok(!state.drafts.some((d: any) => d.form.price === "35.00"));
+
+  const check = await reconcile(env);
+  assert.ok(
+    check.squareOnly.includes("DICE-JAVA"),
+    "an ordinary set without a listing is reported",
+  );
+  assert.ok(!check.squareOnly.includes("DICE-MUD"));
+});
