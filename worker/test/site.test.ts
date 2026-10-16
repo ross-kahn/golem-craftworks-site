@@ -392,6 +392,34 @@ test("product page: options and add-ons change the price; the cart keeps them", 
   assert.deepEqual(v.errors, []);
 });
 
+test("category page: a card's arrows step through its photos without leaving the page", async () => {
+  const v = await visitor();
+  await v.go("/shop/woodworks");
+  await v.until("the Yahtzee card's arrows", () =>
+    Boolean(v.$('[aria-label="Next photo of Yahtzee set"]')),
+  );
+  const media = () =>
+    v.$('[aria-label="Next photo of Yahtzee set"]').closest(".card__media");
+  const photo = () => media().querySelector("[data-main]").getAttribute("src");
+  const dot = () =>
+    [...media().querySelectorAll("[data-dot]")].findIndex(
+      (d: Element) => d.getAttribute("aria-current") === "true",
+    );
+  const first = photo();
+  assert.equal(media().querySelectorAll("[data-dot]").length, 3);
+
+  v.click('[aria-label="Next photo of Yahtzee set"]');
+  assert.notEqual(photo(), first);
+  assert.equal(dot(), 1);
+  v.click('[aria-label="Previous photo of Yahtzee set"]');
+  v.click('[aria-label="Previous photo of Yahtzee set"]'); // back past the first photo, round to the last
+  assert.equal(dot(), 2);
+  v.click('[aria-label="Next photo of Yahtzee set"]');
+  assert.equal(photo(), first);
+  assert.equal(v.win().location.pathname, "/shop/woodworks");
+  assert.deepEqual(v.errors, []);
+});
+
 // Which photo a gallery is showing: its place in the strip, and what the big picture holds.
 const galleryOf = (v: Awaited<ReturnType<typeof visitor>>) => ({
   shown: () =>

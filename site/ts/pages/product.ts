@@ -1,7 +1,7 @@
 // Product page: gallery, option picker, add to cart.
 import * as api from "../api.ts";
 import { cart, openCart, toast } from "../chrome.ts";
-import { gallery } from "../gallery.ts";
+import { arrows, gallery } from "../gallery.ts";
 import { esc } from "../../../shared/text.ts";
 
 const mount = document.querySelector<HTMLElement>("[data-product]")!;
@@ -54,9 +54,6 @@ function listHint(l: ModifierList) {
     : `Choose ${l.min} to ${l.max}`;
 }
 
-const chevron = (d: string) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
-
 function render(p: Product) {
   document.title = `${p.name} · Golem Craftworks`;
   const firstAvail =
@@ -73,10 +70,7 @@ function render(p: Product) {
         <div class="gallery__main">
           ${images.length ? `<img src="${esc(images[0])}" alt="${esc(p.name)}" data-main>` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}
           ${
-            images.length > 1
-              ? `<button class="gallery__nav gallery__nav--prev" type="button" data-step="-1" aria-label="Previous photo">${chevron("M15 5l-7 7 7 7")}</button>
-          <button class="gallery__nav gallery__nav--next" type="button" data-step="1" aria-label="Next photo">${chevron("M9 5l7 7-7 7")}</button>`
-              : ""
+            images.length > 1 ? arrows() : ""
           }
         </div>
         ${

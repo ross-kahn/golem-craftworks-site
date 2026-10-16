@@ -636,7 +636,7 @@ p {
   grid-row: 1 / -1;
 }
 .cat a:hover .cat__media img,
-.card a:hover .cat__media img {
+.card:hover .cat__media img {
   opacity: 0.88;
 }
 .cat__name {
@@ -670,13 +670,17 @@ p {
   background: var(--wash);
   overflow: hidden;
 }
+.card__media > a {
+  display: block;
+  height: 100%;
+}
 .card__media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.4s ease;
 }
-.card a:hover .card__media img {
+.card:hover .card__media img {
   transform: scale(1.03);
 }
 .card__name {
@@ -686,7 +690,7 @@ p {
   line-height: 1.25;
   margin: 12px 0 2px;
 }
-.card a:hover .card__name {
+.card:hover .card__name {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -712,9 +716,59 @@ p {
   font-size: 0.92rem;
   line-height: 1.4;
 }
-.card--sold .card__media img {
-  filter: grayscale(1);
+/* Sold pieces keep their colour, since people browse them for commission ideas. The badge and the quieter text say they're gone. */
+.card--sold .card__name,
+.card--sold .card__price {
+  color: var(--graphite);
+}
+
+/* Stepping through a card's photos: arrows when pointed at, a swipe on a phone, dots for where you are. */
+.card__media[data-photos] {
+  touch-action: pan-y;
+}
+.card .gallery__nav {
+  width: 34px;
+  height: 34px;
+  opacity: 0;
+}
+.card .gallery__nav svg {
+  width: 16px;
+  height: 16px;
+}
+.card:hover .gallery__nav,
+.card .gallery__nav:focus-visible {
+  opacity: 0.85;
+}
+.card .gallery__nav:hover,
+.card .gallery__nav:focus-visible {
+  opacity: 1;
+}
+.card__dots {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.card__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
   opacity: 0.55;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+.card__dots span[aria-current="true"] {
+  opacity: 1;
+}
+/* Touch screens have no hover to reveal the arrows; the dots show there's more, and a swipe moves through them. */
+@media (hover: none) {
+  .card .gallery__nav {
+    display: none;
+  }
 }
 
 .soldmark {

@@ -251,8 +251,9 @@ const cards = (products: PublicProduct[]) =>
     .filter(inStock)
     .map(
       (p) => `
-          <li class="card"><a href="/product/${esc(p.slug)}">
-            <div class="card__media">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}</div>
+          <li class="card">
+            <div class="card__media"><a href="/product/${esc(p.slug)}" tabindex="-1" aria-hidden="true">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`}</a></div>
+            <a href="/product/${esc(p.slug)}">
             <h3 class="card__name">${esc(p.name)}</h3>
             <div class="card__meta"><span class="card__price">${priceLabel(p)}</span></div>
           </a></li>`,

@@ -1,6 +1,7 @@
 // Category page: the product grid for one category, with links to the others.
 import * as api from "../api.ts";
 import { skeletons, shopDown } from "../chrome.ts";
+import { arrows, cardPhotos } from "../gallery.ts";
 import { byCategory } from "../../../shared/catalog.ts";
 import { esc, slugify } from "../../../shared/text.ts";
 
@@ -13,10 +14,19 @@ let products: Product[] = [];
 const slug = decodeURIComponent(location.pathname.split("/shop/")[1] || "");
 
 function card(p: Product) {
-  const img = p.images && p.images[0];
-  const media = img
-    ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`
-    : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`;
+  const images = p.images || [];
+  const link = api.productLink(p);
+  // The photo is a link of its own, beside the name's, so the arrows over it aren't inside a link.
+  const photo = `<a href="${link}" tabindex="-1" aria-hidden="true">${
+    images.length
+      ? `<img src="${esc(images[0])}" alt="" loading="lazy" decoding="async" data-main>`
+      : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`
+  }</a>`;
+  const several = images.length > 1;
+  const steps = several
+    ? `${arrows(p.name)}
+          <span class="card__dots" aria-hidden="true">${images.map((_, i) => `<span data-dot aria-current="${i === 0}"></span>`).join("")}</span>`
+    : "";
   const mark = p.soldOut ? `<span class="soldmark">Sold</span>` : "";
 
   let stock = "";
@@ -27,8 +37,8 @@ function card(p: Product) {
   }
   return `
     <li class="card${p.soldOut ? " card--sold" : ""}">
-      <a href="${api.productLink(p)}">
-        <div class="card__media">${media}${mark}</div>
+      <div class="card__media"${several ? ` data-photos="${esc(JSON.stringify(images))}"` : ""}>${photo}${mark}${steps}</div>
+      <a href="${link}">
         <h3 class="card__name">${esc(p.name)}</h3>
         <div class="card__meta">
           <span class="card__price">${p.soldOut ? "Sold" : api.priceLabel(p)}</span>
@@ -69,6 +79,7 @@ function render() {
 }
 
 soldToggle.addEventListener("change", render);
+cardPhotos(grid);
 
 // The Worker may have filled the grid already; only show placeholders when it's empty.
 if (!grid.children.length) grid.innerHTML = skeletons(8);
