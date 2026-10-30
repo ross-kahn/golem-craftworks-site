@@ -58,6 +58,7 @@ export interface SquareVariationData {
     sold_out?: boolean;
   }[];
   image_ids?: string[];
+  item_option_values?: { item_option_id: string; item_option_value_id: string }[];
 }
 
 export interface SquareItemData {
@@ -72,6 +73,7 @@ export interface SquareItemData {
   image_ids?: string[];
   variations?: SquareObject[];
   modifier_list_info?: SquareModifierListInfo[];
+  item_options?: { item_option_id: string }[]; // "Wood", "Design": each variation is one combination of their values
 }
 
 // How one item uses a modifier list. -1 (or missing) on min/max means "use the list's own setting".
@@ -126,6 +128,12 @@ export interface SquareObject {
   image_data?: { url?: string };
   modifier_list_data?: SquareModifierListData;
   modifier_data?: SquareModifierData;
+  item_option_data?: {
+    name?: string;
+    display_name?: string; // what customers see, when it differs from the name
+    values?: SquareObject[];
+  };
+  item_option_value_data?: { name?: string; ordinal?: number };
 }
 
 export interface SquareCount {
@@ -178,6 +186,14 @@ export interface StorefrontVariation {
   sku: string;
   priceCents: number;
   qty: number | null; // null: Square isn't counting stock for it
+  choices?: string[]; // its value for each of the product's options, in their order
+  image?: string; // the photo picked for it in Square, one of the product's images
+}
+
+// One of Square's item options ("Wood"), with the values the product's variations use, in Square's order.
+export interface StorefrontOption {
+  name: string;
+  values: string[];
 }
 
 export interface StorefrontModifier {
@@ -205,6 +221,7 @@ export interface StorefrontProduct {
   images: string[];
   variations: StorefrontVariation[];
   modifierLists: StorefrontModifierList[];
+  options?: StorefrontOption[]; // when each variation is a combination of Square item options
   createdAt?: string; // when the item was added to Square: the shop's display order, newest first
   updatedAt?: string;
 }

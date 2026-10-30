@@ -20,6 +20,14 @@ interface RawVariation {
   priceCents: number;
   qty?: number | null;
   sku?: string;
+  choices?: string[]; // its value for each of the product's options, in their order
+  image?: string; // its own photo, one of the product's images
+}
+
+// One of Square's item options ("Wood"), with the values the variations use.
+interface ProductOption {
+  name: string;
+  values: string[];
 }
 
 interface Modifier {
@@ -48,6 +56,7 @@ interface RawProduct {
   images?: string[];
   variations?: RawVariation[];
   modifierLists?: ModifierList[];
+  options?: ProductOption[]; // when each variation is a combination of them
   unique?: boolean;
   updatedAt?: string;
 }

@@ -1,7 +1,12 @@
 // Home page: one tile per category, each showing a few of its pieces.
 import * as api from "../api.ts";
 import { skeletons, shopDown } from "../chrome.ts";
-import { byCategory, tilePhotos } from "../../../shared/catalog.ts";
+import {
+  byCategory,
+  designCount,
+  designs,
+  tilePhotos,
+} from "../../../shared/catalog.ts";
 import { esc, slugify } from "../../../shared/text.ts";
 
 const grid = document.querySelector<HTMLElement>("[data-grid]")!;
@@ -22,7 +27,7 @@ function tile(name: string, list: Product[]) {
       <a href="${esc(api.categoryLink(name))}">
         <div class="cat__media" data-n="${photos.length}">${media}</div>
         <h3 class="cat__name">${esc(name)}</h3>
-        <p class="cat__count">${list.length} ${list.length === 1 ? "piece" : "pieces"}</p>
+        <p class="cat__count">${designs(designCount(list))}</p>
       </a>
     </li>`;
 }

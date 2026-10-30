@@ -255,7 +255,11 @@ test("home: one tile per category with something available, linked to its page",
     v.$$(".cat a").map((a) => a.pathname),
     ["/shop/8-piece-rpg-dice", "/shop/woodworks"],
   );
-  assert.equal(v.text(".cat__count"), "7 pieces"); // eight dice sets, one of them sold
+  assert.deepEqual(
+    v.$$(".cat__count").map((el) => el.textContent),
+    // Eight dice sets, one of them sold; the Yahtzee set, and the vault's hex and dragon lids (birds are sold).
+    ["7 designs", "3 designs"],
+  );
   assert.equal(v.text("[data-cart-count]"), "0");
   assert.deepEqual(v.errors, []);
 });
@@ -449,6 +453,57 @@ test("product page: the arrows and thumbnails step through the photos", async ()
 
   v.click('[data-thumb="2"]');
   assert.equal(shown(), 2);
+  assert.deepEqual(v.errors, []);
+});
+
+test("product page: the first option stands alone, the next only offers what's left in that pick", async () => {
+  const v = await visitor();
+  await v.go("/product/hex-dice-vault");
+  await v.until("the add button", () => v.text("[data-add]") === "Add to cart");
+  assert.deepEqual(
+    v.$$(".picker legend").map((l) => l.textContent),
+    ["Wood", "Design"],
+  );
+  const { shown } = galleryOf(v);
+  const value = (option: number, name: string) =>
+    v.$(`[name="option-${option}"][value="${name}"]`);
+  const closed = (option: number) =>
+    v
+      .$$(`[name="option-${option}"]:disabled`)
+      .map((i) => i.value);
+  const label = (option: number, name: string) =>
+    value(option, name).closest("label").textContent.replace(/\s+/g, " ").trim();
+  const pick = (option: number, name: string) => {
+    value(option, name).checked = true;
+    value(option, name).dispatchEvent(
+      new (v.win().Event)("change", { bubbles: true }),
+    );
+  };
+  assert.ok(value(0, "Walnut").checked && value(1, "Hex").checked);
+  assert.equal(v.text("[data-price]"), "$40");
+  assert.deepEqual(closed(0), ["Cherry"], "no cherry left at all");
+  assert.equal(label(0, "Cherry"), "Cherry (sold out)");
+  assert.deepEqual(closed(1), ["Birds"], "walnut comes in hex and dragon");
+  assert.equal(label(1, "Birds"), "Birds (not available in Walnut)");
+
+  v.click('[data-thumb="1"]');
+  pick(1, "Dragon");
+  await v.until("the dragon's price", () => v.text("[data-price]") === "$45");
+  assert.equal(shown(), 2, "the dragon's own photo");
+  assert.deepEqual(closed(0), ["Cherry"], "a design never closes a wood");
+
+  // A wood without the design picked moves the design to the first one it has.
+  pick(0, "Maple");
+  await v.until("the maple price", () => v.text("[data-price]") === "$36");
+  assert.ok(value(1, "Hex").checked);
+  assert.equal(shown(), 1);
+  assert.deepEqual(closed(1), ["Dragon", "Birds"]);
+
+  v.click("[data-add]");
+  await v.until("the cart count", () => v.text("[data-cart-count]") === "1");
+  v.click("[data-open-cart]");
+  await v.until("the cart", () => v.$(".drawer.is-open"));
+  assert.equal(v.text(".line__variant"), "Maple, Hex");
   assert.deepEqual(v.errors, []);
 });
 

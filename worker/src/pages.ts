@@ -15,7 +15,13 @@ import type { Env, PublicProduct, StorefrontCatalog } from "./types.ts";
 import { group } from "radashi";
 import { siteUrl } from "./util.ts";
 import { esc, slugify } from "../../shared/text.ts";
-import { OTHER, byCategory, tilePhotos } from "../../shared/catalog.ts";
+import {
+  OTHER,
+  byCategory,
+  designCount,
+  designs,
+  tilePhotos,
+} from "../../shared/catalog.ts";
 import { PIECES, type Piece } from "./past-commissions.ts";
 import photoList from "./commission-photos.json" with { type: "json" };
 
@@ -187,7 +193,15 @@ function productBody(p: PublicProduct) {
           <h1>${esc(p.name)}</h1>
           <p class="product__price">${priceLabel(p)}</p>
           <p class="product__stock">${stock}</p>
-          ${p.variations.length > 1 ? `<p>${p.variations.map((v) => esc(v.name)).join(", ")}</p>` : ""}
+          ${
+            p.options
+              ? p.options
+                  .map((o) => `<p>${esc(o.name)}: ${o.values.map(esc).join(", ")}</p>`)
+                  .join("")
+              : p.variations.length > 1
+                ? `<p>${p.variations.map((v) => esc(v.name)).join(", ")}</p>`
+                : ""
+          }
           <div class="product__desc">${p.description
             .split(/\n{2,}/)
             .map((para) => `<p>${esc(para)}</p>`)
@@ -277,7 +291,6 @@ export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
     .filter((c) => c.products.length)
     .map((c) => {
       const photos = tilePhotos(c.products.map((p) => p.images));
-      const n = c.products.length;
       return `
           <li class="cat"><a href="/shop/${c.slug}">
             <div class="cat__media" data-n="${photos.length}">${
@@ -291,7 +304,7 @@ export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
                 : `<div class="ph"><img src="/assets/logo.png" alt=""></div>`
             }</div>
             <h3 class="cat__name">${esc(c.name)}</h3>
-            <p class="cat__count">${n} ${n === 1 ? "piece" : "pieces"}</p>
+            <p class="cat__count">${designs(designCount(c.products))}</p>
           </a></li>`;
     })
     .join("");
@@ -318,9 +331,8 @@ export async function categoryPage(
   const link = `${siteUrl(env, url)}/shop/${c.slug}`;
   const title = `${c.name} · ${SHOP}`;
   const available = c.products.filter(inStock);
-  const n = available.length;
-  const description = n
-    ? `${c.name}: ${n} handmade ${n === 1 ? "piece" : "pieces"} available now from ${SHOP} in Madison, Wisconsin.`
+  const description = available.length
+    ? `${c.name}: ${designs(designCount(available))}, handmade and available now from ${SHOP} in Madison, Wisconsin.`
     : `${c.name}, made by hand at ${SHOP} in Madison, Wisconsin.`;
   const image =
     available.map((p) => p.images[0]).find(Boolean) ||

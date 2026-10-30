@@ -1,5 +1,5 @@
 // Square: catalog, inventory, checkout links, webhook verification.
-import { cluster, counting, sift, sum, unique } from "radashi";
+import { cluster, counting, sift, sort, sum, unique } from "radashi";
 import { hmacSha256Base64, enc8, safeEqual, siteUrl } from "./util.ts";
 import { paged } from "../../shared/paged.ts";
 import { csvList, slugify } from "../../shared/text.ts";
@@ -12,9 +12,12 @@ import type {
   Env,
   Fulfillment,
   SquareCount,
+  SquareItemData,
   SquareObject,
   StorefrontModifierList,
+  StorefrontOption,
   StorefrontProduct,
+  StorefrontVariation,
 } from "./types.ts";
 
 const DEFAULT_VERSION = "2025-05-21"; // first version with the current modifier fields (defaults, min/max)
@@ -242,6 +245,44 @@ function modifierLists(
   return lists;
 }
 
+// Square's item options ("Wood", "Design"), when each variation is one combination of their values:
+// the options with the values in use, and each variation's value for each option, by variation id.
+function itemOptions(
+  d: SquareItemData,
+  variations: SquareObject[],
+  related: Map<string, SquareObject>,
+) {
+  const ids = (d.item_options || []).map((o) => o.item_option_id);
+  const options = sift(ids.map((id) => related.get(id)));
+  if (!ids.length || options.length !== ids.length) return null;
+  const choices = new Map<string, string[]>();
+  for (const v of variations) {
+    const picked = v.item_variation_data?.item_option_values || [];
+    const names = options.map((o) => {
+      const id = picked.find(
+        (p) => p.item_option_id === o.id,
+      )?.item_option_value_id;
+      return o.item_option_data?.values?.find((x) => x.id === id)
+        ?.item_option_value_data?.name;
+    });
+    if (names.some((n) => !n)) return null;
+    choices.set(v.id, names as string[]);
+  }
+  const named: StorefrontOption[] = options.map((o, i) => {
+    const od = o.item_option_data || {};
+    return {
+      name: od.display_name || od.name || "",
+      values: sort(
+        od.values || [],
+        (x) => x.item_option_value_data?.ordinal ?? 0,
+      )
+        .map((x) => x.item_option_value_data?.name || "")
+        .filter((n) => [...choices.values()].some((c) => c[i] === n)),
+    };
+  });
+  return { options: named, choices };
+}
+
 // Shape Square's catalog into what the storefront needs. Also returns a SKU map.
 export async function buildStorefront(env: Env) {
   const { items, related } = await fetchCatalog(env);
@@ -279,6 +320,17 @@ export async function buildStorefront(env: Env) {
     candidates.push({ item, variations, cats });
   }
 
+  // Item options aren't always among the related objects; any that are missing are fetched.
+  const optionIds = unique(
+    candidates.flatMap(({ item }) =>
+      (item.item_data?.item_options || []).map((o) => o.item_option_id),
+    ),
+  ).filter((id) => !related.has(id));
+  if (optionIds.length)
+    (await retrieveObjects(env, optionIds)).forEach((o) =>
+      related.set(o.id, o),
+    );
+
   const counts = await fetchCounts(env, allVariationIds);
   const products: StorefrontProduct[] = [];
   for (const { item, variations, cats } of candidates) {
@@ -292,11 +344,12 @@ export async function buildStorefront(env: Env) {
     const images = sift(imageIds.map((id) => related.get(id)?.image_data?.url));
 
     const vs = variations
-      .map((v) => {
+      .map((v): StorefrontVariation | null => {
         const vd = v.item_variation_data || {};
         if (!vd.price_money || vd.pricing_type === "VARIABLE_PRICING")
           return null; // needs a fixed price to sell online
         if (vd.sellable === false) return null;
+        const image = related.get(vd.image_ids?.[0] ?? "")?.image_data?.url;
         return {
           id: v.id,
           name: vd.name || "Default",
@@ -307,10 +360,20 @@ export async function buildStorefront(env: Env) {
             : tracksInventory(v, loc)
               ? (counts.get(v.id) ?? 0)
               : null,
+          ...(image && { image }),
         };
       })
       .filter((v) => v !== null);
     if (!vs.length) continue;
+    const picker = itemOptions(
+      d,
+      variations.filter((v) => vs.some((x) => x.id === v.id)),
+      related,
+    );
+    vs.forEach((v) => {
+      const c = picker?.choices.get(v.id);
+      if (c) v.choices = c;
+    });
 
     const text = squareDescription(d);
     const set = diceSetName(d.name ?? "");
@@ -325,6 +388,7 @@ export async function buildStorefront(env: Env) {
       images,
       variations: vs,
       modifierLists: modifierLists(item, related, loc),
+      ...(picker && { options: picker.options }),
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     });
@@ -395,13 +459,17 @@ export async function catalogReport(env: Env) {
   };
 }
 
-export async function retrieveVariations(env: Env, ids: string[]) {
+async function retrieveObjects(env: Env, ids: string[]) {
   const data = await sq<CatalogResponse>(env, "/v2/catalog/batch-retrieve", {
     method: "POST",
     body: { object_ids: ids, include_related_objects: false },
   });
-  return (data.objects || []).filter(
-    (o) => o.type === "ITEM_VARIATION" && !o.is_deleted,
+  return (data.objects || []).filter((o) => !o.is_deleted);
+}
+
+export async function retrieveVariations(env: Env, ids: string[]) {
+  return (await retrieveObjects(env, ids)).filter(
+    (o) => o.type === "ITEM_VARIATION",
   );
 }
 

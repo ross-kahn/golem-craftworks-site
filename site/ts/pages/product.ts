@@ -2,7 +2,13 @@
 import * as api from "../api.ts";
 import { cart, openCart, toast } from "../chrome.ts";
 import { arrows, gallery } from "../gallery.ts";
+import { max } from "radashi";
 import { esc } from "../../../shared/text.ts";
+import {
+  leadingMatch,
+  optionOpen,
+  settlePicks,
+} from "../../../shared/catalog.ts";
 
 const mount = document.querySelector<HTMLElement>("[data-product]")!;
 // The page's address is /product/<slug>.
@@ -54,10 +60,52 @@ function listHint(l: ModifierList) {
     : `Choose ${l.min} to ${l.max}`;
 }
 
+// Square's item options ("Wood", "Design"), when every variation is one combination of them: a choice for each.
+const optionsOf = (p: Product) =>
+  p.options?.length &&
+  p.variations.every((v) => v.choices?.length === p.options!.length)
+    ? p.options
+    : null;
+
+// One choice per option. Which values are picked, and which can be, is set by syncOptions.
+const optionPickers = (options: ProductOption[]) =>
+  options
+    .map(
+      (o, i) => `
+          <fieldset class="picker">
+            <legend>${esc(o.name)}</legend>
+            <div class="picker__options">
+              ${o.values
+                .map(
+                  (value) => `
+                <label class="picker__option">
+                  <input type="radio" name="option-${i}" value="${esc(value)}">
+                  <span>${esc(value)}</span><small class="visually-hidden" data-note></small>
+                </label>`,
+                )
+                .join("")}
+            </div>
+          </fieldset>`,
+    )
+    .join("");
+
 function render(p: Product) {
   document.title = `${p.name} · Golem Craftworks`;
-  const firstAvail =
-    p.variations.find((v) => v.available > 0) || p.variations[0];
+  const options = optionsOf(p);
+  const combos = p.variations.map((v) => ({
+    choices: v.choices || [],
+    inStock: v.available > 0,
+  }));
+  // The piece for some picks, or when that one isn't made, the one sharing the most of the first picks.
+  const pieceFor = (picks: string[]) =>
+    max(
+      p.variations,
+      (v) => leadingMatch(v.choices!, picks) * 2 + Number(v.available > 0),
+    )!;
+  const firstPicks = options ? settlePicks(options, combos, [], -1) : [];
+  const firstAvail = options
+    ? pieceFor(firstPicks)
+    : p.variations.find((v) => v.available > 0) || p.variations[0];
   const images = p.images && p.images.length ? p.images : [];
   const multi = p.variations.length > 1;
 
@@ -89,7 +137,9 @@ function render(p: Product) {
         <p class="product__price" data-price>${api.money(firstAvail.priceCents)}</p>
         <p class="product__stock" data-stock></p>
         ${
-          multi
+          options
+            ? optionPickers(options)
+            : multi
             ? `
           <fieldset class="picker">
             <legend>${esc(p.optionLabel || "Option")}</legend>
@@ -185,13 +235,51 @@ function render(p: Product) {
     }
   }
 
-  gallery(mount.querySelector<HTMLElement>(".gallery")!, images);
+  const showPhoto = gallery(
+    mount.querySelector<HTMLElement>(".gallery")!,
+    images,
+  );
+
+  const optionInputs = (i: number) => [
+    ...mount.querySelectorAll<HTMLInputElement>(`[name="option-${i}"]`),
+  ];
+  // Ticks the picks and crosses out what can't be had: a first-option value with nothing left at all,
+  // or a later one with nothing left alongside the picks ahead of it.
+  function syncOptions(picks: string[]) {
+    options?.forEach((_, i) =>
+      optionInputs(i).forEach((input) => {
+        const open = optionOpen(combos, picks, i, input.value);
+        input.checked = input.value === picks[i];
+        input.disabled = !open;
+        input.nextElementSibling!.textContent =
+          input.value + (!open && i === 0 ? " (sold out)" : "");
+        input.parentElement!.querySelector("[data-note]")!.textContent =
+          !open && i > 0
+            ? ` (not available in ${picks.slice(0, i).join(", ")})`
+            : "";
+      }),
+    );
+  }
+  function choose(v: Variation) {
+    current = v;
+    const photo = images.indexOf(v.image ?? "");
+    if (photo >= 0) showPhoto(photo);
+    update();
+  }
 
   mount.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
-    if (input.name === "variation") {
-      current = p.variations.find((v) => v.id === input.value) || current;
-      update();
+    if (input.name === "variation")
+      choose(p.variations.find((v) => v.id === input.value) || current);
+    const option = /^option-(\d+)$/.exec(input.name);
+    if (option) {
+      const i = Number(option[1]);
+      const picks = options!.map(
+        (_, j) => optionInputs(j).find((x) => x.checked)?.value ?? "",
+      );
+      const settled = settlePicks(options!, combos, picks, i);
+      syncOptions(settled);
+      choose(pieceFor(settled));
     }
     const list = p.modifierLists.find((l) => input.name === `mod-${l.id}`);
     if (list) {
@@ -226,6 +314,7 @@ function render(p: Product) {
       } else toast(r.reason);
     }
   });
+  syncOptions(firstPicks);
   update();
 }
 

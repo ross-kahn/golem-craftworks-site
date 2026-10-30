@@ -109,6 +109,7 @@ function freshState() {
       modifierList("ML_OFF", "Turned off", {}, [modifier("M_OFF", "Off", 100)]),
       modifierList("ML_TEXT", "Engraving text", { modifier_type: "TEXT" }, []),
     ],
+    options: [] as object[], // item options Square only hands over when asked for by id
     counts: { V_DICE: 1, V_WAL: 3, V_CHE: 0, V_OLD: 5 },
     listings: {
       101: {
@@ -295,7 +296,10 @@ globalThis.fetch = (async (input: unknown, init: any = {}) => {
     return ok({ objects: state.catalog, related_objects: state.related });
   }
   if (url.endsWith("/v2/catalog/batch-retrieve")) {
-    const all = state.catalog.flatMap((i: any) => i.item_data.variations);
+    const all = [
+      ...state.catalog.flatMap((i: any) => i.item_data.variations),
+      ...state.options,
+    ];
     return ok({
       objects: all.filter((v: any) => body.object_ids.includes(v.id)),
     });
@@ -596,6 +600,85 @@ test("storefront: modifier lists carry Square's defaults and limits", async () =
   )!.modifierLists;
   assert.deepEqual([again[1].min, again[1].max], [1, 1]);
   assert.equal(again[0].modifiers[0].default, false);
+});
+
+test("storefront: Square's item options become one choice each, and a variation knows its photo", async () => {
+  const option = (
+    id: string,
+    data: object,
+    values: [id: string, name: string, ordinal: number][],
+  ) => ({
+    id,
+    type: "ITEM_OPTION",
+    item_option_data: {
+      ...data,
+      values: values.map(([vid, name, ordinal]) => ({
+        id: vid,
+        type: "ITEM_OPTION_VAL",
+        item_option_value_data: { item_option_id: id, name, ordinal },
+      })),
+    },
+  });
+  const yz = state.catalog[1];
+  yz.item_data.item_options = [
+    { item_option_id: "O_WOOD" },
+    { item_option_id: "O_ART" },
+  ];
+  const [wal, che] = yz.item_data.variations;
+  const pick = (v: any, wood: string, art: string) => {
+    v.item_variation_data.item_option_values = [
+      { item_option_id: "O_WOOD", item_option_value_id: wood },
+      { item_option_id: "O_ART", item_option_value_id: art },
+    ];
+  };
+  pick(wal, "OV_WAL", "OV_DRAGON");
+  pick(che, "OV_CHE", "OV_BIRDS");
+  wal.item_variation_data.image_ids = ["IMG2"];
+  state.related.push(
+    { id: "IMG2", type: "IMAGE", image_data: { url: "https://img/wal.jpg" } },
+    option("O_WOOD", { name: "Wood" }, [
+      ["OV_MAP", "Maple", 0], // no variation uses it
+      ["OV_CHE", "Cherry", 2],
+      ["OV_WAL", "Walnut", 1],
+    ]),
+  );
+  // Not among the related objects: fetched by id.
+  state.options.push(
+    option("O_ART", { name: "Lid art (engraving file)", display_name: "Design" }, [
+      ["OV_DRAGON", "Dragon", 0],
+      ["OV_BIRDS", "Birds", 1],
+    ]),
+  );
+
+  const product = async () =>
+    (await square.buildStorefront(makeEnv())).products.find(
+      (p) => p.id === "I_YZ",
+    )!;
+  const p = await product();
+  assert.deepEqual(p.options, [
+    { name: "Wood", values: ["Walnut", "Cherry"] },
+    { name: "Design", values: ["Dragon", "Birds"] },
+  ]);
+  assert.deepEqual(
+    p.variations.map((v) => [v.name, v.choices, v.image]),
+    [
+      ["Walnut", ["Walnut", "Dragon"], "https://img/wal.jpg"],
+      ["Cherry", ["Cherry", "Birds"], undefined],
+    ],
+  );
+  assert.deepEqual(p.images, ["https://img/yz.jpg", "https://img/wal.jpg"]);
+  assert.deepEqual(
+    calls
+      .filter((c) => c.url.endsWith("/v2/catalog/batch-retrieve"))
+      .map((c) => c.body.object_ids),
+    [["O_ART"]],
+  );
+
+  // A variation that isn't a combination of the options: one plain list, as before.
+  delete che.item_variation_data.item_option_values;
+  const plain = await product();
+  assert.equal(plain.options, undefined);
+  assert.ok(plain.variations.every((v) => !v.choices));
 });
 
 test("Square -> Etsy: one-of-a-kind sells in person, Etsy listing is deactivated", async () => {
@@ -1406,7 +1489,7 @@ test("home page shows a tile per category with something available", async () =>
   assert.ok(
     html.includes(
       '<div class="cat__media" data-n="1"><img src="https://img/yz.jpg"',
-    ) && html.includes('<p class="cat__count">1 piece</p>'),
+    ) && html.includes('<p class="cat__count">1 design</p>'),
   );
   assert.ok(
     !html.includes("/product/") && !html.includes("ssr:"),
@@ -1449,7 +1532,7 @@ test("category pages list what's available; same-named items get distinct addres
       '<link rel="canonical" href="https://golemcraftworks.com/shop/game-sets">',
     ),
   );
-  assert.ok(html.includes("Game sets: 1 handmade piece available now"));
+  assert.ok(html.includes("Game sets: 1 design, handmade and available now"));
   assert.ok(
     /<h1[^>]*>\s*Game sets\s*<\/h1>/.test(html) &&
       html.includes(

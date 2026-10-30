@@ -16,6 +16,7 @@ export function arrows(of?: string) {
 }
 
 // Makes the arrows and thumbnails inside `root` work. `images` are the full-size photos, in the strip's order.
+// Returns a way to show one of them, by its place in the strip.
 export function gallery(root: HTMLElement, images: string[]) {
   let shown = 0;
   function show(i: number) {
@@ -37,6 +38,7 @@ export function gallery(root: HTMLElement, images: string[]) {
     if (step)
       show((shown + Number(step.dataset.step) + images.length) % images.length);
   });
+  return show;
 }
 
 // Makes the photos step on every product card in `grid`, including cards drawn into it later.

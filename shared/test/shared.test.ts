@@ -11,7 +11,15 @@ import {
   withoutSlash,
   words,
 } from "../text.ts";
-import { byCategory, tilePhotos } from "../catalog.ts";
+import {
+  byCategory,
+  designCount,
+  designs,
+  leadingMatch,
+  optionOpen,
+  settlePicks,
+  tilePhotos,
+} from "../catalog.ts";
 import { paged } from "../paged.ts";
 import { check, isEmail, line, paragraph } from "../validate.ts";
 import { Commission, Review } from "../forms.ts";
@@ -204,4 +212,66 @@ test("review form: the rating is a whole number from 1 to 5", () => {
   const spam = check(Review, { website: "http://x", elapsed: "1200" });
   assert.equal(spam.data.website, "http://x");
   assert.equal(spam.data.elapsed, 1200);
+});
+
+test("designCount: a design option's values in stock, or one per product", () => {
+  const vault = {
+    options: [{ name: "Wood" }, { name: "Design" }],
+    variations: [
+      { qty: 1, choices: ["Walnut", "Dragon"] },
+      { qty: 2, choices: ["Maple", "Dragon"] },
+      { qty: 1, choices: ["Walnut", "Birds"] },
+      { qty: 0, choices: ["Maple", "Mushroom"] }, // sold
+    ],
+  };
+  const dice = { variations: [{ qty: 1 }] };
+  const madeToOrder = { variations: [{ qty: null }] };
+  const sold = { variations: [{ qty: 0 }] };
+  assert.equal(designCount([vault, dice, madeToOrder, sold]), 4);
+  assert.equal(designs(1), "1 design");
+  assert.equal(designs(4), "4 designs");
+});
+
+test("options: the first stands alone, each later one depends on the picks ahead of it", () => {
+  const options = [
+    { values: ["Walnut", "Maple", "Cherry"] },
+    { values: ["Small", "Large"] },
+    { values: ["Dragon", "Birds"] },
+  ];
+  const combo = (choices: string, inStock = true) => ({
+    choices: choices.split(" "),
+    inStock,
+  });
+  const combos = [
+    combo("Walnut Large Birds"),
+    combo("Walnut Small Dragon", false),
+    combo("Maple Small Dragon"),
+    combo("Maple Large Dragon"),
+    combo("Cherry Small Birds", false),
+  ];
+  const open = (picks: string[], i: number) =>
+    options[i].values.filter((x) => optionOpen(combos, picks, i, x));
+  assert.deepEqual(open([], 0), ["Walnut", "Maple"]);
+  assert.deepEqual(open(["Walnut"], 1), ["Large"]);
+  assert.deepEqual(open(["Maple", "Large"], 2), ["Dragon"]);
+  assert.deepEqual(open(["Maple", "Large", "Birds"], 1), ["Small", "Large"], "later picks don't count");
+
+  assert.deepEqual(settlePicks(options, combos, [], -1), ["Walnut", "Large", "Birds"]);
+  // Changing the first keeps what's still open after it, and moves what isn't.
+  assert.deepEqual(
+    settlePicks(options, combos, ["Maple", "Large", "Birds"], 0),
+    ["Maple", "Large", "Dragon"],
+  );
+  assert.deepEqual(
+    settlePicks(options, combos, ["Maple", "Small", "Dragon"], 1),
+    ["Maple", "Small", "Dragon"],
+  );
+  // Nothing left: the first value, so there's still something to show as sold.
+  assert.deepEqual(
+    settlePicks(options, [combo("Cherry Small Birds", false)], [], -1),
+    ["Walnut", "Small", "Dragon"],
+  );
+
+  assert.equal(leadingMatch(["Maple", "Large", "Dragon"], ["Maple", "Large", "Dragon"]), 3);
+  assert.equal(leadingMatch(["Maple", "Small", "Dragon"], ["Maple", "Large", "Dragon"]), 1);
 });
