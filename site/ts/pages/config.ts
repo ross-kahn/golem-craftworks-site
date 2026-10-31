@@ -1,10 +1,13 @@
 // Site settings. After editing, `npm run deploy` puts them live.
 // This is its own script so the Worker can serve it with the shipping price filled in.
+// The shop's name and contact details are in shared/business.ts.
+import { BUSINESS } from "../../../shared/business.ts";
+
 window.GC_CONFIG = {
-  shopName: "Golem Craftworks",
-  contactEmail: "ross@golemcraftworks.com",
-  instagramUrl: "https://www.instagram.com/golem_craftworks/",
-  etsyUrl: "https://golemcraftworks.etsy.com",
+  shopName: BUSINESS.name,
+  contactEmail: BUSINESS.email,
+  instagramUrl: BUSINESS.instagramUrl,
+  etsyUrl: BUSINESS.etsyUrl,
 
   // Optional spam check on the review form (Cloudflare Turnstile). Leave empty to go without it.
   // Needs the matching TURNSTILE_SECRET set on the Worker.

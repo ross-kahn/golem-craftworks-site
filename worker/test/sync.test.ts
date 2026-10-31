@@ -1623,7 +1623,7 @@ test("the shipping price comes from one setting, everywhere it's shown", async (
   assert.ok((config.headers.get("content-type") || "").includes("javascript"));
   const js = await config.text();
   assert.ok(
-    /shopName:\s*"Golem Craftworks"/.test(js) &&
+    js.includes('"Golem Craftworks"') &&
       js.trimEnd().endsWith("window.GC_CONFIG.shippingCents = 950;"),
   );
 

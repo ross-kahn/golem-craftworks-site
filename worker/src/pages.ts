@@ -6,10 +6,11 @@
 //   /                   the home page with one tile per category
 //   /commissions/       the commissions page with the past commissions listed
 //   /commissions/<slug> one past commission: its photos and write-up
+//   /about/  /reviews/  /contact/  /privacy/   as they are, with the footer filled in
 //   /sitemap.xml  /robots.txt  /llms.txt  /feeds/google.xml
 //
-// The pages start from the static files in site/ and fill the <!--ssr:…--> slots. The browser scripts
-// then take over as before.
+// The pages start from the static files in site/ and fill the <!--ssr:…--> slots. Every page's footer
+// (with the contact details and policy links) is filled in this way. The browser scripts then take over as before.
 
 import type { Env, PublicProduct, StorefrontCatalog } from "./types.ts";
 import { group } from "radashi";
@@ -24,11 +25,12 @@ import {
 } from "../../shared/catalog.ts";
 import { PIECES, type Piece } from "./past-commissions.ts";
 import photoList from "./commission-photos.json" with { type: "json" };
+import { BUSINESS, businessData, siteFooter } from "../../shared/business.ts";
 
 // KV: every address a product has been served at -> its Square id (kept up to date in index.ts).
 export const ADDRESSES_KEY = "product:addresses";
 
-const SHOP = "Golem Craftworks";
+const SHOP = BUSINESS.name;
 const TAGLINE =
   "Hardwood dice vaults, game sets, and one-of-a-kind dice, made by hand in Madison, Wisconsin.";
 // Crawlers behind AI search and assistants, named so the welcome is explicit.
@@ -102,7 +104,9 @@ const file = (body: string, type: string) =>
 
 async function template(env: Env, url: URL, path: string) {
   const res = await env.ASSETS!.fetch(new Request(new URL(path, url)));
-  return res.ok ? res.text() : null;
+  return res.ok
+    ? fill(await res.text(), "footer", siteFooter(new Date().getFullYear()))
+    : null;
 }
 
 // Put `content` in the <!--ssr:name--> slot. The function form keeps "$" in the content literal.
@@ -111,6 +115,10 @@ const fill = (html: string, name: string, content: string) =>
     new RegExp(`<!--ssr:${name}-->[\\s\\S]*?<!--/ssr:${name}-->`),
     () => content,
   );
+
+// Data for search engines (schema.org), ready to go in a page's <head>.
+const ldJson = (data: unknown) =>
+  `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
 
 // Product data in the form search engines read (schema.org).
 function productData(p: PublicProduct, link: string, env: Env) {
@@ -196,7 +204,10 @@ function productBody(p: PublicProduct) {
           ${
             p.options
               ? p.options
-                  .map((o) => `<p>${esc(o.name)}: ${o.values.map(esc).join(", ")}</p>`)
+                  .map(
+                    (o) =>
+                      `<p>${esc(o.name)}: ${o.values.map(esc).join(", ")}</p>`,
+                  )
                   .join("")
               : p.variations.length > 1
                 ? `<p>${p.variations.map((v) => esc(v.name)).join(", ")}</p>`
@@ -254,7 +265,7 @@ export async function productPage(
     `<meta property="og:url" content="${esc(link)}">`,
     `<meta property="og:image" content="${esc(image)}">`,
     `<meta name="twitter:card" content="summary_large_image">`,
-    `<script type="application/ld+json">${JSON.stringify(productData(p, link, env)).replace(/</g, "\\u003c")}</script>`,
+    ldJson(productData(p, link, env)),
   ].join("\n  ");
   return page(fill(fill(html, "head", head), "product", productBody(p)));
 }
@@ -308,7 +319,23 @@ export async function homePage(env: Env, url: URL, catalog: StorefrontCatalog) {
           </a></li>`;
     })
     .join("");
-  return page(fill(html, "grid", tiles));
+  return page(
+    fill(
+      fill(html, "grid", tiles),
+      "business",
+      ldJson(businessData(siteUrl(env, url))),
+    ),
+  );
+}
+
+// Pages with nothing from the catalog in them: only the footer, and on the contact page the business data.
+export const PLAIN_PAGES = ["/about/", "/reviews/", "/contact/", "/privacy/"];
+
+export async function plainPage(env: Env, url: URL) {
+  const html = await template(env, url, url.pathname);
+  return html === null
+    ? null
+    : page(fill(html, "business", ldJson(businessData(siteUrl(env, url)))));
 }
 
 export async function categoryPage(
@@ -540,6 +567,8 @@ const STATIC_PAGES = [
   "/reviews/",
   "/about/",
   "/shipping/",
+  "/contact/",
+  "/privacy/",
 ];
 
 export function sitemap(env: Env, url: URL, catalog: StorefrontCatalog) {
@@ -594,6 +623,8 @@ export function llms(env: Env, url: URL, catalog: StorefrontCatalog) {
       `- [Reviews](${base}/reviews/): reviews from Etsy buyers and from this site`,
       `- [About](${base}/about/): who makes the pieces and how`,
       `- [Shipping and returns](${base}/shipping/)`,
+      `- [Contact](${base}/contact/): ${BUSINESS.email}, ${BUSINESS.phone}, ${BUSINESS.city}, ${BUSINESS.region}`,
+      `- [Privacy policy](${base}/privacy/)`,
       "",
       ...all.flatMap((c) => [`## ${c.name}`, "", ...c.products.map(line), ""]),
       ...(PIECES.length

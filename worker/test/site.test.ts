@@ -10,6 +10,7 @@ import worker from "../src/index.ts";
 import type { Env } from "../src/types.ts";
 import { PIECES } from "../src/past-commissions.ts";
 import photoList from "../src/commission-photos.json" with { type: "json" };
+import { BUSINESS } from "../../shared/business.ts";
 
 const photos: Record<string, string[]> = photoList;
 
@@ -271,13 +272,15 @@ test("every page gets the header, the footer, and the cart", async () => {
     "/shipping/",
     "/commissions/",
     "/reviews/",
+    "/contact/",
+    "/privacy/",
     "/thanks/",
     "/nowhere",
   ]) {
     await v.go(path);
     assert.deepEqual(
       v.$$(".site-header .nav a").map((a) => a.textContent),
-      ["Shop", "Commissions", "Reviews", "About"],
+      ["Shop", "Commissions", "Reviews", "About", "Contact"],
       path,
     );
     assert.match(
@@ -297,6 +300,57 @@ test("every page gets the header, the footer, and the cart", async () => {
   await v.go("/about/");
   assert.equal(v.text('.nav a[aria-current="page"]'), "About");
   assert.deepEqual(v.errors, []);
+});
+
+test("without scripts, every page names the business and links to its contact details and policies", async () => {
+  const env = makeEnv();
+  const get = async (path: string) =>
+    (await serve(env, new Request(SITE + path))).text();
+  for (const path of [
+    "/",
+    "/shop/woodworks",
+    "/product/hex-dice-vault",
+    "/commissions/",
+    `/commissions/${PIECES[0].slug}`,
+    "/about/",
+    "/shipping/",
+    "/reviews/",
+    "/contact/",
+    "/privacy/",
+    "/product/never-made",
+  ]) {
+    const html = await get(path);
+    for (const want of [
+      'href="/contact/"',
+      'href="/shipping/"',
+      'href="/privacy/"',
+      `href="mailto:${BUSINESS.email}"`,
+      `href="${BUSINESS.phoneLink}"`,
+      BUSINESS.legalName,
+    ])
+      assert.ok(html.includes(want), `${path}: ${want}`);
+  }
+
+  // The contact page writes the details out itself: they have to be the same ones.
+  const contact = await get("/contact/");
+  for (const want of [BUSINESS.email, BUSINESS.phone, BUSINESS.phoneLink])
+    assert.ok(contact.includes(want), want);
+
+  // The business as search engines read it, on the home and contact pages.
+  for (const html of [await get("/"), contact]) {
+    const data = JSON.parse(
+      html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1],
+    );
+    assert.equal(data["@type"], "OnlineStore");
+    assert.equal(data.legalName, BUSINESS.legalName);
+    assert.equal(data.telephone, BUSINESS.phone);
+    assert.equal(data.address.addressLocality, BUSINESS.city);
+    assert.equal(data.hasMerchantReturnPolicy.merchantReturnDays, 60);
+  }
+
+  const sitemap = await get("/sitemap.xml");
+  for (const path of ["/contact/", "/privacy/"])
+    assert.ok(sitemap.includes(`<loc>${SITE}${path}</loc>`), path);
 });
 
 test("category page: available pieces, sold ones on request, links to the others", async () => {
@@ -468,11 +522,12 @@ test("product page: the first option stands alone, the next only offers what's l
   const value = (option: number, name: string) =>
     v.$(`[name="option-${option}"][value="${name}"]`);
   const closed = (option: number) =>
-    v
-      .$$(`[name="option-${option}"]:disabled`)
-      .map((i) => i.value);
+    v.$$(`[name="option-${option}"]:disabled`).map((i) => i.value);
   const label = (option: number, name: string) =>
-    value(option, name).closest("label").textContent.replace(/\s+/g, " ").trim();
+    value(option, name)
+      .closest("label")
+      .textContent.replace(/\s+/g, " ")
+      .trim();
   const pick = (option: number, name: string) => {
     value(option, name).checked = true;
     value(option, name).dispatchEvent(

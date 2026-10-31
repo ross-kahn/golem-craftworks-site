@@ -14,7 +14,9 @@ run_worker_first = [
   # The commissions page and one page per past commission (worker/src/past-commissions.ts).
   "/commissions/*",
   # These two show the shipping price, which is filled in from SHIPPING_FLAT_CENTS below.
-  "/js/config.js", "/shipping/"
+  "/js/config.js", "/shipping/",
+  # The rest of the pages, so their footer (contact details and policy links) is there without scripts.
+  "/about/", "/reviews/", "/contact/", "/privacy/"
 ]
 
 # Bundles site/ts -> site/js before every deploy, and again in `npm run dev` whenever a script changes.

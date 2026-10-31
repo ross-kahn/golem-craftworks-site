@@ -1,6 +1,7 @@
 // What every page has: the header, the footer, the cart and its drawer. Loading this file draws them.
 import * as api from "./api.ts";
 import { esc } from "../../shared/text.ts";
+import { siteFooter } from "../../shared/business.ts";
 
 const cfg = window.GC_CONFIG;
 const CART_KEY = "gc-cart-v2";
@@ -148,6 +149,7 @@ function header(active: string | undefined) {
     link("/commissions/", "Commissions", "commissions"),
     link("/reviews/", "Reviews", "reviews"),
     link("/about/", "About", "about"),
+    link("/contact/", "Contact", "contact"),
   ].join("");
   return `
     <a class="skip-link" href="#main">Skip to content</a>
@@ -172,41 +174,6 @@ function header(active: string | undefined) {
     <nav class="mobile-nav" id="mobile-nav" aria-label="Main">${links}
       <button type="button" data-theme-toggle>${icons.moon}${icons.sun}${themeLabel}</button>
     </nav>`;
-}
-
-function footer() {
-  const year = new Date().getFullYear();
-  return `
-    <div class="wrap">
-      <div class="site-footer__inner">
-        <div>
-          <a class="brand" href="/">
-            <img src="/assets/logo.png" alt="" width="52" height="60">
-            <span class="brand__name">${esc(cfg.shopName)}</span>
-          </a>
-          <p class="site-footer__tagline">Hardwood boxes, game sets, and dice, made by hand in Madison, Wisconsin.</p>
-        </div>
-        <div>
-          <h3>Shop</h3>
-          <ul>
-            <li><a href="/">All products</a></li>
-            <li><a href="/commissions/">Commissions</a></li>
-            <li><a href="/reviews/">Reviews</a></li>
-            <li><a href="/about/">About</a></li>
-            <li><a href="/shipping/">Shipping and returns</a></li>
-          </ul>
-        </div>
-        <div>
-          <h3>Elsewhere</h3>
-          <ul>
-            <li><a href="${esc(cfg.instagramUrl)}" rel="noopener">Instagram</a></li>
-            <li><a href="${esc(cfg.etsyUrl)}" rel="noopener">Etsy</a></li>
-            <li><a href="mailto:${esc(cfg.contactEmail)}">${esc(cfg.contactEmail)}</a></li>
-          </ul>
-        </div>
-      </div>
-      <p class="site-footer__legal">© ${year} ${esc(cfg.shopName)} LLC. Payments are processed securely by Square.</p>
-    </div>`;
 }
 
 function drawerShell() {
@@ -446,7 +413,7 @@ function boot() {
   }
   if (f) {
     f.classList.add("site-footer");
-    f.innerHTML = footer();
+    f.innerHTML = siteFooter(new Date().getFullYear()); // the same one the Worker sent, if it did
   }
   document.body.insertAdjacentHTML("beforeend", drawerShell());
   renderCount();

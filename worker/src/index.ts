@@ -254,6 +254,7 @@ async function builtPage(env: Env, ctx: Ctx, url: URL) {
   if (path === "/robots.txt") return pages.robots(env, url);
   if (path === "/js/config.js") return pages.siteConfig(env, url);
   if (path === "/shipping/") return pages.shippingPage(env, url);
+  if (pages.PLAIN_PAGES.includes(path)) return pages.plainPage(env, url);
   if (path === "/commissions/") return pages.commissionsPage(env, url);
   if (path.startsWith("/commissions/")) return pages.commissionPage(env, url);
   const isProduct = path.startsWith("/product/") && path !== "/product/";

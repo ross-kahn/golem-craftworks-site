@@ -1621,7 +1621,7 @@ body.cart-open {
 }
 @media (min-width: 820px) {
   .site-footer__inner {
-    grid-template-columns: 1.3fr 1fr 1fr;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
   }
 }
 .site-footer .brand img {
